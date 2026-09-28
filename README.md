@@ -22,7 +22,10 @@ PostgreSQL is authoritative. Queue delivery alone never authorizes execution. Wo
 database leases while executing; the API-side recovery scheduler abandons expired attempts,
 advances the fencing epoch through a replacement claim, and recreates missing or stale dispatches.
 Logical failures are classified and settled into either a persisted `RETRY_WAIT` with one sampled
-due time or a terminal failure. BullMQ does not own the business retry schedule.
+due time or a terminal failure. Approval gates and side-effect outcomes are also PostgreSQL-backed.
+Tool attempts use stable logical keys and an independent controlled-receiver ledger: supported
+receivers safely deduplicate retries, while ambiguous unsupported writes enter `UNKNOWN` and
+`RECONCILIATION` without automatic resend. BullMQ does not own business retries or effect safety.
 
 ## Workspace
 
@@ -80,5 +83,4 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Approvals, external-effect/idempotency records, provider adapters, LLM operations, fault
-injection, and the React dashboard remain deferred.
+Provider adapters, LLM operations, broader fault injection, and the React dashboard remain deferred.

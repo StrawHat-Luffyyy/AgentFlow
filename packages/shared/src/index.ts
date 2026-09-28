@@ -3,13 +3,22 @@ import { z } from "zod";
 
 export const tracer = trace.getTracer("agentflow-runtime", "0.1.0");
 
-export const stepKinds = ["DETERMINISTIC", "APPROVAL"] as const;
+export const stepKinds = ["DETERMINISTIC", "APPROVAL", "TOOL"] as const;
+export const effectClasses = [
+  "PURE",
+  "REPEATABLE_READ",
+  "RECEIVER_IDEMPOTENT_WRITE",
+  "TRANSACTIONAL_LOCAL_WRITE",
+  "RECONCILIABLE_WRITE",
+  "UNSAFE_WRITE",
+] as const;
 export const stepStatuses = [
   "PENDING",
   "READY",
   "RUNNING",
   "RETRY_WAIT",
   "WAITING_APPROVAL",
+  "UNKNOWN",
   "SUCCEEDED",
   "FAILED",
   "CANCELLED",
@@ -52,9 +61,21 @@ const approvalStepDefinitionSchema = z.object({
   expiresAfterMs: z.number().int().min(1_000).max(30 * 24 * 60 * 60 * 1_000),
 });
 
+const toolStepDefinitionSchema = z.object({
+  key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
+  kind: z.literal("TOOL"),
+  handler: z.literal("publish-report"),
+  toolVersion: z.string().trim().min(1).max(100).default("1"),
+  effectClass: z.enum([
+    "RECEIVER_IDEMPOTENT_WRITE",
+    "UNSAFE_WRITE",
+  ]),
+});
+
 export const workflowStepDefinitionSchema = z.union([
   deterministicStepDefinitionSchema,
   approvalStepDefinitionSchema,
+  toolStepDefinitionSchema,
 ]);
 
 export const workflowDefinitionSchema = z.object({
@@ -120,6 +141,21 @@ export const approvalDecisionSchema = z.object({
 });
 
 export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>;
+
+export const reconciliationDecisionSchema = z.object({
+  resolution: z.enum(["CONFIRM_SUCCEEDED", "FAIL_FINAL"]),
+  receiverId: z.string().trim().min(1).max(200).optional(),
+  receipt: z.record(z.string(), z.unknown()).optional(),
+}).superRefine((decision, context) => {
+  if (decision.resolution === "CONFIRM_SUCCEEDED" && (!decision.receiverId || !decision.receipt)) {
+    context.addIssue({
+      code: "custom",
+      message: "CONFIRM_SUCCEEDED requires receiverId and receipt",
+    });
+  }
+});
+
+export type ReconciliationDecision = z.infer<typeof reconciliationDecisionSchema>;
 
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {

@@ -9,6 +9,7 @@ import {
   workflowDefinitionSchema,
   type OperationJob,
   type ApprovalDecision,
+  type ReconciliationDecision,
   type RetryPolicy,
   type WorkflowDefinition,
   type WorkflowStepDefinition,
@@ -44,9 +45,9 @@ async function materializeStep(
   const waitingForApproval = input.definition.kind === "APPROVAL";
   await transaction.query(
     `INSERT INTO workflow_steps
-       (id, run_id, node_key, position, kind, handler, status, input_json,
-        max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)`,
+       (id, run_id, node_key, position, kind, handler, effect_class, tool_version,
+        status, input_json, max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14)`,
     [
       stepId,
       input.runId,
@@ -54,6 +55,8 @@ async function materializeStep(
       input.position,
       input.definition.kind,
       input.definition.handler,
+      input.definition.kind === "TOOL" ? input.definition.effectClass : "PURE",
+      input.definition.kind === "TOOL" ? input.definition.toolVersion : "1",
       waitingForApproval ? "WAITING_APPROVAL" : "READY",
       JSON.stringify(input.stepInput),
       input.policy.maxAttempts,
@@ -319,6 +322,7 @@ export async function getRun(database: Queryable, runId: string) {
   const [steps, checkpoint] = await Promise.all([
     database.query(
       `SELECT id, node_key AS "nodeKey", position, kind, handler, status,
+         effect_class AS "effectClass", tool_version AS "toolVersion",
          input_json AS input, accepted_output_json AS "acceptedOutput",
          attempt_count AS "attemptCount", lease_epoch AS "leaseEpoch",
          lease_owner AS "leaseOwner", lease_expires_at AS "leaseExpiresAt",
@@ -344,7 +348,9 @@ export async function getRun(database: Queryable, runId: string) {
       ? run.control
       : run.control === "CANCEL_REQUESTED"
         ? "CANCEL_REQUESTED"
-        : run.waitReason === "APPROVAL"
+        : run.waitReason === "RECONCILIATION"
+          ? "NEEDS_ATTENTION"
+          : run.waitReason === "APPROVAL"
           ? "WAITING_APPROVAL"
           : run.waitReason === "RETRY"
             ? "RETRY_WAIT"
@@ -381,6 +387,197 @@ export async function getRunApprovals(database: Queryable, runId: string) {
     [runId],
   );
   return approvals.rows;
+}
+
+export async function getRunToolExecutions(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const executions = await database.query(
+    `SELECT te.id, te.run_id AS "runId", te.step_id AS "stepId",
+       te.attempt_id AS "attemptId", te.effect_ordinal AS "effectOrdinal",
+       te.tool_name AS "toolName", te.tool_version AS "toolVersion",
+       te.effect_class AS "effectClass", te.request_hash AS "requestHash",
+       te.idempotency_record_id AS "idempotencyRecordId",
+       ir.idempotency_key AS "idempotencyKey", ir.status AS "idempotencyStatus",
+       te.invocation_status AS "invocationStatus", te.receiver_id AS "receiverId",
+       te.receipt_json AS receipt, te.sent_at AS "sentAt",
+       te.completed_at AS "completedAt", te.created_at AS "createdAt"
+     FROM tool_executions te
+     JOIN idempotency_records ir ON ir.id = te.idempotency_record_id
+     WHERE te.run_id = $1 ORDER BY te.created_at, te.id`,
+    [runId],
+  );
+  return executions.rows;
+}
+
+export async function reconcileToolExecution(
+  database: Database,
+  toolExecutionId: string,
+  decision: ReconciliationDecision,
+) {
+  return withTransaction(database, async (transaction) => {
+    const locked = await transaction.query<{
+      run_id: string;
+      lifecycle: string;
+      control: string;
+      wait_reason: string;
+      state_revision: number;
+      current_checkpoint_id: string;
+      workflow_version_id: string;
+      definition_json: WorkflowDefinition;
+      step_id: string;
+      position: number;
+      step_status: string;
+      idempotency_record_id: string;
+      invocation_status: string;
+      max_attempts: number;
+      retry_initial_ms: number;
+      retry_multiplier: number;
+      retry_cap_ms: number;
+    }>(
+      `SELECT wr.id AS run_id, wr.lifecycle, wr.control, wr.wait_reason,
+         wr.state_revision, wr.current_checkpoint_id, wr.workflow_version_id,
+         wv.definition_json, ws.id AS step_id, ws.position, ws.status AS step_status,
+         ws.max_attempts, ws.retry_initial_ms, ws.retry_multiplier, ws.retry_cap_ms,
+         te.idempotency_record_id, te.invocation_status
+       FROM tool_executions te
+       JOIN workflow_steps ws ON ws.id = te.step_id
+       JOIN workflow_runs wr ON wr.id = ws.run_id
+       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+       WHERE te.id = $1 FOR UPDATE OF wr`,
+      [toolExecutionId],
+    );
+    const row = locked.rows[0];
+    if (!row) throw new NotFoundError("Tool execution not found");
+    if (
+      row.lifecycle !== "OPEN" || row.wait_reason !== "RECONCILIATION" ||
+      row.step_status !== "UNKNOWN" || row.invocation_status !== "UNKNOWN"
+    ) {
+      throw new ConflictError("Tool execution is not awaiting reconciliation");
+    }
+    await transaction.query("SELECT 1 FROM workflow_steps WHERE id = $1 FOR UPDATE", [row.step_id]);
+    await transaction.query("SELECT 1 FROM idempotency_records WHERE id = $1 FOR UPDATE", [row.idempotency_record_id]);
+    await transaction.query("SELECT 1 FROM tool_executions WHERE id = $1 FOR UPDATE", [toolExecutionId]);
+
+    if (decision.resolution === "FAIL_FINAL") {
+      const failure = { code: "EFFECT_RECONCILED_FAILED", toolExecutionId };
+      await transaction.query(
+        `UPDATE tool_executions SET invocation_status = 'FAILED', completed_at = now()
+         WHERE id = $1`,
+        [toolExecutionId],
+      );
+      await transaction.query(
+        `UPDATE idempotency_records SET status = 'FAILED_FINAL', updated_at = now()
+         WHERE id = $1`,
+        [row.idempotency_record_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_steps SET status = 'FAILED', completed_at = now(),
+           failure_json = $1::jsonb WHERE id = $2`,
+        [JSON.stringify(failure), row.step_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'FAILED', wait_reason = 'NONE',
+           failure_json = $1::jsonb, finished_at = now() WHERE id = $2`,
+        [JSON.stringify(failure), row.run_id],
+      );
+      const sequence = await nextEventSequence(transaction, row.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'EFFECT_RECONCILED_FAILED', $5::jsonb)`,
+        [randomUUID(), row.run_id, sequence, row.step_id, JSON.stringify(failure)],
+      );
+      return getRun(transaction, row.run_id);
+    }
+
+    const output = {
+      published: true,
+      receiverId: decision.receiverId!,
+      receipt: decision.receipt!,
+      reconciled: true,
+    };
+    await transaction.query(
+      `UPDATE tool_executions SET invocation_status = 'SUCCEEDED', receiver_id = $1,
+         receipt_json = $2::jsonb, completed_at = now() WHERE id = $3`,
+      [decision.receiverId, JSON.stringify(decision.receipt), toolExecutionId],
+    );
+    await transaction.query(
+      `UPDATE idempotency_records SET status = 'SUCCEEDED', result_json = $1::jsonb,
+         receipt_json = $2::jsonb, updated_at = now() WHERE id = $3`,
+      [JSON.stringify(output), JSON.stringify(decision.receipt), row.idempotency_record_id],
+    );
+    await transaction.query(
+      `UPDATE workflow_steps SET status = 'SUCCEEDED', accepted_output_json = $1::jsonb,
+         completed_at = now(), failure_json = NULL WHERE id = $2`,
+      [JSON.stringify(output), row.step_id],
+    );
+
+    const definition = workflowDefinitionSchema.parse(row.definition_json);
+    const nextDefinition = definition.steps[row.position + 1];
+    let successorId: string | null = null;
+    let successorApprovalId: string | null = null;
+    if (nextDefinition) {
+      const successor = await materializeStep(transaction, {
+        runId: row.run_id,
+        workflowVersionId: row.workflow_version_id,
+        position: row.position + 1,
+        definition: nextDefinition,
+        stepInput: output,
+        policy: {
+          maxAttempts: row.max_attempts,
+          initialBackoffMs: row.retry_initial_ms,
+          multiplier: row.retry_multiplier,
+          maxBackoffMs: row.retry_cap_ms,
+        },
+        control: row.control,
+      });
+      successorId = successor.stepId;
+      successorApprovalId = successor.approvalId;
+    }
+    const checkpointId = randomUUID();
+    const revision = row.state_revision + 1;
+    await transaction.query(
+      `INSERT INTO checkpoints
+         (id, run_id, revision, parent_id, workflow_version_id, cursor, reason, snapshot_json)
+       VALUES ($1, $2, $3, $4, $5, $6, 'EFFECT_RECONCILED_SUCCEEDED', $7::jsonb)`,
+      [
+        checkpointId,
+        row.run_id,
+        revision,
+        row.current_checkpoint_id,
+        row.workflow_version_id,
+        nextDefinition?.key ?? null,
+        JSON.stringify({ toolExecutionId, receiverId: decision.receiverId, successorId }),
+      ],
+    );
+    if (nextDefinition) {
+      await transaction.query(
+        `UPDATE workflow_runs SET current_checkpoint_id = $1, state_revision = $2,
+           wait_reason = $3 WHERE id = $4`,
+        [checkpointId, revision, successorApprovalId ? "APPROVAL" : "NONE", row.run_id],
+      );
+    } else {
+      await transaction.query(
+        `UPDATE workflow_runs SET current_checkpoint_id = $1, state_revision = $2,
+           lifecycle = 'SUCCEEDED', wait_reason = 'NONE', finished_at = now()
+         WHERE id = $3`,
+        [checkpointId, revision, row.run_id],
+      );
+    }
+    const sequence = await nextEventSequence(transaction, row.run_id);
+    await transaction.query(
+      `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+       VALUES ($1, $2, $3, $4, 'EFFECT_RECONCILED_SUCCEEDED', $5::jsonb)`,
+      [
+        randomUUID(),
+        row.run_id,
+        sequence,
+        row.step_id,
+        JSON.stringify({ toolExecutionId, receiverId: decision.receiverId, checkpointId, successorId }),
+      ],
+    );
+    return getRun(transaction, row.run_id);
+  });
 }
 
 export async function decideApproval(
@@ -643,7 +840,10 @@ export interface ClaimedOperation {
   leaseEpoch: number;
   workerId: string;
   nodeKey: string;
+  kind: string;
   handler: string;
+  effectClass: string;
+  toolVersion: string;
   position: number;
   input: Record<string, unknown>;
 }
@@ -670,7 +870,10 @@ export async function claimOperation(
       attempt_count: number;
       lease_epoch: number;
       node_key: string;
+      kind: string;
       handler: string;
+      effect_class: string;
+      tool_version: string;
       position: number;
       input_json: Record<string, unknown>;
     }>(
@@ -678,7 +881,8 @@ export async function claimOperation(
          wr.workflow_version_id, wr.lifecycle, wr.control, wr.wait_reason,
          (wr.deadline_at > now()) AS deadline_valid, ws.status,
          ws.dispatch_generation, ws.attempt_count, ws.lease_epoch,
-         ws.node_key, ws.handler, ws.position, ws.input_json
+         ws.node_key, ws.kind, ws.handler, ws.effect_class, ws.tool_version,
+         ws.position, ws.input_json
        FROM workflow_runs wr
        JOIN workflow_steps ws ON ws.run_id = wr.id
        WHERE wr.id = $1 AND ws.id = $2
@@ -725,11 +929,238 @@ export async function claimOperation(
       leaseEpoch,
       workerId,
       nodeKey: row.node_key,
+      kind: row.kind,
       handler: row.handler,
+      effectClass: row.effect_class,
+      toolVersion: row.tool_version,
       position: row.position,
       input: row.input_json,
     };
   });
+}
+
+export interface PreparedToolExecution {
+  toolExecutionId: string;
+  idempotencyRecordId: string;
+  key: string;
+  requestHash: string;
+  effectClass: string;
+  receiverNamespace: string;
+}
+
+const controlledPublicationNamespace = "controlled-publication-v1";
+
+export async function prepareToolExecution(
+  database: Database,
+  operation: ClaimedOperation,
+): Promise<PreparedToolExecution> {
+  if (operation.kind !== "TOOL") throw new ConflictError("Operation is not a tool step");
+  return withTransaction(database, async (transaction) => {
+    const locked = await transaction.query<{
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+    }>(
+      `SELECT wr.lifecycle, wr.control, (wr.deadline_at > now()) AS deadline_valid,
+         ws.status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status
+       FROM workflow_runs wr
+       JOIN workflow_steps ws ON ws.run_id = wr.id
+       JOIN step_attempts sa ON sa.step_id = ws.id
+       WHERE wr.id = $1 AND ws.id = $2 AND sa.id = $3
+       FOR UPDATE OF wr, ws, sa`,
+      [operation.runId, operation.operationId, operation.attemptId],
+    );
+    const row = locked.rows[0];
+    if (
+      !row || row.lifecycle !== "OPEN" || row.control !== "RUN" || !row.deadline_valid ||
+      row.status !== "RUNNING" || row.lease_owner !== operation.workerId ||
+      row.lease_epoch !== operation.leaseEpoch || !row.lease_valid ||
+      row.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Tool invocation rejected by lease fencing");
+    }
+
+    const requestHash = hash(operation.input);
+    const key = `agentflow:${operation.runId}:${operation.operationId}:0`;
+    const scope = `run:${operation.runId}`;
+    const recordId = randomUUID();
+    await transaction.query(
+      `INSERT INTO idempotency_records
+         (id, run_id, operation_id, effect_ordinal, scope, tool_namespace,
+          idempotency_key, request_hash, status, receiver_account, retention_until)
+       VALUES ($1, $2, $3, 0, $4, $5, $6, $7, 'PREPARED', 'controlled',
+         now() + interval '30 days')
+       ON CONFLICT (operation_id, effect_ordinal) DO NOTHING`,
+      [recordId, operation.runId, operation.operationId, scope, controlledPublicationNamespace, key, requestHash],
+    );
+    const recordResult = await transaction.query<{
+      id: string;
+      request_hash: string;
+      idempotency_key: string;
+      tool_namespace: string;
+      status: string;
+    }>(
+      `SELECT id, request_hash, idempotency_key, tool_namespace, status
+       FROM idempotency_records WHERE operation_id = $1 AND effect_ordinal = 0
+       FOR UPDATE`,
+      [operation.operationId],
+    );
+    const record = recordResult.rows[0]!;
+    if (
+      record.request_hash !== requestHash || record.idempotency_key !== key ||
+      record.tool_namespace !== controlledPublicationNamespace
+    ) {
+      throw new ConflictError("Stable tool identity is bound to different request data");
+    }
+    if (record.status === "SUCCEEDED" || record.status === "FAILED_FINAL" || record.status === "UNKNOWN") {
+      throw new ConflictError(`Tool identity is already ${record.status}`);
+    }
+    if (operation.effectClass === "UNSAFE_WRITE" && record.status === "IN_FLIGHT") {
+      const prior = await transaction.query(
+        "SELECT 1 FROM tool_executions WHERE idempotency_record_id = $1 AND attempt_id <> $2 LIMIT 1",
+        [record.id, operation.attemptId],
+      );
+      if (prior.rowCount !== 0) {
+        throw new ConflictError("Unsafe tool outcome must be reconciled before another send");
+      }
+    }
+
+    const toolExecutionId = randomUUID();
+    await transaction.query(
+      `INSERT INTO tool_executions
+         (id, run_id, step_id, attempt_id, effect_ordinal, tool_name, tool_version,
+          effect_class, request_hash, idempotency_record_id, invocation_status)
+       VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8, $9, 'PREPARED')
+       ON CONFLICT (attempt_id, effect_ordinal) DO NOTHING`,
+      [
+        toolExecutionId,
+        operation.runId,
+        operation.operationId,
+        operation.attemptId,
+        operation.handler,
+        operation.toolVersion,
+        operation.effectClass,
+        requestHash,
+        record.id,
+      ],
+    );
+    const execution = await transaction.query<{ id: string; request_hash: string; invocation_status: string }>(
+      `SELECT id, request_hash, invocation_status FROM tool_executions
+       WHERE attempt_id = $1 AND effect_ordinal = 0 FOR UPDATE`,
+      [operation.attemptId],
+    );
+    const executionRow = execution.rows[0]!;
+    if (executionRow.request_hash !== requestHash || executionRow.invocation_status !== "PREPARED") {
+      throw new ConflictError("Tool attempt has already left its prepared state");
+    }
+    await transaction.query(
+      `UPDATE idempotency_records SET status = 'IN_FLIGHT',
+         first_sent_at = COALESCE(first_sent_at, now()), updated_at = now()
+       WHERE id = $1`,
+      [record.id],
+    );
+    await transaction.query(
+      `UPDATE tool_executions SET invocation_status = 'IN_FLIGHT', sent_at = now()
+       WHERE id = $1`,
+      [executionRow.id],
+    );
+    return {
+      toolExecutionId: executionRow.id,
+      idempotencyRecordId: record.id,
+      key,
+      requestHash,
+      effectClass: operation.effectClass,
+      receiverNamespace: controlledPublicationNamespace,
+    };
+  });
+}
+
+export async function publishToControlledReceiver(
+  database: Database,
+  intent: PreparedToolExecution,
+  payload: Record<string, unknown>,
+) {
+  if (hash(payload) !== intent.requestHash) {
+    throw new ConflictError("Receiver payload does not match the prepared tool request");
+  }
+  return withTransaction(database, async (transaction) => {
+    const receiverId = randomUUID();
+    const receipt = { receiverId, status: "ACCEPTED" };
+    const idempotencyKey = intent.effectClass === "RECEIVER_IDEMPOTENT_WRITE" ? intent.key : null;
+    if (idempotencyKey) {
+      await transaction.query(
+        `INSERT INTO controlled_publication_effects
+           (id, receiver_namespace, idempotency_key, request_hash, payload_json, receipt_json)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
+         ON CONFLICT (receiver_namespace, idempotency_key)
+           WHERE idempotency_key IS NOT NULL DO NOTHING`,
+        [
+          receiverId,
+          intent.receiverNamespace,
+          idempotencyKey,
+          intent.requestHash,
+          JSON.stringify(payload),
+          JSON.stringify(receipt),
+        ],
+      );
+      const persisted = await transaction.query<{
+        id: string;
+        request_hash: string;
+        receipt_json: Record<string, unknown>;
+      }>(
+        `SELECT id, request_hash, receipt_json FROM controlled_publication_effects
+         WHERE receiver_namespace = $1 AND idempotency_key = $2 FOR UPDATE`,
+        [intent.receiverNamespace, idempotencyKey],
+      );
+      const row = persisted.rows[0]!;
+      if (row.request_hash !== intent.requestHash) {
+        throw new ConflictError("Receiver idempotency key is bound to a different request");
+      }
+      return { receiverId: row.id, receipt: row.receipt_json, replayed: row.id !== receiverId };
+    }
+
+    await transaction.query(
+      `INSERT INTO controlled_publication_effects
+         (id, receiver_namespace, idempotency_key, request_hash, payload_json, receipt_json)
+       VALUES ($1, $2, NULL, $3, $4::jsonb, $5::jsonb)`,
+      [receiverId, intent.receiverNamespace, intent.requestHash, JSON.stringify(payload), JSON.stringify(receipt)],
+    );
+    return { receiverId, receipt, replayed: false };
+  });
+}
+
+export async function executeToolOperation(
+  database: Database,
+  operation: ClaimedOperation,
+): Promise<Record<string, unknown>> {
+  if (operation.handler !== "publish-report") {
+    throw new PermanentOperationError(`Unsupported tool handler: ${operation.handler}`);
+  }
+  const intent = await prepareToolExecution(database, operation);
+  let result: Awaited<ReturnType<typeof publishToControlledReceiver>>;
+  try {
+    result = await publishToControlledReceiver(database, intent, operation.input);
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      throw new PermanentOperationError(error.message, "TOOL_IDENTITY_CONFLICT");
+    }
+    if (operation.effectClass === "UNSAFE_WRITE" || operation.effectClass === "RECONCILIABLE_WRITE") {
+      throw new UnknownEffectError("Receiver outcome is ambiguous", error);
+    }
+    throw new RetryableOperationError("Receiver request did not produce a confirmed result", "RECEIVER_UNAVAILABLE");
+  }
+  return {
+    published: true,
+    receiverId: result.receiverId,
+    receipt: result.receipt,
+    receiverReplayed: result.replayed,
+  };
 }
 
 export async function renewOperationLease(
@@ -782,6 +1213,12 @@ export class PermanentOperationError extends Error {
 
 export class AttemptTimeoutError extends Error {
   constructor(message = "Operation attempt deadline exceeded") {
+    super(message);
+  }
+}
+
+export class UnknownEffectError extends Error {
+  constructor(message: string, readonly causeValue?: unknown) {
     super(message);
   }
 }
@@ -865,6 +1302,16 @@ async function cancelLockedOperation(
     [operation.operationId],
   );
   await transaction.query(
+    `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+     WHERE attempt_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+    [operation.attemptId],
+  );
+  await transaction.query(
+    `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+     WHERE operation_id = $1 AND status = 'IN_FLIGHT'`,
+    [operation.operationId],
+  );
+  await transaction.query(
     `UPDATE workflow_steps SET status = 'CANCELLED', next_attempt_at = NULL,
        failure_json = jsonb_build_object('code', 'RUN_CANCELLED')
      WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RETRY_WAIT')`,
@@ -884,6 +1331,99 @@ async function cancelLockedOperation(
     [randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId],
   );
   return { cancelled: true };
+}
+
+export async function settleUnknownToolOutcome(
+  database: Database,
+  operation: ClaimedOperation,
+  error: UnknownEffectError,
+) {
+  return withTransaction(database, async (transaction) => {
+    const locked = await transaction.query<{
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+    }>(
+      `SELECT wr.lifecycle, wr.control, (wr.deadline_at > now()) AS deadline_valid,
+         ws.status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid
+       FROM workflow_runs wr JOIN workflow_steps ws ON ws.run_id = wr.id
+       WHERE wr.id = $1 AND ws.id = $2 FOR UPDATE OF wr, ws`,
+      [operation.runId, operation.operationId],
+    );
+    const row = locked.rows[0];
+    if (
+      !row || row.lifecycle !== "OPEN" || row.status !== "RUNNING" ||
+      row.lease_owner !== operation.workerId || row.lease_epoch !== operation.leaseEpoch ||
+      !row.lease_valid
+    ) {
+      throw new ConflictError("Unknown tool outcome rejected by lease fencing");
+    }
+    if (row.control === "CANCEL_REQUESTED") {
+      return cancelLockedOperation(transaction, operation);
+    }
+    const failure = {
+      code: "EFFECT_OUTCOME_UNKNOWN",
+      effectClass: operation.effectClass,
+      message: error.message.slice(0, 1_000),
+    };
+    await transaction.query(
+      `UPDATE step_attempts SET status = 'FAILED', finished_at = now(),
+         error_class = 'TIMEOUT', retryable = false, error_json = $1::jsonb
+       WHERE id = $2 AND status = 'RUNNING'`,
+      [JSON.stringify(failure), operation.attemptId],
+    );
+    await transaction.query(
+      `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+       WHERE attempt_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+      [operation.attemptId],
+    );
+    await transaction.query(
+      `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+       WHERE operation_id = $1 AND status = 'IN_FLIGHT'`,
+      [operation.operationId],
+    );
+    await transaction.query(
+      `UPDATE workflow_steps SET status = 'UNKNOWN', lease_owner = NULL,
+         lease_expires_at = NULL, next_attempt_at = NULL, failure_json = $1::jsonb
+       WHERE id = $2`,
+      [JSON.stringify(failure), operation.operationId],
+    );
+    if (row.deadline_valid) {
+      await transaction.query(
+        `UPDATE workflow_runs SET wait_reason = 'RECONCILIATION',
+           control = CASE WHEN control = 'PAUSE_REQUESTED' THEN 'PAUSED' ELSE control END
+         WHERE id = $1`,
+        [operation.runId],
+      );
+    } else {
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'TIMED_OUT', wait_reason = 'NONE',
+           failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED'),
+           finished_at = now() WHERE id = $1`,
+        [operation.runId],
+      );
+    }
+    const sequence = await nextEventSequence(transaction, operation.runId);
+    await transaction.query(
+      `INSERT INTO audit_events
+         (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+       VALUES ($1, $2, $3, $4, $5, 'EFFECT_OUTCOME_UNKNOWN', $6::jsonb)`,
+      [
+        randomUUID(),
+        operation.runId,
+        sequence,
+        operation.operationId,
+        operation.attemptId,
+        JSON.stringify(failure),
+      ],
+    );
+    return { unknown: true, timedOut: !row.deadline_valid };
+  });
 }
 
 export async function settleOperationFailure(
@@ -937,6 +1477,16 @@ export async function settleOperationFailure(
     if (!row.deadline_valid) {
       const timeout = { code: "RUN_DEADLINE_EXCEEDED", cause: payload };
       await transaction.query(
+        `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+         WHERE attempt_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+        [operation.attemptId],
+      );
+      await transaction.query(
+        `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+         WHERE operation_id = $1 AND status = 'IN_FLIGHT'`,
+        [operation.operationId],
+      );
+      await transaction.query(
         `UPDATE workflow_steps
          SET status = 'FAILED', lease_owner = NULL, lease_expires_at = NULL,
            next_attempt_at = NULL, completed_at = now(), failure_json = $1::jsonb
@@ -961,6 +1511,11 @@ export async function settleOperationFailure(
 
     const canRetry = failure.retryable && row.attempt_count < row.max_attempts;
     if (canRetry) {
+      await transaction.query(
+        `UPDATE tool_executions SET invocation_status = 'ABANDONED', completed_at = now()
+         WHERE attempt_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+        [operation.attemptId],
+      );
       const delayMs = retryDelayMs(row, failure.retryAfterMs);
       const due = await transaction.query<{ next_attempt_at: Date }>(
         `UPDATE workflow_steps
@@ -1005,6 +1560,16 @@ export async function settleOperationFailure(
       ...payload,
       exhausted: failure.retryable && row.attempt_count >= row.max_attempts,
     };
+    await transaction.query(
+      `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+       WHERE attempt_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+      [operation.attemptId],
+    );
+    await transaction.query(
+      `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+       WHERE operation_id = $1 AND status = 'IN_FLIGHT'`,
+      [operation.operationId],
+    );
     await transaction.query(
       `UPDATE workflow_steps
        SET status = 'FAILED', lease_owner = NULL, lease_expires_at = NULL,
@@ -1172,6 +1737,7 @@ export async function controlRun(
 export interface SchedulingRepairResult {
   expiredApprovals: number;
   expiredLeases: number;
+  unknownEffects: number;
   recoveredDispatches: number;
   dueRetries: number;
   timedOutRuns: number;
@@ -1192,6 +1758,7 @@ export async function repairScheduling(
   return withTransaction(database, async (transaction) => {
     let expiredLeases = 0;
     let expiredApprovals = 0;
+    let unknownEffects = 0;
     let recoveredDispatches = 0;
     let dueRetries = 0;
     let timedOutRuns = 0;
@@ -1263,6 +1830,16 @@ export async function repairScheduling(
         [run.id],
       );
       await transaction.query(
+        `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+         WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+        [run.id],
+      );
+      await transaction.query(
+        `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+         WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
+        [run.id],
+      );
+      await transaction.query(
         `UPDATE workflow_runs SET lifecycle = 'TIMED_OUT', wait_reason = 'NONE',
            failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED'),
            finished_at = now() WHERE id = $1`,
@@ -1306,6 +1883,16 @@ export async function repairScheduling(
         [run.id],
       );
       await transaction.query(
+        `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+         WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+        [run.id],
+      );
+      await transaction.query(
+        `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+         WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
+        [run.id],
+      );
+      await transaction.query(
         `UPDATE workflow_runs SET lifecycle = 'CANCELLED', wait_reason = 'NONE',
            finished_at = now() WHERE id = $1`,
         [run.id],
@@ -1331,13 +1918,31 @@ export async function repairScheduling(
       retry_multiplier: number;
       retry_cap_ms: number;
       attempt_timed_out: boolean;
+      effect_class: string;
+      tool_execution_id: string | null;
+      idempotency_record_id: string | null;
     }>(
       `SELECT ws.id, ws.run_id, wr.control, ws.lease_epoch,
          ws.attempt_count, ws.max_attempts, ws.retry_initial_ms,
          ws.retry_multiplier, ws.retry_cap_ms,
+         ws.effect_class,
          (SELECT sa.id FROM step_attempts sa
           WHERE sa.step_id = ws.id AND sa.epoch = ws.lease_epoch
           ORDER BY sa.started_at DESC LIMIT 1) AS attempt_id,
+         (SELECT te.id FROM tool_executions te
+          WHERE te.step_id = ws.id AND te.attempt_id = (
+            SELECT sa.id FROM step_attempts sa
+            WHERE sa.step_id = ws.id AND sa.epoch = ws.lease_epoch
+            ORDER BY sa.started_at DESC LIMIT 1
+          ) AND te.invocation_status = 'IN_FLIGHT'
+          LIMIT 1) AS tool_execution_id,
+         (SELECT te.idempotency_record_id FROM tool_executions te
+          WHERE te.step_id = ws.id AND te.attempt_id = (
+            SELECT sa.id FROM step_attempts sa
+            WHERE sa.step_id = ws.id AND sa.epoch = ws.lease_epoch
+            ORDER BY sa.started_at DESC LIMIT 1
+          ) AND te.invocation_status = 'IN_FLIGHT'
+          LIMIT 1) AS idempotency_record_id,
          EXISTS (SELECT 1 FROM step_attempts sa
            WHERE sa.step_id = ws.id AND sa.epoch = ws.lease_epoch
              AND sa.deadline_at <= now()) AS attempt_timed_out
@@ -1371,6 +1976,51 @@ export async function repairScheduling(
             row.attempt_timed_out ? "TIMEOUT" : "TRANSIENT",
             code,
           ],
+        );
+      }
+      const uncertainUnsafeEffect = row.tool_execution_id !== null &&
+        (row.effect_class === "UNSAFE_WRITE" || row.effect_class === "RECONCILIABLE_WRITE");
+      if (uncertainUnsafeEffect) {
+        const failure = { code: "EFFECT_OUTCOME_UNKNOWN", effectClass: row.effect_class };
+        await transaction.query(
+          `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+           WHERE id = $1 AND invocation_status = 'IN_FLIGHT'`,
+          [row.tool_execution_id],
+        );
+        await transaction.query(
+          `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+           WHERE id = $1 AND status = 'IN_FLIGHT'`,
+          [row.idempotency_record_id],
+        );
+        await transaction.query(
+          `UPDATE workflow_steps SET status = 'UNKNOWN', lease_owner = NULL,
+             lease_expires_at = NULL, next_attempt_at = NULL, failure_json = $1::jsonb
+           WHERE id = $2`,
+          [JSON.stringify(failure), row.id],
+        );
+        await transaction.query(
+          `UPDATE workflow_runs SET wait_reason = 'RECONCILIATION',
+             control = CASE WHEN control = 'PAUSE_REQUESTED' THEN 'PAUSED' ELSE control END
+           WHERE id = $1`,
+          [row.run_id],
+        );
+        const sequence = await nextEventSequence(transaction, row.run_id);
+        await transaction.query(
+          `INSERT INTO audit_events
+             (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+           VALUES ($1, $2, $3, $4, $5, 'EFFECT_OUTCOME_UNKNOWN', $6::jsonb)`,
+          [randomUUID(), row.run_id, sequence, row.id, row.attempt_id, JSON.stringify(failure)],
+        );
+        unknownEffects += 1;
+        if (row.attempt_timed_out) timedOutAttempts += 1;
+        else expiredLeases += 1;
+        continue;
+      }
+      if (row.tool_execution_id) {
+        await transaction.query(
+          `UPDATE tool_executions SET invocation_status = 'ABANDONED', completed_at = now()
+           WHERE id = $1 AND invocation_status = 'IN_FLIGHT'`,
+          [row.tool_execution_id],
         );
       }
       const canRetry = row.attempt_count < row.max_attempts;
@@ -1544,6 +2194,7 @@ export async function repairScheduling(
     return {
       expiredApprovals,
       expiredLeases,
+      unknownEffects,
       recoveredDispatches,
       dueRetries,
       timedOutRuns,
@@ -1632,6 +2283,34 @@ export async function completeOperation(
         );
         if (attemptUpdate.rowCount !== 1) {
           throw new ConflictError("Attempt is no longer authoritative");
+        }
+        if (operation.kind === "TOOL") {
+          const receiverId = output.receiverId;
+          const receipt = output.receipt;
+          if (
+            typeof receiverId !== "string" || receiverId.length === 0 ||
+            receipt === null || typeof receipt !== "object" || Array.isArray(receipt)
+          ) {
+            throw new ConflictError("Tool completion is missing receiver evidence");
+          }
+          const execution = await transaction.query<{ id: string; idempotency_record_id: string }>(
+            `SELECT id, idempotency_record_id FROM tool_executions
+             WHERE attempt_id = $1 AND step_id = $2 AND invocation_status = 'IN_FLIGHT'
+             FOR UPDATE`,
+            [operation.attemptId, operation.operationId],
+          );
+          const executionRow = execution.rows[0];
+          if (!executionRow) throw new ConflictError("Tool invocation is no longer authoritative");
+          await transaction.query(
+            `UPDATE tool_executions SET invocation_status = 'SUCCEEDED', receiver_id = $1,
+               receipt_json = $2::jsonb, completed_at = now() WHERE id = $3`,
+            [receiverId, JSON.stringify(receipt), executionRow.id],
+          );
+          await transaction.query(
+            `UPDATE idempotency_records SET status = 'SUCCEEDED', result_json = $1::jsonb,
+               receipt_json = $2::jsonb, updated_at = now() WHERE id = $3`,
+            [JSON.stringify(output), JSON.stringify(receipt), executionRow.idempotency_record_id],
+          );
         }
         await transaction.query(
           `UPDATE workflow_steps

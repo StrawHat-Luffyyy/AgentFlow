@@ -4,8 +4,11 @@ import {
   classifyOperationError,
   completeOperation,
   executeDeterministicOperation,
+  executeToolOperation,
   renewOperationLease,
   settleOperationFailure,
+  settleUnknownToolOutcome,
+  UnknownEffectError,
 } from "@agentflow/runtime";
 import { operationJobSchema, queueName } from "@agentflow/shared";
 import { Worker, type ConnectionOptions, type Job } from "bullmq";
@@ -50,8 +53,14 @@ export async function processOperationJob(
   try {
     let output: Record<string, unknown>;
     try {
-      output = await executeDeterministicOperation(operation);
+      output = operation.kind === "TOOL"
+        ? await executeToolOperation(database, operation)
+        : executeDeterministicOperation(operation);
     } catch (error) {
+      if (error instanceof UnknownEffectError) {
+        const settlement = await settleUnknownToolOutcome(database, operation, error);
+        return { skipped: false, unknown: true, settlement };
+      }
       const failure = classifyOperationError(error);
       const settlement = await settleOperationFailure(database, operation, failure);
       return { skipped: false, failed: true, failure, settlement };

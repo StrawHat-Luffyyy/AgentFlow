@@ -15,6 +15,9 @@ import {
   completeOperation,
   controlRun,
   executeDeterministicOperation,
+  executeToolOperation,
+  prepareToolExecution,
+  publishToControlledReceiver,
   renewOperationLease,
   repairScheduling,
   settleOperationFailure,
@@ -120,6 +123,55 @@ async function createApprovalRun(name: string, expiresAfterMs = 60_000) {
   return { version, run, approval: approvals.approvals[0]! };
 }
 
+async function createPublicationRun(
+  name: string,
+  effectClass: "RECEIVER_IDEMPOTENT_WRITE" | "UNSAFE_WRITE",
+) {
+  const workflow = await request<{ id: string }>("/workflows", {
+    method: "POST",
+    body: JSON.stringify({ name, description: "Publication side effects" }),
+  });
+  const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+    method: "POST",
+    body: JSON.stringify({
+      version: 1,
+      definition: {
+        steps: [{
+          key: "publish",
+          kind: "TOOL",
+          handler: "publish-report",
+          toolVersion: "1",
+          effectClass,
+        }],
+      },
+    }),
+  });
+  const run = await request<{
+    id: string;
+    publicStatus: string;
+    steps: Array<{
+      id: string;
+      status: string;
+      dispatchGeneration: number;
+      effectClass: string;
+    }>;
+  }>("/runs", {
+    method: "POST",
+    body: JSON.stringify({
+      workflowVersionId: version.id,
+      input: { report: `report:${name}`, target: "controlled://publications/main" },
+      creationKey: `${name}-run`,
+      retryPolicy: {
+        maxAttempts: 3,
+        initialBackoffMs: 0,
+        multiplier: 1,
+        maxBackoffMs: 0,
+      },
+    }),
+  });
+  return { version, run };
+}
+
 async function waitForSucceeded(runId: string) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
@@ -135,7 +187,8 @@ beforeAll(async () => {
   database = createDatabase(databaseUrl);
   await migrate(database);
   await database.query(`
-    TRUNCATE approvals, audit_events, outbox, checkpoints, step_attempts, workflow_steps,
+    TRUNCATE tool_executions, idempotency_records, controlled_publication_effects,
+      approvals, audit_events, outbox, checkpoints, step_attempts, workflow_steps,
       workflow_runs, workflow_versions, workflows CASCADE
   `);
 
@@ -1263,4 +1316,221 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     );
     expect(successors.rows[0]?.count).toBe("0");
   });
+
+  it("executes a classified publication through the worker and independent receiver ledger", async () => {
+    const { run } = await createPublicationRun(
+      "worker-publication-workflow",
+      "RECEIVER_IDEMPOTENT_WRITE",
+    );
+    await waitForSucceeded(run.id);
+    const persisted = await database.query<{
+      effects: string;
+      records: string;
+      executions: string;
+      record_status: string;
+    }>(
+      `SELECT
+         (SELECT count(*) FROM controlled_publication_effects cpe
+          JOIN idempotency_records ir ON ir.request_hash = cpe.request_hash
+          WHERE ir.run_id = $1) AS effects,
+         (SELECT count(*) FROM idempotency_records WHERE run_id = $1) AS records,
+         (SELECT count(*) FROM tool_executions WHERE run_id = $1) AS executions,
+         (SELECT status FROM idempotency_records WHERE run_id = $1) AS record_status`,
+      [run.id],
+    );
+    expect(persisted.rows[0]).toEqual({
+      effects: "1",
+      records: "1",
+      executions: "1",
+      record_status: "SUCCEEDED",
+    });
+  }, 20_000);
+
+  it("reuses a stable receiver key after remote success and a local crash", async () => {
+    await worker.pause(true);
+    try {
+      const { version, run } = await createPublicationRun(
+        "idempotent-publication-workflow",
+        "RECEIVER_IDEMPOTENT_WRITE",
+      );
+      const step = run.steps[0]!;
+      expect(step.effectClass).toBe("RECEIVER_IDEMPOTENT_WRITE");
+      const firstClaim = await claimOperation(
+        database,
+        {
+          runId: run.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        },
+        "publication-worker-1",
+        15_000,
+      );
+      expect(firstClaim).not.toBeNull();
+      const firstIntent = await prepareToolExecution(database, firstClaim!);
+      const remoteResult = await publishToControlledReceiver(database, firstIntent, firstClaim!.input);
+      expect(remoteResult.replayed).toBe(false);
+
+      await database.query(
+        "UPDATE workflow_steps SET lease_expires_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+      expect(await repairScheduling(database, 10_000)).toMatchObject({
+        expiredLeases: 1,
+        unknownEffects: 0,
+      });
+      await database.query(
+        "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+      expect(await repairScheduling(database, 10_000)).toMatchObject({ dueRetries: 1 });
+      const retryState = await request<{
+        steps: Array<{ dispatchGeneration: number; status: string }>;
+      }>(`/runs/${run.id}`);
+      const secondClaim = await claimOperation(
+        database,
+        {
+          runId: run.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: retryState.steps[0]!.dispatchGeneration,
+        },
+        "publication-worker-2",
+        15_000,
+      );
+      expect(secondClaim).not.toBeNull();
+      const output = await executeToolOperation(database, secondClaim!);
+      expect(output.receiverReplayed).toBe(true);
+      await completeOperation(database, secondClaim!, output);
+
+      const completed = await request<{ lifecycle: string }>(`/runs/${run.id}`);
+      expect(completed.lifecycle).toBe("SUCCEEDED");
+      const persisted = await database.query<{
+        receiver_effects: string;
+        idempotency_records: string;
+        stable_keys: string;
+        tool_executions: string;
+        abandoned: string;
+        succeeded: string;
+      }>(
+        `SELECT
+           (SELECT count(*) FROM controlled_publication_effects
+            WHERE request_hash = $2) AS receiver_effects,
+           (SELECT count(*) FROM idempotency_records WHERE operation_id = $1) AS idempotency_records,
+           (SELECT count(DISTINCT ir.idempotency_key)
+            FROM tool_executions te JOIN idempotency_records ir ON ir.id = te.idempotency_record_id
+            WHERE te.step_id = $1) AS stable_keys,
+           (SELECT count(*) FROM tool_executions WHERE step_id = $1) AS tool_executions,
+           (SELECT count(*) FROM tool_executions
+            WHERE step_id = $1 AND invocation_status = 'ABANDONED') AS abandoned,
+           (SELECT count(*) FROM tool_executions
+            WHERE step_id = $1 AND invocation_status = 'SUCCEEDED') AS succeeded`,
+        [step.id, firstIntent.requestHash],
+      );
+      expect(persisted.rows[0]).toEqual({
+        receiver_effects: "1",
+        idempotency_records: "1",
+        stable_keys: "1",
+        tool_executions: "2",
+        abandoned: "1",
+        succeeded: "1",
+      });
+      await expect(
+        database.query(
+          "UPDATE idempotency_records SET idempotency_key = $1 WHERE operation_id = $2",
+          ["mutated-key", step.id],
+        ),
+      ).rejects.toMatchObject({ constraint: "idempotency_identity_immutable" });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("moves an unsupported ambiguous receiver to UNKNOWN without resending", async () => {
+    await worker.pause(true);
+    try {
+      const { version, run } = await createPublicationRun(
+        "unsafe-publication-workflow",
+        "UNSAFE_WRITE",
+      );
+      const step = run.steps[0]!;
+      const claim = await claimOperation(
+        database,
+        {
+          runId: run.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        },
+        "unsafe-publication-worker",
+        15_000,
+      );
+      expect(claim).not.toBeNull();
+      const intent = await prepareToolExecution(database, claim!);
+      const remoteResult = await publishToControlledReceiver(database, intent, claim!.input);
+      expect(remoteResult.replayed).toBe(false);
+      await database.query(
+        "UPDATE workflow_steps SET lease_expires_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+      expect(await repairScheduling(database, 10_000)).toMatchObject({
+        expiredLeases: 1,
+        unknownEffects: 1,
+        dueRetries: 0,
+      });
+      await repairScheduling(database, 0);
+      const unknown = await request<{
+        lifecycle: string;
+        waitReason: string;
+        publicStatus: string;
+        steps: Array<{ status: string }>;
+      }>(`/runs/${run.id}`);
+      expect(unknown).toMatchObject({
+        lifecycle: "OPEN",
+        waitReason: "RECONCILIATION",
+        publicStatus: "NEEDS_ATTENTION",
+      });
+      expect(unknown.steps[0]?.status).toBe("UNKNOWN");
+      const beforeResolution = await database.query<{
+        receiver_effects: string;
+        replacement_dispatches: string;
+        idempotency_status: string;
+      }>(
+        `SELECT
+           (SELECT count(*) FROM controlled_publication_effects
+            WHERE request_hash = $2) AS receiver_effects,
+           (SELECT count(*) FROM outbox WHERE step_id = $1 AND generation > 1) AS replacement_dispatches,
+           (SELECT status FROM idempotency_records WHERE operation_id = $1) AS idempotency_status`,
+        [step.id, intent.requestHash],
+      );
+      expect(beforeResolution.rows[0]).toEqual({
+        receiver_effects: "1",
+        replacement_dispatches: "0",
+        idempotency_status: "UNKNOWN",
+      });
+      const executions = await request<{
+        executions: Array<{ id: string; invocationStatus: string }>;
+      }>(`/runs/${run.id}/tool-executions`);
+      expect(executions.executions[0]?.invocationStatus).toBe("UNKNOWN");
+      const reconciled = await request<{ lifecycle: string }>(
+        `/tool-executions/${executions.executions[0]!.id}/reconcile`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            resolution: "CONFIRM_SUCCEEDED",
+            receiverId: remoteResult.receiverId,
+            receipt: remoteResult.receipt,
+          }),
+        },
+      );
+      expect(reconciled.lifecycle).toBe("SUCCEEDED");
+      const afterResolution = await database.query<{ receiver_effects: string }>(
+        "SELECT count(*) AS receiver_effects FROM controlled_publication_effects WHERE request_hash = $1",
+        [intent.requestHash],
+      );
+      expect(afterResolution.rows[0]?.receiver_effects).toBe("1");
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
 });

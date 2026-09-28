@@ -10,12 +10,15 @@ import {
   getRun,
   getRunApprovals,
   getRunHistory,
+  getRunToolExecutions,
+  reconcileToolExecution,
 } from "@agentflow/runtime";
 import {
   approvalDecisionSchema,
   createRunSchema,
   createWorkflowSchema,
   createWorkflowVersionSchema,
+  reconciliationDecisionSchema,
 } from "@agentflow/shared";
 import type { Queue } from "bullmq";
 import express from "express";
@@ -70,6 +73,17 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.get("/runs/:id/approvals", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ approvals: await getRunApprovals(database, runId) });
+  });
+
+  app.get("/runs/:id/tool-executions", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ executions: await getRunToolExecutions(database, runId) });
+  });
+
+  app.post("/tool-executions/:id/reconcile", async (request: express.Request, response: express.Response) => {
+    const toolExecutionId = z.string().uuid().parse(request.params.id);
+    const body = reconciliationDecisionSchema.parse(request.body);
+    response.json(await reconcileToolExecution(database, toolExecutionId, body));
   });
 
   app.post("/approvals/:id/decisions", async (request: express.Request, response: express.Response) => {
