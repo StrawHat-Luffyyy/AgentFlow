@@ -5,11 +5,14 @@ import {
   createRun,
   createWorkflow,
   createWorkflowVersion,
+  decideApproval,
   controlRun,
   getRun,
+  getRunApprovals,
   getRunHistory,
 } from "@agentflow/runtime";
 import {
+  approvalDecisionSchema,
   createRunSchema,
   createWorkflowSchema,
   createWorkflowVersionSchema,
@@ -62,6 +65,21 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.get("/runs/:id/history", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ events: await getRunHistory(database, runId) });
+  });
+
+  app.get("/runs/:id/approvals", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ approvals: await getRunApprovals(database, runId) });
+  });
+
+  app.post("/approvals/:id/decisions", async (request: express.Request, response: express.Response) => {
+    const approvalId = z.string().uuid().parse(request.params.id);
+    const body = approvalDecisionSchema.parse(request.body);
+    const reviewer = {
+      id: z.string().trim().min(1).max(200).parse(request.header("x-agentflow-reviewer-id")),
+      role: z.string().trim().min(1).max(100).parse(request.header("x-agentflow-reviewer-role")),
+    };
+    response.json(await decideApproval(database, approvalId, body, reviewer));
   });
 
   for (const command of ["pause", "resume", "cancel"] as const) {

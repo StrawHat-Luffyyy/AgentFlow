@@ -3,12 +3,13 @@ import { z } from "zod";
 
 export const tracer = trace.getTracer("agentflow-runtime", "0.1.0");
 
-export const stepKinds = ["DETERMINISTIC"] as const;
+export const stepKinds = ["DETERMINISTIC", "APPROVAL"] as const;
 export const stepStatuses = [
   "PENDING",
   "READY",
   "RUNNING",
   "RETRY_WAIT",
+  "WAITING_APPROVAL",
   "SUCCEEDED",
   "FAILED",
   "CANCELLED",
@@ -37,11 +38,24 @@ export const retryPolicySchema = z.object({
 
 export type RetryPolicy = z.infer<typeof retryPolicySchema>;
 
-export const workflowStepDefinitionSchema = z.object({
+const deterministicStepDefinitionSchema = z.object({
   key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
-  kind: z.enum(stepKinds).default("DETERMINISTIC"),
+  kind: z.literal("DETERMINISTIC").default("DETERMINISTIC"),
   handler: z.enum(["generate-summary", "finalize"]),
 });
+
+const approvalStepDefinitionSchema = z.object({
+  key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
+  kind: z.literal("APPROVAL"),
+  handler: z.literal("approval"),
+  reviewerRole: z.string().trim().min(1).max(100),
+  expiresAfterMs: z.number().int().min(1_000).max(30 * 24 * 60 * 60 * 1_000),
+});
+
+export const workflowStepDefinitionSchema = z.union([
+  deterministicStepDefinitionSchema,
+  approvalStepDefinitionSchema,
+]);
 
 export const workflowDefinitionSchema = z.object({
   steps: z.array(workflowStepDefinitionSchema).min(1).max(20),
@@ -97,6 +111,15 @@ export const createRunSchema = z.object({
   deadlineMs: z.number().int().min(1_000).max(86_400_000).default(300_000),
   retryPolicy: retryPolicySchema.default(defaultRetryPolicy),
 });
+
+export const approvalDecisionSchema = z.object({
+  decisionRequestId: z.string().uuid(),
+  decision: z.enum(["APPROVE", "REJECT"]),
+  proposalHash: z.string().regex(/^[a-f0-9]{64}$/),
+  payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>;
 
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {

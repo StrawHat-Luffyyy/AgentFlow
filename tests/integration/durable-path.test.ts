@@ -1,4 +1,5 @@
 import { once } from "node:events";
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createApp } from "../../apps/api/src/app.ts";
 import { createOutboxDispatcher } from "../../apps/api/src/outbox.ts";
@@ -55,6 +56,70 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: { "content-type": "application/json", ...init?.headers },
+  });
+}
+
+async function restartApi(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  server = createApp(database, queue).listen(0);
+  await once(server, "listening");
+  const address = server.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
+async function createApprovalRun(name: string, expiresAfterMs = 60_000) {
+  const workflow = await request<{ id: string }>("/workflows", {
+    method: "POST",
+    body: JSON.stringify({ name, description: "Approval semantics" }),
+  });
+  const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+    method: "POST",
+    body: JSON.stringify({
+      version: 1,
+      definition: {
+        steps: [
+          {
+            key: "review",
+            kind: "APPROVAL",
+            handler: "approval",
+            reviewerRole: "release-manager",
+            expiresAfterMs,
+          },
+          { key: "finalize", kind: "DETERMINISTIC", handler: "finalize" },
+        ],
+      },
+    }),
+  });
+  const run = await request<{
+    id: string;
+    publicStatus: string;
+    steps: Array<{ id: string; status: string }>;
+  }>("/runs", {
+    method: "POST",
+    body: JSON.stringify({
+      workflowVersionId: version.id,
+      input: { release: name, target: "production" },
+      creationKey: `${name}-run`,
+    }),
+  });
+  const approvals = await request<{
+    approvals: Array<{
+      id: string;
+      status: string;
+      proposalHash: string;
+      payloadHash: string;
+      reviewerRole: string;
+    }>;
+  }>(`/runs/${run.id}/approvals`);
+  return { version, run, approval: approvals.approvals[0]! };
+}
+
 async function waitForSucceeded(runId: string) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
@@ -70,7 +135,7 @@ beforeAll(async () => {
   database = createDatabase(databaseUrl);
   await migrate(database);
   await database.query(`
-    TRUNCATE audit_events, outbox, checkpoints, step_attempts, workflow_steps,
+    TRUNCATE approvals, audit_events, outbox, checkpoints, step_attempts, workflow_steps,
       workflow_runs, workflow_versions, workflows CASCADE
   `);
 
@@ -936,4 +1001,266 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 20_000);
+
+  it("persists an approval across API restart and replays an exact decision once", async () => {
+    await worker.pause(true);
+    try {
+      const { run, approval } = await createApprovalRun("approval-restart-workflow");
+      expect(run.publicStatus).toBe("WAITING_APPROVAL");
+      expect(run.steps[0]?.status).toBe("WAITING_APPROVAL");
+      expect(approval).toMatchObject({ status: "PENDING", reviewerRole: "release-manager" });
+
+      await restartApi();
+      const decisionRequestId = randomUUID();
+      const decision = {
+        decisionRequestId,
+        decision: "APPROVE",
+        proposalHash: approval.proposalHash,
+        payloadHash: approval.payloadHash,
+      };
+      const init = {
+        method: "POST",
+        headers: {
+          "x-agentflow-reviewer-id": "reviewer-1",
+          "x-agentflow-reviewer-role": "release-manager",
+        },
+        body: JSON.stringify(decision),
+      } satisfies RequestInit;
+      const accepted = await request<{ replayed: boolean; run: { waitReason: string } }>(
+        `/approvals/${approval.id}/decisions`,
+        init,
+      );
+      expect(accepted).toMatchObject({ replayed: false, run: { waitReason: "NONE" } });
+      const replayed = await request<{ replayed: boolean }>(
+        `/approvals/${approval.id}/decisions`,
+        init,
+      );
+      expect(replayed.replayed).toBe(true);
+
+      const persisted = await database.query<{ successors: string; dispatches: string }>(
+        `SELECT
+           (SELECT count(*) FROM workflow_steps WHERE run_id = $1 AND position = 1) AS successors,
+           (SELECT count(*) FROM outbox WHERE run_id = $1 AND generation = 1) AS dispatches`,
+        [run.id],
+      );
+      expect(persisted.rows[0]).toEqual({ successors: "1", dispatches: "1" });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("rejects role and hash mismatches without changing the pending approval", async () => {
+    const { run, approval } = await createApprovalRun("approval-mismatch-workflow");
+    const baseDecision = {
+      decisionRequestId: randomUUID(),
+      decision: "APPROVE",
+      proposalHash: approval.proposalHash,
+      payloadHash: approval.payloadHash,
+    };
+    const wrongRole = await rawRequest(`/approvals/${approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-2",
+        "x-agentflow-reviewer-role": "developer",
+      },
+      body: JSON.stringify(baseDecision),
+    });
+    expect(wrongRole.status).toBe(409);
+    const wrongHash = await rawRequest(`/approvals/${approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-2",
+        "x-agentflow-reviewer-role": "release-manager",
+      },
+      body: JSON.stringify({ ...baseDecision, decisionRequestId: randomUUID(), payloadHash: "0".repeat(64) }),
+    });
+    expect(wrongHash.status).toBe(409);
+    await expect(
+      database.query(
+        "UPDATE approvals SET payload_hash = $1 WHERE id = $2",
+        ["f".repeat(64), approval.id],
+      ),
+    ).rejects.toMatchObject({ constraint: "approvals_identity_immutable" });
+    const pending = await request<{ approvals: Array<{ status: string }> }>(
+      `/runs/${run.id}/approvals`,
+    );
+    expect(pending.approvals[0]?.status).toBe("PENDING");
+  });
+
+  it("fences late decisions after cancellation and approval expiration", async () => {
+    const cancelled = await createApprovalRun("approval-cancel-workflow");
+    await request(`/runs/${cancelled.run.id}/cancel`, { method: "POST" });
+    const lateCancelled = await rawRequest(`/approvals/${cancelled.approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-3",
+        "x-agentflow-reviewer-role": "release-manager",
+      },
+      body: JSON.stringify({
+        decisionRequestId: randomUUID(),
+        decision: "APPROVE",
+        proposalHash: cancelled.approval.proposalHash,
+        payloadHash: cancelled.approval.payloadHash,
+      }),
+    });
+    expect(lateCancelled.status).toBe(409);
+
+    const expired = await createApprovalRun("approval-expiry-workflow", 1_000);
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    const repairs = await Promise.all([
+      repairScheduling(database, 10_000),
+      repairScheduling(database, 10_000),
+    ]);
+    expect(repairs.reduce((sum, result) => sum + result.expiredApprovals, 0)).toBe(1);
+    const lateExpired = await rawRequest(`/approvals/${expired.approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-3",
+        "x-agentflow-reviewer-role": "release-manager",
+      },
+      body: JSON.stringify({
+        decisionRequestId: randomUUID(),
+        decision: "APPROVE",
+        proposalHash: expired.approval.proposalHash,
+        payloadHash: expired.approval.payloadHash,
+      }),
+    });
+    expect(lateExpired.status).toBe(409);
+    const settled = await request<{
+      lifecycle: string;
+      failure: { code: string };
+    }>(`/runs/${expired.run.id}`);
+    expect(settled).toMatchObject({ lifecycle: "FAILED", failure: { code: "APPROVAL_EXPIRED" } });
+
+    const timedOut = await createApprovalRun("approval-run-deadline-workflow");
+    await database.query(
+      "UPDATE workflow_runs SET deadline_at = now() - interval '1 second' WHERE id = $1",
+      [timedOut.run.id],
+    );
+    const afterRunDeadline = await rawRequest(`/approvals/${timedOut.approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-3",
+        "x-agentflow-reviewer-role": "release-manager",
+      },
+      body: JSON.stringify({
+        decisionRequestId: randomUUID(),
+        decision: "APPROVE",
+        proposalHash: timedOut.approval.proposalHash,
+        payloadHash: timedOut.approval.payloadHash,
+      }),
+    });
+    expect(afterRunDeadline.status).toBe(409);
+    const deadlineRun = await request<{ lifecycle: string; failure: { code: string } }>(
+      `/runs/${timedOut.run.id}`,
+    );
+    expect(deadlineRun).toMatchObject({
+      lifecycle: "TIMED_OUT",
+      failure: { code: "RUN_DEADLINE_EXCEEDED" },
+    });
+  });
+
+  it("serializes concurrent double approval into one continuation dispatch", async () => {
+    await worker.pause(true);
+    try {
+      const { run, approval } = await createApprovalRun("approval-double-workflow");
+      const decide = (decisionRequestId: string) => rawRequest(`/approvals/${approval.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "x-agentflow-reviewer-id": "reviewer-4",
+          "x-agentflow-reviewer-role": "release-manager",
+        },
+        body: JSON.stringify({
+          decisionRequestId,
+          decision: "APPROVE",
+          proposalHash: approval.proposalHash,
+          payloadHash: approval.payloadHash,
+        }),
+      });
+      const responses = await Promise.all([decide(randomUUID()), decide(randomUUID())]);
+      expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+      const persisted = await database.query<{ approvals: string; successors: string; dispatches: string }>(
+        `SELECT
+           (SELECT count(*) FROM approvals WHERE id = $2 AND status = 'APPROVED') AS approvals,
+           (SELECT count(*) FROM workflow_steps WHERE run_id = $1 AND position = 1) AS successors,
+           (SELECT count(*) FROM outbox WHERE run_id = $1) AS dispatches`,
+        [run.id, approval.id],
+      );
+      expect(persisted.rows[0]).toEqual({ approvals: "1", successors: "1", dispatches: "1" });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("records approval while paused without dispatching or implicitly resuming", async () => {
+    await worker.pause(true);
+    try {
+      const { run, approval } = await createApprovalRun("approval-paused-workflow");
+      await request(`/runs/${run.id}/pause`, { method: "POST" });
+      const decided = await request<{
+        run: { control: string; steps: Array<{ status: string }> };
+      }>(`/approvals/${approval.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "x-agentflow-reviewer-id": "reviewer-5",
+          "x-agentflow-reviewer-role": "release-manager",
+        },
+        body: JSON.stringify({
+          decisionRequestId: randomUUID(),
+          decision: "APPROVE",
+          proposalHash: approval.proposalHash,
+          payloadHash: approval.payloadHash,
+        }),
+      });
+      expect(decided.run.control).toBe("PAUSED");
+      expect(decided.run.steps[1]?.status).toBe("READY");
+      const beforeResume = await database.query<{ dispatches: string }>(
+        "SELECT count(*) AS dispatches FROM outbox WHERE run_id = $1",
+        [run.id],
+      );
+      expect(beforeResume.rows[0]?.dispatches).toBe("0");
+      await request(`/runs/${run.id}/resume`, { method: "POST" });
+      const afterResume = await database.query<{ dispatches: string }>(
+        "SELECT count(*) AS dispatches FROM outbox WHERE run_id = $1",
+        [run.id],
+      );
+      expect(afterResume.rows[0]?.dispatches).toBe("1");
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("durably rejects an approval without creating a continuation", async () => {
+    const { run, approval } = await createApprovalRun("approval-rejection-workflow");
+    const rejected = await request<{
+      run: { lifecycle: string; failure: { code: string } };
+      approvals: Array<{ status: string; decidedBy: string; decidedRole: string }>;
+    }>(`/approvals/${approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reviewer-6",
+        "x-agentflow-reviewer-role": "release-manager",
+      },
+      body: JSON.stringify({
+        decisionRequestId: randomUUID(),
+        decision: "REJECT",
+        proposalHash: approval.proposalHash,
+        payloadHash: approval.payloadHash,
+      }),
+    });
+    expect(rejected.run).toMatchObject({
+      lifecycle: "FAILED",
+      failure: { code: "APPROVAL_REJECTED" },
+    });
+    expect(rejected.approvals[0]).toMatchObject({
+      status: "REJECTED",
+      decidedBy: "reviewer-6",
+      decidedRole: "release-manager",
+    });
+    const successors = await database.query<{ count: string }>(
+      "SELECT count(*) AS count FROM workflow_steps WHERE run_id = $1 AND position > 0",
+      [run.id],
+    );
+    expect(successors.rows[0]?.count).toBe("0");
+  });
 });

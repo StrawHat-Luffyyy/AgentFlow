@@ -8,8 +8,10 @@ import {
   tracer,
   workflowDefinitionSchema,
   type OperationJob,
+  type ApprovalDecision,
   type RetryPolicy,
   type WorkflowDefinition,
+  type WorkflowStepDefinition,
 } from "@agentflow/shared";
 
 export class NotFoundError extends Error {}
@@ -17,6 +19,93 @@ export class ConflictError extends Error {}
 
 function hash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+interface StepPolicy {
+  maxAttempts: number;
+  initialBackoffMs: number;
+  multiplier: number;
+  maxBackoffMs: number;
+}
+
+async function materializeStep(
+  transaction: Transaction,
+  input: {
+    runId: string;
+    workflowVersionId: string;
+    position: number;
+    definition: WorkflowStepDefinition;
+    stepInput: Record<string, unknown>;
+    policy: StepPolicy;
+    control: string;
+  },
+): Promise<{ stepId: string; approvalId: string | null }> {
+  const stepId = randomUUID();
+  const waitingForApproval = input.definition.kind === "APPROVAL";
+  await transaction.query(
+    `INSERT INTO workflow_steps
+       (id, run_id, node_key, position, kind, handler, status, input_json,
+        max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)`,
+    [
+      stepId,
+      input.runId,
+      input.definition.key,
+      input.position,
+      input.definition.kind,
+      input.definition.handler,
+      waitingForApproval ? "WAITING_APPROVAL" : "READY",
+      JSON.stringify(input.stepInput),
+      input.policy.maxAttempts,
+      input.policy.initialBackoffMs,
+      input.policy.multiplier,
+      input.policy.maxBackoffMs,
+    ],
+  );
+
+  if (input.definition.kind === "APPROVAL") {
+    const approvalId = randomUUID();
+    const payload = input.stepInput;
+    const proposal = { stepKey: input.definition.key, payload };
+    await transaction.query(
+      `INSERT INTO approvals
+       (id, run_id, step_id, generation, status, proposal_json, proposal_hash,
+          payload_json, payload_hash, reviewer_role, expires_at)
+       VALUES ($1, $2, $3, 1, 'PENDING', $4::jsonb, $5, $6::jsonb, $7, $8,
+         now() + ($9 * interval '1 millisecond'))`,
+      [
+        approvalId,
+        input.runId,
+        stepId,
+        JSON.stringify(proposal),
+        hash(proposal),
+        JSON.stringify(payload),
+        hash(payload),
+        input.definition.reviewerRole,
+        input.definition.expiresAfterMs,
+      ],
+    );
+    await transaction.query(
+      "UPDATE workflow_runs SET wait_reason = 'APPROVAL' WHERE id = $1",
+      [input.runId],
+    );
+    return { stepId, approvalId };
+  }
+
+  if (input.control === "RUN") {
+    const job: OperationJob = {
+      runId: input.runId,
+      operationId: stepId,
+      workflowVersionId: input.workflowVersionId,
+      dispatchGeneration: 1,
+    };
+    await transaction.query(
+      `INSERT INTO outbox (id, run_id, step_id, generation, kind, payload_json)
+       VALUES ($1, $2, $3, 1, 'DISPATCH_OPERATION', $4::jsonb)`,
+      [randomUUID(), input.runId, stepId, JSON.stringify(job)],
+    );
+  }
+  return { stepId, approvalId: null };
 }
 
 async function nextEventSequence(transaction: Transaction, runId: string): Promise<number> {
@@ -135,16 +224,8 @@ export async function createRun(
         if (!firstDefinition) throw new ConflictError("Workflow version has no steps");
 
         const runId = randomUUID();
-        const stepId = randomUUID();
         const checkpointId = randomUUID();
-        const outboxId = randomUUID();
         const eventId = randomUUID();
-        const job: OperationJob = {
-          runId,
-          operationId: stepId,
-          workflowVersionId: input.workflowVersionId,
-          dispatchGeneration: 1,
-        };
 
         await transaction.query(
           `INSERT INTO workflow_runs
@@ -159,24 +240,15 @@ export async function createRun(
             deadlineMs,
           ],
         );
-        await transaction.query(
-          `INSERT INTO workflow_steps
-             (id, run_id, node_key, position, kind, handler, status, input_json,
-              max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
-           VALUES ($1, $2, $3, 0, $4, $5, 'READY', $6::jsonb, $7, $8, $9, $10)`,
-          [
-            stepId,
-            runId,
-            firstDefinition.key,
-            firstDefinition.kind,
-            firstDefinition.handler,
-            JSON.stringify(input.input),
-            retryPolicy.maxAttempts,
-            retryPolicy.initialBackoffMs,
-            retryPolicy.multiplier,
-            retryPolicy.maxBackoffMs,
-          ],
-        );
+        const first = await materializeStep(transaction, {
+          runId,
+          workflowVersionId: input.workflowVersionId,
+          position: 0,
+          definition: firstDefinition,
+          stepInput: input.input,
+          policy: retryPolicy,
+          control: "RUN",
+        });
         await transaction.query(
           `INSERT INTO checkpoints
              (id, run_id, revision, workflow_version_id, cursor, reason, snapshot_json)
@@ -194,16 +266,19 @@ export async function createRun(
           [checkpointId, runId],
         );
         await transaction.query(
-          `INSERT INTO outbox
-             (id, run_id, step_id, generation, kind, payload_json)
-           VALUES ($1, $2, $3, 1, 'DISPATCH_OPERATION', $4::jsonb)`,
-          [outboxId, runId, stepId, JSON.stringify(job)],
-        );
-        await transaction.query(
           `INSERT INTO audit_events
              (id, run_id, sequence, step_id, type, payload_json)
            VALUES ($1, $2, 1, $3, 'RUN_CREATED', $4::jsonb)`,
-          [eventId, runId, stepId, JSON.stringify({ checkpointId, workflowVersionId: input.workflowVersionId })],
+          [
+            eventId,
+            runId,
+            first.stepId,
+            JSON.stringify({
+              checkpointId,
+              workflowVersionId: input.workflowVersionId,
+              approvalId: first.approvalId,
+            }),
+          ],
         );
         return getRun(transaction, runId);
       });
@@ -269,11 +344,13 @@ export async function getRun(database: Queryable, runId: string) {
       ? run.control
       : run.control === "CANCEL_REQUESTED"
         ? "CANCEL_REQUESTED"
-        : run.waitReason === "RETRY"
-          ? "RETRY_WAIT"
-          : stepRows.some((step) => step.status === "RUNNING")
-            ? "RUNNING"
-            : "QUEUED";
+        : run.waitReason === "APPROVAL"
+          ? "WAITING_APPROVAL"
+          : run.waitReason === "RETRY"
+            ? "RETRY_WAIT"
+            : stepRows.some((step) => step.status === "RUNNING")
+              ? "RUNNING"
+              : "QUEUED";
   return { ...run, publicStatus, steps: steps.rows, checkpoint: checkpoint.rows[0] };
 }
 
@@ -287,6 +364,274 @@ export async function getRunHistory(database: Database, runId: string) {
     [runId],
   );
   return events.rows;
+}
+
+export async function getRunApprovals(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const approvals = await database.query(
+    `SELECT id, run_id AS "runId", step_id AS "stepId", generation, status,
+       proposal_json AS proposal, proposal_hash AS "proposalHash",
+       payload_json AS payload, payload_hash AS "payloadHash",
+       reviewer_role AS "reviewerRole", expires_at AS "expiresAt",
+       decision, decision_at AS "decisionAt", decided_by AS "decidedBy",
+       decided_role AS "decidedRole", decision_request_id AS "decisionRequestId",
+       created_at AS "createdAt"
+     FROM approvals WHERE run_id = $1 ORDER BY created_at, id`,
+    [runId],
+  );
+  return approvals.rows;
+}
+
+export async function decideApproval(
+  database: Database,
+  approvalId: string,
+  decision: ApprovalDecision,
+  reviewer: { id: string; role: string },
+) {
+  const outcome = await withTransaction(database, async (transaction) => {
+    const target = await transaction.query<{
+      run_id: string;
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      state_revision: number;
+      current_checkpoint_id: string;
+      workflow_version_id: string;
+      definition_json: WorkflowDefinition;
+      step_id: string;
+      position: number;
+      max_attempts: number;
+      retry_initial_ms: number;
+      retry_multiplier: number;
+      retry_cap_ms: number;
+    }>(
+      `SELECT wr.id AS run_id, wr.lifecycle, wr.control,
+         (wr.deadline_at > now()) AS deadline_valid, wr.state_revision,
+         wr.current_checkpoint_id, wr.workflow_version_id, wv.definition_json,
+         a.step_id, ws.position, ws.max_attempts, ws.retry_initial_ms,
+         ws.retry_multiplier, ws.retry_cap_ms
+       FROM approvals a
+       JOIN workflow_runs wr ON wr.id = a.run_id
+       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+       JOIN workflow_steps ws ON ws.id = a.step_id
+       WHERE a.id = $1
+       FOR UPDATE OF wr`,
+      [approvalId],
+    );
+    const run = target.rows[0];
+    if (!run) throw new NotFoundError("Approval not found");
+
+    const replay = await transaction.query<{
+      id: string;
+      decision: string | null;
+      proposal_hash: string;
+      payload_hash: string;
+      decided_by: string | null;
+      decided_role: string | null;
+    }>(
+      `SELECT id, decision, proposal_hash, payload_hash, decided_by, decided_role
+       FROM approvals WHERE decision_request_id = $1 FOR UPDATE`,
+      [decision.decisionRequestId],
+    );
+    const replayRow = replay.rows[0];
+    if (replayRow) {
+      if (
+        replayRow.id !== approvalId ||
+        replayRow.decision !== decision.decision ||
+        replayRow.proposal_hash !== decision.proposalHash ||
+        replayRow.payload_hash !== decision.payloadHash ||
+        replayRow.decided_by !== reviewer.id ||
+        replayRow.decided_role !== reviewer.role
+      ) {
+        throw new ConflictError("Decision request ID is already bound to a different decision");
+      }
+      return { kind: "accepted" as const, runId: run.run_id, replayed: true };
+    }
+
+    const approvalResult = await transaction.query<{
+      status: string;
+      proposal_hash: string;
+      payload_hash: string;
+      payload_json: Record<string, unknown>;
+      reviewer_role: string;
+      unexpired: boolean;
+    }>(
+      `SELECT status, proposal_hash, payload_hash, payload_json, reviewer_role,
+         (expires_at > now()) AS unexpired
+       FROM approvals WHERE id = $1 FOR UPDATE`,
+      [approvalId],
+    );
+    const approval = approvalResult.rows[0]!;
+    if (run.lifecycle !== "OPEN") throw new ConflictError("Terminal run cannot accept approval decisions");
+    if (approval.status !== "PENDING") throw new ConflictError("Approval has already been resolved");
+    if (approval.reviewer_role !== reviewer.role) {
+      throw new ConflictError("Reviewer role is not authorized for this approval");
+    }
+    if (
+      approval.proposal_hash !== decision.proposalHash ||
+      approval.payload_hash !== decision.payloadHash
+    ) {
+      throw new ConflictError("Approval hashes do not match the persisted proposal and payload");
+    }
+    if (!run.deadline_valid) {
+      const failure = { code: "RUN_DEADLINE_EXCEEDED" };
+      await transaction.query(
+        "UPDATE approvals SET status = 'CANCELLED', decision_at = now() WHERE id = $1",
+        [approvalId],
+      );
+      await transaction.query(
+        `UPDATE workflow_steps SET status = 'FAILED', completed_at = now(),
+           failure_json = $1::jsonb WHERE id = $2 AND status = 'WAITING_APPROVAL'`,
+        [JSON.stringify(failure), run.step_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'TIMED_OUT', wait_reason = 'NONE',
+           failure_json = $1::jsonb, finished_at = now() WHERE id = $2`,
+        [JSON.stringify(failure), run.run_id],
+      );
+      const sequence = await nextEventSequence(transaction, run.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'RUN_TIMED_OUT', $5::jsonb)`,
+        [randomUUID(), run.run_id, sequence, run.step_id, JSON.stringify(failure)],
+      );
+      return { kind: "timedOut" as const };
+    }
+    if (!approval.unexpired) {
+      const failure = { code: "APPROVAL_EXPIRED", approvalId };
+      await transaction.query(
+        "UPDATE approvals SET status = 'EXPIRED', decision_at = now() WHERE id = $1",
+        [approvalId],
+      );
+      await transaction.query(
+        `UPDATE workflow_steps SET status = 'FAILED', completed_at = now(),
+           failure_json = $1::jsonb WHERE id = $2 AND status = 'WAITING_APPROVAL'`,
+        [JSON.stringify(failure), run.step_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'FAILED', wait_reason = 'NONE',
+           failure_json = $1::jsonb, finished_at = now() WHERE id = $2`,
+        [JSON.stringify(failure), run.run_id],
+      );
+      const sequence = await nextEventSequence(transaction, run.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'APPROVAL_EXPIRED', $5::jsonb)`,
+        [randomUUID(), run.run_id, sequence, run.step_id, JSON.stringify(failure)],
+      );
+      return { kind: "expired" as const };
+    }
+
+    const approvalStatus = decision.decision === "APPROVE" ? "APPROVED" : "REJECTED";
+    await transaction.query(
+      `UPDATE approvals SET status = $1, decision = $2, decision_at = now(),
+         decided_by = $3, decided_role = $4, decision_request_id = $5
+       WHERE id = $6`,
+      [approvalStatus, decision.decision, reviewer.id, reviewer.role, decision.decisionRequestId, approvalId],
+    );
+
+    if (decision.decision === "REJECT") {
+      const failure = { code: "APPROVAL_REJECTED", approvalId, reviewerId: reviewer.id };
+      await transaction.query(
+        `UPDATE workflow_steps SET status = 'FAILED', completed_at = now(),
+           failure_json = $1::jsonb WHERE id = $2`,
+        [JSON.stringify(failure), run.step_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'FAILED', wait_reason = 'NONE',
+           failure_json = $1::jsonb, finished_at = now() WHERE id = $2`,
+        [JSON.stringify(failure), run.run_id],
+      );
+      const sequence = await nextEventSequence(transaction, run.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'APPROVAL_REJECTED', $5::jsonb)`,
+        [randomUUID(), run.run_id, sequence, run.step_id, JSON.stringify(failure)],
+      );
+      return { kind: "accepted" as const, runId: run.run_id, replayed: false };
+    }
+
+    await transaction.query(
+      `UPDATE workflow_steps SET status = 'SUCCEEDED', accepted_output_json = $1::jsonb,
+         completed_at = now(), failure_json = NULL WHERE id = $2`,
+      [JSON.stringify(approval.payload_json), run.step_id],
+    );
+    const definition = workflowDefinitionSchema.parse(run.definition_json);
+    const nextDefinition = definition.steps[run.position + 1];
+    let successorId: string | null = null;
+    let successorApprovalId: string | null = null;
+    if (nextDefinition) {
+      const successor = await materializeStep(transaction, {
+        runId: run.run_id,
+        workflowVersionId: run.workflow_version_id,
+        position: run.position + 1,
+        definition: nextDefinition,
+        stepInput: approval.payload_json,
+        policy: {
+          maxAttempts: run.max_attempts,
+          initialBackoffMs: run.retry_initial_ms,
+          multiplier: run.retry_multiplier,
+          maxBackoffMs: run.retry_cap_ms,
+        },
+        control: run.control,
+      });
+      successorId = successor.stepId;
+      successorApprovalId = successor.approvalId;
+    }
+
+    const checkpointId = randomUUID();
+    const revision = run.state_revision + 1;
+    await transaction.query(
+      `INSERT INTO checkpoints
+         (id, run_id, revision, parent_id, workflow_version_id, cursor, reason, snapshot_json)
+       VALUES ($1, $2, $3, $4, $5, $6, 'APPROVAL_APPROVED', $7::jsonb)`,
+      [
+        checkpointId,
+        run.run_id,
+        revision,
+        run.current_checkpoint_id,
+        run.workflow_version_id,
+        nextDefinition?.key ?? null,
+        JSON.stringify({ approvalId, reviewerId: reviewer.id, successorId, successorApprovalId }),
+      ],
+    );
+    if (nextDefinition) {
+      await transaction.query(
+        `UPDATE workflow_runs SET current_checkpoint_id = $1, state_revision = $2,
+           wait_reason = $3 WHERE id = $4`,
+        [checkpointId, revision, successorApprovalId ? "APPROVAL" : "NONE", run.run_id],
+      );
+    } else {
+      await transaction.query(
+        `UPDATE workflow_runs SET current_checkpoint_id = $1, state_revision = $2,
+           lifecycle = 'SUCCEEDED', wait_reason = 'NONE', finished_at = now()
+         WHERE id = $3`,
+        [checkpointId, revision, run.run_id],
+      );
+    }
+    const sequence = await nextEventSequence(transaction, run.run_id);
+    await transaction.query(
+      `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+       VALUES ($1, $2, $3, $4, 'APPROVAL_APPROVED', $5::jsonb)`,
+      [
+        randomUUID(),
+        run.run_id,
+        sequence,
+        run.step_id,
+        JSON.stringify({ approvalId, reviewerId: reviewer.id, checkpointId, successorId }),
+      ],
+    );
+    return { kind: "accepted" as const, runId: run.run_id, replayed: false };
+  });
+
+  if (outcome.kind === "expired") throw new ConflictError("Approval has expired");
+  if (outcome.kind === "timedOut") throw new ConflictError("Run deadline has expired");
+  return {
+    replayed: outcome.replayed,
+    run: await getRun(database, outcome.runId),
+    approvals: await getRunApprovals(database, outcome.runId),
+  };
 }
 
 export interface ClaimedOperation {
@@ -712,7 +1057,7 @@ export async function controlRun(
 
     const steps = await transaction.query<{ id: string; status: string; dispatch_generation: number }>(
       `SELECT id, status, dispatch_generation FROM workflow_steps
-       WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT')
+       WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')
        ORDER BY position FOR UPDATE`,
       [runId],
     );
@@ -755,7 +1100,12 @@ export async function controlRun(
         await transaction.query(
           `UPDATE workflow_steps SET status = 'CANCELLED', next_attempt_at = NULL,
              failure_json = jsonb_build_object('code', 'RUN_CANCELLED')
-           WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RETRY_WAIT')`,
+           WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
+          [runId],
+        );
+        await transaction.query(
+          `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
+           WHERE run_id = $1 AND status = 'PENDING'`,
           [runId],
         );
         await transaction.query(
@@ -820,6 +1170,7 @@ export async function controlRun(
 }
 
 export interface SchedulingRepairResult {
+  expiredApprovals: number;
   expiredLeases: number;
   recoveredDispatches: number;
   dueRetries: number;
@@ -840,6 +1191,7 @@ export async function repairScheduling(
 ): Promise<SchedulingRepairResult> {
   return withTransaction(database, async (transaction) => {
     let expiredLeases = 0;
+    let expiredApprovals = 0;
     let recoveredDispatches = 0;
     let dueRetries = 0;
     let timedOutRuns = 0;
@@ -847,11 +1199,46 @@ export async function repairScheduling(
     let failedOperations = 0;
     let timedOutAttempts = 0;
 
+    const approvals = await transaction.query<{ id: string; run_id: string; step_id: string }>(
+      `SELECT a.id, a.run_id, a.step_id
+       FROM approvals a
+       JOIN workflow_runs wr ON wr.id = a.run_id
+       WHERE a.status = 'PENDING' AND a.expires_at <= now()
+         AND wr.lifecycle = 'OPEN' AND wr.deadline_at > now()
+       ORDER BY a.expires_at, a.id LIMIT $1
+       FOR UPDATE OF wr, a SKIP LOCKED`,
+      [batchSize],
+    );
+    for (const approval of approvals.rows) {
+      const failure = { code: "APPROVAL_EXPIRED", approvalId: approval.id };
+      await transaction.query(
+        "UPDATE approvals SET status = 'EXPIRED', decision_at = now() WHERE id = $1",
+        [approval.id],
+      );
+      await transaction.query(
+        `UPDATE workflow_steps SET status = 'FAILED', completed_at = now(),
+           failure_json = $1::jsonb WHERE id = $2 AND status = 'WAITING_APPROVAL'`,
+        [JSON.stringify(failure), approval.step_id],
+      );
+      await transaction.query(
+        `UPDATE workflow_runs SET lifecycle = 'FAILED', wait_reason = 'NONE',
+           failure_json = $1::jsonb, finished_at = now() WHERE id = $2`,
+        [JSON.stringify(failure), approval.run_id],
+      );
+      const sequence = await nextEventSequence(transaction, approval.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'APPROVAL_EXPIRED', $5::jsonb)`,
+        [randomUUID(), approval.run_id, sequence, approval.step_id, JSON.stringify(failure)],
+      );
+      expiredApprovals += 1;
+    }
+
     const timedOut = await transaction.query<{ id: string }>(
       `SELECT id FROM workflow_runs
        WHERE lifecycle = 'OPEN' AND deadline_at <= now()
        ORDER BY deadline_at, id LIMIT $1
-       FOR UPDATE SKIP LOCKED`,
+       FOR UPDATE`,
       [batchSize],
     );
     for (const run of timedOut.rows) {
@@ -867,7 +1254,12 @@ export async function repairScheduling(
         `UPDATE workflow_steps SET status = 'FAILED', lease_owner = NULL,
            lease_expires_at = NULL, next_attempt_at = NULL, completed_at = now(),
            failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED')
-         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT')`,
+         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
+        [run.id],
+      );
+      await transaction.query(
+        `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
+         WHERE run_id = $1 AND status = 'PENDING'`,
         [run.id],
       );
       await transaction.query(
@@ -905,7 +1297,12 @@ export async function repairScheduling(
         `UPDATE workflow_steps SET status = 'CANCELLED', lease_owner = NULL,
            lease_expires_at = NULL, next_attempt_at = NULL,
            failure_json = jsonb_build_object('code', 'RUN_CANCELLED')
-         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT')`,
+         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
+        [run.id],
+      );
+      await transaction.query(
+        `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
+         WHERE run_id = $1 AND status = 'PENDING'`,
         [run.id],
       );
       await transaction.query(
@@ -1145,6 +1542,7 @@ export async function repairScheduling(
     }
 
     return {
+      expiredApprovals,
       expiredLeases,
       recoveredDispatches,
       dueRetries,
@@ -1248,7 +1646,26 @@ export async function completeOperation(
         const nextDefinition = definition.steps[row.position + 1];
         const revision = row.state_revision + 1;
         const checkpointId = randomUUID();
-        const successorId = nextDefinition ? randomUUID() : null;
+        let successorId: string | null = null;
+        let approvalId: string | null = null;
+        if (nextDefinition) {
+          const successor = await materializeStep(transaction, {
+            runId: operation.runId,
+            workflowVersionId: row.workflow_version_id,
+            position: row.position + 1,
+            definition: nextDefinition,
+            stepInput: output,
+            policy: {
+              maxAttempts: row.max_attempts,
+              initialBackoffMs: row.retry_initial_ms,
+              multiplier: row.retry_multiplier,
+              maxBackoffMs: row.retry_cap_ms,
+            },
+            control: row.control === "PAUSE_REQUESTED" ? "PAUSED" : row.control,
+          });
+          successorId = successor.stepId;
+          approvalId = successor.approvalId;
+        }
         await transaction.query(
           `INSERT INTO checkpoints
              (id, run_id, revision, parent_id, workflow_version_id, cursor, reason, snapshot_json)
@@ -1264,44 +1681,12 @@ export async function completeOperation(
               completedOperation: operation.operationId,
               acceptedOutput: output,
               nextOperation: successorId,
+              approvalId,
             }),
           ],
         );
 
-        if (nextDefinition && successorId) {
-          await transaction.query(
-            `INSERT INTO workflow_steps
-               (id, run_id, node_key, position, kind, handler, status, input_json,
-                max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
-             VALUES ($1, $2, $3, $4, $5, $6, 'READY', $7::jsonb, $8, $9, $10, $11)`,
-            [
-              successorId,
-              operation.runId,
-              nextDefinition.key,
-              row.position + 1,
-              nextDefinition.kind,
-              nextDefinition.handler,
-              JSON.stringify(output),
-              row.max_attempts,
-              row.retry_initial_ms,
-              row.retry_multiplier,
-              row.retry_cap_ms,
-            ],
-          );
-          if (row.control === "RUN") {
-            const job: OperationJob = {
-              runId: operation.runId,
-              operationId: successorId,
-              workflowVersionId: row.workflow_version_id,
-              dispatchGeneration: 1,
-            };
-            await transaction.query(
-              `INSERT INTO outbox
-                 (id, run_id, step_id, generation, kind, payload_json)
-               VALUES ($1, $2, $3, 1, 'DISPATCH_OPERATION', $4::jsonb)`,
-              [randomUUID(), operation.runId, successorId, JSON.stringify(job)],
-            );
-          }
+        if (nextDefinition) {
           await transaction.query(
             `UPDATE workflow_runs
              SET current_checkpoint_id = $1, state_revision = $2,
@@ -1331,7 +1716,7 @@ export async function completeOperation(
             sequence,
             operation.operationId,
             operation.attemptId,
-            JSON.stringify({ checkpointId, successorId }),
+            JSON.stringify({ checkpointId, successorId, approvalId }),
           ],
         );
         return { checkpointId, successorId, runCompleted: successorId === null };
