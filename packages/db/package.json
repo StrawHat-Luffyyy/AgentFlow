@@ -1,0 +1,19 @@
+{
+  "name": "@agentflow/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@agentflow/config": "workspace:*",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}

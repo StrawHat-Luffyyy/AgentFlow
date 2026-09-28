@@ -1,0 +1,22 @@
+{
+  "name": "@agentflow/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentflow/config": "workspace:*",
+    "@agentflow/db": "workspace:*",
+    "@agentflow/runtime": "workspace:*",
+    "@agentflow/shared": "workspace:*",
+    "bullmq": "^5.61.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}

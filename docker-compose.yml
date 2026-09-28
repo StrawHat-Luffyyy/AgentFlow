@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: agentflow
+      POSTGRES_PASSWORD: agentflow
+      POSTGRES_DB: agentflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - agentflow-postgres:/var/lib/postgresql/data
+      - ./infra/docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentflow -d agentflow"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - agentflow-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://agentflow:agentflow@postgres:5432/agentflow
+      REDIS_URL: redis://redis:6379
+      API_PORT: 3000
+      OUTBOX_POLL_MS: 500
+      OTEL_SERVICE_NAME: agentflow-api
+    command: ["pnpm", "--filter", "@agentflow/api", "start"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://agentflow:agentflow@postgres:5432/agentflow
+      REDIS_URL: redis://redis:6379
+      WORKER_ID: worker-compose-1
+      WORKER_CONCURRENCY: 2
+      OPERATION_LEASE_MS: 15000
+      OTEL_SERVICE_NAME: agentflow-worker
+    command: ["pnpm", "--filter", "@agentflow/worker", "start"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  agentflow-postgres:
+  agentflow-redis:
