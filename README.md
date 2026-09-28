@@ -1,6 +1,6 @@
 # AgentFlow
 
-AgentFlow is a durable workflow runtime for bounded AI-agent execution. This repository currently contains the first TypeScript platform milestone: an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, and a worker that executes deterministic logical operations.
+AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, and a worker that executes deterministic logical operations.
 
 The Python research prototype is a separate workstream and is not embedded in this TypeScript platform.
 
@@ -21,6 +21,8 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 PostgreSQL is authoritative. Queue delivery alone never authorizes execution. Workers renew
 database leases while executing; the API-side recovery scheduler abandons expired attempts,
 advances the fencing epoch through a replacement claim, and recreates missing or stale dispatches.
+Logical failures are classified and settled into either a persisted `RETRY_WAIT` with one sampled
+due time or a terminal failure. BullMQ does not own the business retry schedule.
 
 ## Workspace
 
@@ -55,6 +57,10 @@ Invoke-RestMethod -Uri "http://localhost:3000/runs/$($run.id)"
 Invoke-RestMethod -Uri "http://localhost:3000/runs/$($run.id)/history"
 ```
 
+Runs accept optional `deadlineMs` and `retryPolicy` fields. Durable controls are exposed as
+`POST /runs/:id/pause`, `POST /runs/:id/resume`, and `POST /runs/:id/cancel`. The run response
+reports independent `lifecycle`, `control`, `waitReason`, and derived `publicStatus` values.
+
 Run verification:
 
 ```powershell
@@ -74,5 +80,5 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Approvals, external-effect/idempotency records, bounded failure retry policy, provider adapters,
-LLM operations, fault injection, and the React dashboard remain deferred.
+Approvals, external-effect/idempotency records, provider adapters, LLM operations, fault
+injection, and the React dashboard remain deferred.

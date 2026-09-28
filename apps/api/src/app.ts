@@ -5,6 +5,7 @@ import {
   createRun,
   createWorkflow,
   createWorkflowVersion,
+  controlRun,
   getRun,
   getRunHistory,
 } from "@agentflow/runtime";
@@ -62,6 +63,13 @@ export function createApp(database: Database, queue: Queue): express.Express {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ events: await getRunHistory(database, runId) });
   });
+
+  for (const command of ["pause", "resume", "cancel"] as const) {
+    app.post(`/runs/:id/${command}`, async (request: express.Request, response: express.Response) => {
+      const runId = z.string().uuid().parse(request.params.id);
+      response.json(await controlRun(database, runId, command));
+    });
+  }
 
   app.use(
     (error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {

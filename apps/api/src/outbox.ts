@@ -34,6 +34,7 @@ export function createOutboxDispatcher(
         const job = operationJobSchema.parse(candidate.payload_json);
         await queue.add(queue.name, job, {
           jobId: `operation-${job.operationId}-${job.dispatchGeneration}`,
+          attempts: 1,
           removeOnComplete: 100,
           removeOnFail: 100,
         });

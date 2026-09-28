@@ -14,6 +14,7 @@ const environmentSchema = z.object({
   WORKER_ID: z.string().min(1).default(`worker-${process.pid}`),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().max(32).default(2),
   OPERATION_LEASE_MS: z.coerce.number().int().min(1_000).default(15_000),
+  ATTEMPT_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(60_000),
   LEASE_HEARTBEAT_MS: z.coerce.number().int().min(100).default(5_000),
   OUTBOX_POLL_MS: z.coerce.number().int().min(100).default(500),
   SCHEDULER_POLL_MS: z.coerce.number().int().min(100).default(2_000),

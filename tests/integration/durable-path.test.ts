@@ -12,9 +12,11 @@ import { defaultWorkflowDefinition } from "@agentflow/shared";
 import {
   claimOperation,
   completeOperation,
+  controlRun,
   executeDeterministicOperation,
   renewOperationLease,
   repairScheduling,
+  settleOperationFailure,
 } from "../../packages/runtime/src/index.ts";
 import { Queue, QueueEvents, type Job, type Worker } from "bullmq";
 import type { Server } from "node:http";
@@ -250,7 +252,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       expect(await renewOperationLease(database, staleClaim!, 5_000)).toBe(false);
 
       const repaired = await repairScheduling(database, 10_000);
-      expect(repaired).toEqual({ expiredLeases: 1, recoveredDispatches: 0 });
+      expect(repaired).toMatchObject({ expiredLeases: 1, recoveredDispatches: 0 });
       await expect(
         completeOperation(database, staleClaim!, executeDeterministicOperation(staleClaim!)),
       ).rejects.toThrow("lease fencing");
@@ -267,10 +269,16 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         [step.id],
       );
       expect(recoveredStep.rows[0]).toMatchObject({
-        status: "READY",
-        dispatch_generation: 2,
+        status: "RETRY_WAIT",
+        dispatch_generation: 1,
         abandoned_attempts: "1",
       });
+
+      await database.query(
+        "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+      expect(await repairScheduling(database, 10_000)).toMatchObject({ dueRetries: 1 });
 
       const replacement = await claimOperation(
         database,
@@ -327,7 +335,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       );
 
       const repaired = await repairScheduling(database, 1_000);
-      expect(repaired).toEqual({ expiredLeases: 0, recoveredDispatches: 1 });
+      expect(repaired).toMatchObject({ expiredLeases: 0, recoveredDispatches: 1 });
       const recovered = await database.query<{
         dispatch_generation: number;
         generations: number[];
@@ -340,7 +348,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       expect(recovered.rows[0]).toMatchObject({ dispatch_generation: 2, generations: [1, 2] });
 
       const secondRepair = await repairScheduling(database, 1_000);
-      expect(secondRepair).toEqual({ expiredLeases: 0, recoveredDispatches: 0 });
+      expect(secondRepair).toMatchObject({ expiredLeases: 0, recoveredDispatches: 0 });
 
       const missing = await request<{ id: string; steps: Array<{ id: string }> }>("/runs", {
         method: "POST",
@@ -354,7 +362,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await database.query("DELETE FROM outbox WHERE step_id = $1", [missingStep.id]);
 
       const missingRepair = await repairScheduling(database, 1_000);
-      expect(missingRepair).toEqual({ expiredLeases: 0, recoveredDispatches: 1 });
+      expect(missingRepair).toMatchObject({ expiredLeases: 0, recoveredDispatches: 1 });
       const restored = await database.query<{
         dispatch_generation: number;
         outbox_rows: string;
@@ -370,7 +378,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     }
   }, 20_000);
 
-  it("settles a worker execution failure through expired-lease recovery", async () => {
+  it("settles a permanent worker execution failure in the application ledger", async () => {
     await worker.pause(true);
     try {
       const workflow = await request<{ id: string }>("/workflows", {
@@ -403,35 +411,446 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         },
       } as Job;
 
-      await expect(
-        processOperationJob(database, "failing-worker", 1_000, job, 250),
-      ).rejects.toThrow("Unsupported deterministic handler");
-      const failedDelivery = await database.query<{ status: string; attempts: string }>(
-        `SELECT ws.status,
+      const failureResult = await processOperationJob(database, "failing-worker", 1_000, job, 250);
+      expect(failureResult).toMatchObject({
+        failed: true,
+        failure: { errorClass: "PERMANENT", retryable: false },
+        settlement: { retryScheduled: false, runFailed: true },
+      });
+      const failedDelivery = await database.query<{ status: string; attempts: string; lifecycle: string }>(
+        `SELECT ws.status, wr.lifecycle,
            (SELECT count(*) FROM step_attempts sa
-            WHERE sa.step_id = ws.id AND sa.status = 'RUNNING') AS attempts
-         FROM workflow_steps ws WHERE ws.id = $1`,
+            WHERE sa.step_id = ws.id AND sa.status = 'FAILED') AS attempts
+         FROM workflow_steps ws JOIN workflow_runs wr ON wr.id = ws.run_id
+         WHERE ws.id = $1`,
         [step.id],
       );
-      expect(failedDelivery.rows[0]).toEqual({ status: "RUNNING", attempts: "1" });
+      expect(failedDelivery.rows[0]).toEqual({ status: "FAILED", attempts: "1", lifecycle: "FAILED" });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("persists bounded retry policy, sampled backoff, and terminal exhaustion", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "retry-policy-workflow", description: "Retry policy" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "retry policy" },
+          creationKey: "integration-retry-policy",
+          deadlineMs: 60_000,
+          retryPolicy: {
+            maxAttempts: 2,
+            initialBackoffMs: 1_000,
+            multiplier: 2,
+            maxBackoffMs: 1_000,
+          },
+        }),
+      });
+      const step = created.steps[0]!;
+      const conflictingCreation = await fetch(`${baseUrl}/runs`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "retry policy" },
+          creationKey: "integration-retry-policy",
+          deadlineMs: 60_000,
+          retryPolicy: {
+            maxAttempts: 3,
+            initialBackoffMs: 1_000,
+            multiplier: 2,
+            maxBackoffMs: 1_000,
+          },
+        }),
+      });
+      expect(conflictingCreation.status).toBe(409);
+      const job = {
+        runId: created.id,
+        operationId: step.id,
+        workflowVersionId: version.id,
+        dispatchGeneration: step.dispatchGeneration,
+      };
+      const first = await claimOperation(database, job, "retry-worker-1", 15_000, 30_000);
+      expect(first).not.toBeNull();
+      const firstSettlement = await settleOperationFailure(database, first!, {
+        code: "UPSTREAM_UNAVAILABLE",
+        errorClass: "TRANSIENT",
+        message: "temporary upstream failure",
+        retryable: true,
+        retryAfterMs: 500,
+      });
+      expect(firstSettlement).toMatchObject({ retryScheduled: true });
+
+      const waiting = await database.query<{
+        status: string;
+        wait_reason: string;
+        delay_ms: number;
+        error_class: string;
+        retryable: boolean;
+      }>(
+        `SELECT ws.status, wr.wait_reason,
+           EXTRACT(EPOCH FROM (ws.next_attempt_at - sa.finished_at)) * 1000 AS delay_ms,
+           sa.error_class, sa.retryable
+         FROM workflow_steps ws
+         JOIN workflow_runs wr ON wr.id = ws.run_id
+         JOIN step_attempts sa ON sa.step_id = ws.id AND sa.attempt_no = 1
+         WHERE ws.id = $1`,
+        [step.id],
+      );
+      expect(waiting.rows[0]).toMatchObject({
+        status: "RETRY_WAIT",
+        wait_reason: "RETRY",
+        error_class: "TRANSIENT",
+        retryable: true,
+      });
+      expect(Number(waiting.rows[0]?.delay_ms)).toBeGreaterThanOrEqual(500);
+      expect(Number(waiting.rows[0]?.delay_ms)).toBeLessThanOrEqual(1_000);
+
+      const persistedDue = firstSettlement.retryScheduled ? firstSettlement.nextAttemptAt : null;
+      expect(await repairScheduling(database, 10_000)).toMatchObject({ dueRetries: 0 });
+      const unchanged = await database.query<{ next_attempt_at: Date }>(
+        "SELECT next_attempt_at FROM workflow_steps WHERE id = $1",
+        [step.id],
+      );
+      expect(unchanged.rows[0]?.next_attempt_at.getTime()).toBe(persistedDue?.getTime());
 
       await database.query(
-        "UPDATE workflow_steps SET lease_expires_at = now() - interval '1 second' WHERE id = $1",
+        "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
         [step.id],
       );
-      expect(await repairScheduling(database, 10_000)).toEqual({
-        expiredLeases: 1,
-        recoveredDispatches: 0,
+      expect(await repairScheduling(database, 10_000)).toMatchObject({ dueRetries: 1 });
+      const second = await claimOperation(
+        database,
+        { ...job, dispatchGeneration: 2 },
+        "retry-worker-2",
+        15_000,
+        30_000,
+      );
+      expect(second?.attemptNo).toBe(2);
+      const exhausted = await settleOperationFailure(database, second!, {
+        code: "UPSTREAM_UNAVAILABLE",
+        errorClass: "TRANSIENT",
+        message: "still unavailable",
+        retryable: true,
       });
-      const settled = await database.query<{ status: string; abandoned: string }>(
-        `SELECT ws.status,
-           (SELECT count(*) FROM step_attempts sa
-            WHERE sa.step_id = ws.id AND sa.status = 'ABANDONED') AS abandoned
-         FROM workflow_steps ws WHERE ws.id = $1`,
+      expect(exhausted).toEqual({ retryScheduled: false, runFailed: true });
+      const terminal = await request<{
+        lifecycle: string;
+        waitReason: string;
+        failure: { exhausted: boolean };
+      }>(`/runs/${created.id}`);
+      expect(terminal).toMatchObject({
+        lifecycle: "FAILED",
+        waitReason: "NONE",
+        failure: { exhausted: true },
+      });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("honors pause and resume across an active-operation boundary", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "pause-resume-workflow", description: "Control state" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "pause resume" },
+          creationKey: "integration-pause-resume",
+        }),
+      });
+      const step = created.steps[0]!;
+      const claim = await claimOperation(
+        database,
+        {
+          runId: created.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        },
+        "pause-worker",
+        15_000,
+      );
+      expect(claim).not.toBeNull();
+
+      const pauseRequested = await request<{ control: string; publicStatus: string }>(
+        `/runs/${created.id}/pause`,
+        { method: "POST", body: "{}" },
+      );
+      expect(pauseRequested).toMatchObject({ control: "PAUSE_REQUESTED", publicStatus: "PAUSE_REQUESTED" });
+      await completeOperation(database, claim!, executeDeterministicOperation(claim!));
+
+      const paused = await request<{
+        control: string;
+        steps: Array<{ id: string; status: string }>;
+      }>(`/runs/${created.id}`);
+      expect(paused.control).toBe("PAUSED");
+      expect(paused.steps.map((candidate) => candidate.status)).toEqual(["SUCCEEDED", "READY"]);
+      const successor = paused.steps[1]!;
+      const pausedOutbox = await database.query<{ count: string }>(
+        "SELECT count(*) FROM outbox WHERE step_id = $1",
+        [successor.id],
+      );
+      expect(pausedOutbox.rows[0]?.count).toBe("0");
+
+      const resumed = await request<{ control: string; publicStatus: string }>(
+        `/runs/${created.id}/resume`,
+        { method: "POST", body: "{}" },
+      );
+      expect(resumed.control).toBe("RUN");
+      const resumedOutbox = await database.query<{ generations: number[] }>(
+        "SELECT ARRAY_AGG(generation ORDER BY generation) AS generations FROM outbox WHERE step_id = $1",
+        [successor.id],
+      );
+      expect(resumedOutbox.rows[0]?.generations).toEqual([2]);
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("fences an attempt deadline and persists a retry wait", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "attempt-timeout-workflow", description: "Attempt timeout" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "attempt timeout" },
+          creationKey: "integration-attempt-timeout",
+          retryPolicy: {
+            maxAttempts: 2,
+            initialBackoffMs: 1_000,
+            multiplier: 2,
+            maxBackoffMs: 2_000,
+          },
+        }),
+      });
+      const step = created.steps[0]!;
+      const claim = await claimOperation(
+        database,
+        {
+          runId: created.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        },
+        "timeout-worker",
+        15_000,
+        1_000,
+      );
+      expect(claim).not.toBeNull();
+      await database.query(
+        "UPDATE step_attempts SET deadline_at = now() - interval '1 second' WHERE id = $1",
+        [claim!.attemptId],
+      );
+
+      expect(await repairScheduling(database, 10_000)).toMatchObject({
+        timedOutAttempts: 1,
+        expiredLeases: 0,
+      });
+      const timedOut = await database.query<{
+        step_status: string;
+        attempt_status: string;
+        error_class: string;
+        code: string;
+      }>(
+        `SELECT ws.status AS step_status, sa.status AS attempt_status,
+           sa.error_class, sa.error_json->>'code' AS code
+         FROM workflow_steps ws JOIN step_attempts sa ON sa.step_id = ws.id
+         WHERE ws.id = $1`,
         [step.id],
       );
-      expect(settled.rows[0]).toEqual({ status: "READY", abandoned: "1" });
-      await database.query("UPDATE workflow_steps SET handler = 'generate-summary' WHERE id = $1", [step.id]);
+      expect(timedOut.rows[0]).toEqual({
+        step_status: "RETRY_WAIT",
+        attempt_status: "FAILED",
+        error_class: "TIMEOUT",
+        code: "ATTEMPT_TIMEOUT",
+      });
+      await expect(
+        completeOperation(database, claim!, executeDeterministicOperation(claim!)),
+      ).rejects.toThrow("lease fencing");
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("serializes resume with a due retry without duplicate dispatch", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "resume-retry-race-workflow", description: "Resume race" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "resume retry race" },
+          creationKey: "integration-resume-retry-race",
+        }),
+      });
+      const step = created.steps[0]!;
+      const claim = await claimOperation(
+        database,
+        {
+          runId: created.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        },
+        "resume-race-worker",
+        15_000,
+      );
+      expect(claim).not.toBeNull();
+      await controlRun(database, created.id, "pause");
+      expect(await settleOperationFailure(database, claim!, {
+        code: "TEMPORARY_FAILURE",
+        errorClass: "TRANSIENT",
+        message: "retry after resume",
+        retryable: true,
+      })).toMatchObject({ retryScheduled: true });
+      await database.query(
+        "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+
+      await Promise.all([
+        controlRun(database, created.id, "resume"),
+        repairScheduling(database, 10_000),
+      ]);
+      await repairScheduling(database, 10_000);
+      const persisted = await database.query<{
+        status: string;
+        control: string;
+        dispatch_generation: number;
+        replacement_dispatches: string;
+        retry_due_events: string;
+      }>(
+        `SELECT ws.status, wr.control, ws.dispatch_generation,
+           (SELECT count(*) FROM outbox WHERE step_id = ws.id AND generation = 2) AS replacement_dispatches,
+           (SELECT count(*) FROM audit_events
+            WHERE step_id = ws.id AND type = 'RETRY_DUE') AS retry_due_events
+         FROM workflow_steps ws JOIN workflow_runs wr ON wr.id = ws.run_id
+         WHERE ws.id = $1`,
+        [step.id],
+      );
+      expect(persisted.rows[0]).toEqual({
+        status: "READY",
+        control: "RUN",
+        dispatch_generation: 2,
+        replacement_dispatches: "1",
+        retry_due_events: "1",
+      });
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("serializes cancellation and timeout against worker completion", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "control-race-workflow", description: "Control races" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+      });
+
+      for (const mode of ["cancel", "timeout"] as const) {
+        const created = await request<{
+          id: string;
+          steps: Array<{ id: string; dispatchGeneration: number }>;
+        }>("/runs", {
+          method: "POST",
+          body: JSON.stringify({
+            workflowVersionId: version.id,
+            input: { mode },
+            creationKey: `integration-${mode}-race`,
+          }),
+        });
+        const step = created.steps[0]!;
+        const claim = await claimOperation(
+          database,
+          {
+            runId: created.id,
+            operationId: step.id,
+            workflowVersionId: version.id,
+            dispatchGeneration: step.dispatchGeneration,
+          },
+          `${mode}-worker`,
+          15_000,
+        );
+        expect(claim).not.toBeNull();
+
+        if (mode === "cancel") {
+          await Promise.all([
+            controlRun(database, created.id, "cancel"),
+            completeOperation(database, claim!, executeDeterministicOperation(claim!)),
+          ]);
+        } else {
+          await database.query(
+            "UPDATE workflow_runs SET deadline_at = now() - interval '1 second' WHERE id = $1",
+            [created.id],
+          );
+          await Promise.allSettled([
+            repairScheduling(database, 10_000),
+            completeOperation(database, claim!, executeDeterministicOperation(claim!)),
+          ]);
+        }
+
+        const run = await request<{
+          lifecycle: string;
+          steps: Array<{ status: string }>;
+        }>(`/runs/${created.id}`);
+        expect(run.lifecycle).toBe(mode === "cancel" ? "CANCELLED" : "TIMED_OUT");
+        expect(run.steps.some((candidate) => candidate.status === "READY" || candidate.status === "RUNNING")).toBe(false);
+      }
     } finally {
       await worker.resume();
     }
@@ -498,11 +917,21 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         [step.id],
       );
       expect(persisted.rows[0]).toEqual({
-        dispatch_generation: 2,
-        replacement_dispatches: "1",
+        dispatch_generation: 1,
+        replacement_dispatches: "0",
         abandoned_attempts: "1",
         expiry_events: "1",
       });
+
+      await database.query(
+        "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+        [step.id],
+      );
+      const dueRepairs = await Promise.all([
+        repairScheduling(database, 10_000),
+        repairScheduling(database, 10_000),
+      ]);
+      expect(dueRepairs.reduce((sum, result) => sum + result.dueRetries, 0)).toBe(1);
     } finally {
       await worker.resume();
     }

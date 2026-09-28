@@ -22,6 +22,7 @@ const worker = createOperationWorker({
   connection: redisConnection(config.REDIS_URL),
   workerId: config.WORKER_ID,
   leaseMs: config.OPERATION_LEASE_MS,
+  attemptTimeoutMs: config.ATTEMPT_TIMEOUT_MS,
   heartbeatMs: config.LEASE_HEARTBEAT_MS,
   concurrency: config.WORKER_CONCURRENCY,
 });

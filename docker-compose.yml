@@ -60,6 +60,7 @@ services:
       WORKER_ID: worker-compose-1
       WORKER_CONCURRENCY: 2
       OPERATION_LEASE_MS: 15000
+      ATTEMPT_TIMEOUT_MS: 60000
       LEASE_HEARTBEAT_MS: 5000
       OTEL_SERVICE_NAME: agentflow-worker
     command: ["pnpm", "--filter", "@agentflow/worker", "start"]

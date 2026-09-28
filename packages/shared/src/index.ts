@@ -8,9 +8,34 @@ export const stepStatuses = [
   "PENDING",
   "READY",
   "RUNNING",
+  "RETRY_WAIT",
   "SUCCEEDED",
   "FAILED",
+  "CANCELLED",
 ] as const;
+
+export const runLifecycles = ["OPEN", "SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"] as const;
+export const runControls = ["RUN", "PAUSE_REQUESTED", "PAUSED", "CANCEL_REQUESTED"] as const;
+export const runWaitReasons = ["NONE", "RETRY", "APPROVAL", "RECONCILIATION"] as const;
+
+export const defaultRetryPolicy = {
+  maxAttempts: 3,
+  initialBackoffMs: 1_000,
+  multiplier: 2,
+  maxBackoffMs: 30_000,
+} as const;
+
+export const retryPolicySchema = z.object({
+  maxAttempts: z.number().int().min(1).max(20).default(defaultRetryPolicy.maxAttempts),
+  initialBackoffMs: z.number().int().min(0).max(300_000).default(defaultRetryPolicy.initialBackoffMs),
+  multiplier: z.number().min(1).max(10).default(defaultRetryPolicy.multiplier),
+  maxBackoffMs: z.number().int().min(0).max(3_600_000).default(defaultRetryPolicy.maxBackoffMs),
+}).refine(
+  (policy) => policy.maxBackoffMs >= policy.initialBackoffMs,
+  { message: "maxBackoffMs must be greater than or equal to initialBackoffMs" },
+);
+
+export type RetryPolicy = z.infer<typeof retryPolicySchema>;
 
 export const workflowStepDefinitionSchema = z.object({
   key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -69,6 +94,8 @@ export const createRunSchema = z.object({
   workflowVersionId: z.string().uuid(),
   input: z.record(z.string(), z.unknown()),
   creationKey: z.string().min(1).max(200).optional(),
+  deadlineMs: z.number().int().min(1_000).max(86_400_000).default(300_000),
+  retryPolicy: retryPolicySchema.default(defaultRetryPolicy),
 });
 
 export function canonicalJson(value: unknown): string {

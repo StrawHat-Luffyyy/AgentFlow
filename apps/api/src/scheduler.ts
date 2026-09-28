@@ -25,7 +25,7 @@ export function createRecoveryScheduler(
     try {
       activeRepair = repairOnce();
       const repaired = await activeRepair;
-      if (repaired.expiredLeases || repaired.recoveredDispatches) {
+      if (Object.values(repaired).some((count) => count > 0)) {
         console.info("Scheduling repair completed", repaired);
       }
     } catch (error) {
