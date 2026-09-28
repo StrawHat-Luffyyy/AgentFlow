@@ -38,6 +38,8 @@ services:
       REDIS_URL: redis://redis:6379
       API_PORT: 3000
       OUTBOX_POLL_MS: 500
+      SCHEDULER_POLL_MS: 2000
+      DISPATCH_RECOVERY_MS: 10000
       OTEL_SERVICE_NAME: agentflow-api
     command: ["pnpm", "--filter", "@agentflow/api", "start"]
     ports:
@@ -58,6 +60,7 @@ services:
       WORKER_ID: worker-compose-1
       WORKER_CONCURRENCY: 2
       OPERATION_LEASE_MS: 15000
+      LEASE_HEARTBEAT_MS: 5000
       OTEL_SERVICE_NAME: agentflow-worker
     command: ["pnpm", "--filter", "@agentflow/worker", "start"]
     depends_on:

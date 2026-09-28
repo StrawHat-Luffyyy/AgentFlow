@@ -18,7 +18,9 @@ Worker → PostgreSQL eligibility check and fenced claim
 Atomic result + attempt + operation + checkpoint + successor + outbox
 ```
 
-PostgreSQL is authoritative. Queue delivery alone never authorizes execution.
+PostgreSQL is authoritative. Queue delivery alone never authorizes execution. Workers renew
+database leases while executing; the API-side recovery scheduler abandons expired attempts,
+advances the fencing epoch through a replacement claim, and recreates missing or stale dispatches.
 
 ## Workspace
 
@@ -72,4 +74,5 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Approvals, external-effect/idempotency records, lease heartbeats and reclamation, retry scheduling, provider adapters, LLM operations, repair scans, fault injection, and the React dashboard follow after this basic durable path is established.
+Approvals, external-effect/idempotency records, bounded failure retry policy, provider adapters,
+LLM operations, fault injection, and the React dashboard remain deferred.

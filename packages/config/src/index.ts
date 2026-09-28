@@ -14,9 +14,20 @@ const environmentSchema = z.object({
   WORKER_ID: z.string().min(1).default(`worker-${process.pid}`),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().max(32).default(2),
   OPERATION_LEASE_MS: z.coerce.number().int().min(1_000).default(15_000),
+  LEASE_HEARTBEAT_MS: z.coerce.number().int().min(100).default(5_000),
   OUTBOX_POLL_MS: z.coerce.number().int().min(100).default(500),
+  SCHEDULER_POLL_MS: z.coerce.number().int().min(100).default(2_000),
+  DISPATCH_RECOVERY_MS: z.coerce.number().int().min(1_000).default(10_000),
   OTEL_SERVICE_NAME: z.string().min(1).default("agentflow"),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
+}).superRefine((environment, context) => {
+  if (environment.LEASE_HEARTBEAT_MS >= environment.OPERATION_LEASE_MS) {
+    context.addIssue({
+      code: "custom",
+      path: ["LEASE_HEARTBEAT_MS"],
+      message: "LEASE_HEARTBEAT_MS must be less than OPERATION_LEASE_MS",
+    });
+  }
 });
 
 export type AgentFlowConfig = z.infer<typeof environmentSchema>;

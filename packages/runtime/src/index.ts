@@ -333,6 +333,173 @@ export async function claimOperation(
   });
 }
 
+export async function renewOperationLease(
+  database: Database,
+  operation: ClaimedOperation,
+  leaseMs: number,
+): Promise<boolean> {
+  const result = await database.query(
+    `UPDATE workflow_steps
+     SET lease_expires_at = now() + ($1 * interval '1 millisecond')
+     WHERE id = $2 AND run_id = $3 AND status = 'RUNNING'
+       AND lease_owner = $4 AND lease_epoch = $5
+       AND lease_expires_at > now()`,
+    [
+      leaseMs,
+      operation.operationId,
+      operation.runId,
+      operation.workerId,
+      operation.leaseEpoch,
+    ],
+  );
+  return result.rowCount === 1;
+}
+
+export interface SchedulingRepairResult {
+  expiredLeases: number;
+  recoveredDispatches: number;
+}
+
+/**
+ * Repairs database-authoritative work that can no longer make progress.
+ * Every mutation and replacement outbox intent is committed atomically.
+ */
+export async function repairScheduling(
+  database: Database,
+  dispatchRecoveryMs: number,
+  batchSize = 25,
+): Promise<SchedulingRepairResult> {
+  return withTransaction(database, async (transaction) => {
+    let expiredLeases = 0;
+    let recoveredDispatches = 0;
+
+    const expired = await transaction.query<{
+      id: string;
+      run_id: string;
+      workflow_version_id: string;
+      dispatch_generation: number;
+      lease_epoch: number;
+      attempt_id: string | null;
+    }>(
+      `SELECT ws.id, ws.run_id, wr.workflow_version_id,
+         ws.dispatch_generation, ws.lease_epoch,
+         (SELECT sa.id FROM step_attempts sa
+          WHERE sa.step_id = ws.id AND sa.epoch = ws.lease_epoch
+          ORDER BY sa.started_at DESC LIMIT 1) AS attempt_id
+       FROM workflow_steps ws
+       JOIN workflow_runs wr ON wr.id = ws.run_id
+       WHERE wr.lifecycle = 'OPEN' AND ws.status = 'RUNNING'
+         AND ws.lease_expires_at <= now()
+       ORDER BY ws.lease_expires_at, ws.id
+       LIMIT $1
+       FOR UPDATE OF ws SKIP LOCKED`,
+      [batchSize],
+    );
+
+    for (const row of expired.rows) {
+      const generation = row.dispatch_generation + 1;
+      if (row.attempt_id) {
+        await transaction.query(
+          `UPDATE step_attempts
+           SET status = 'ABANDONED', finished_at = now(),
+             error_json = jsonb_build_object('code', 'LEASE_EXPIRED', 'epoch', $2::integer)
+           WHERE id = $1 AND status = 'RUNNING'`,
+          [row.attempt_id, row.lease_epoch],
+        );
+      }
+      await transaction.query(
+        `UPDATE workflow_steps
+         SET status = 'READY', lease_owner = NULL, lease_expires_at = NULL,
+           dispatch_generation = $1
+         WHERE id = $2`,
+        [generation, row.id],
+      );
+      const job: OperationJob = {
+        runId: row.run_id,
+        operationId: row.id,
+        workflowVersionId: row.workflow_version_id,
+        dispatchGeneration: generation,
+      };
+      await transaction.query(
+        `INSERT INTO outbox
+           (id, run_id, step_id, generation, kind, payload_json)
+         VALUES ($1, $2, $3, $4, 'DISPATCH_OPERATION', $5::jsonb)`,
+        [randomUUID(), row.run_id, row.id, generation, JSON.stringify(job)],
+      );
+      const sequence = await nextEventSequence(transaction, row.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events
+           (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, $5, 'LEASE_EXPIRED', $6::jsonb)`,
+        [
+          randomUUID(),
+          row.run_id,
+          sequence,
+          row.id,
+          row.attempt_id,
+          JSON.stringify({ expiredEpoch: row.lease_epoch, dispatchGeneration: generation }),
+        ],
+      );
+      expiredLeases += 1;
+    }
+
+    const stranded = await transaction.query<{
+      id: string;
+      run_id: string;
+      workflow_version_id: string;
+      dispatch_generation: number;
+    }>(
+      `SELECT ws.id, ws.run_id, wr.workflow_version_id, ws.dispatch_generation
+       FROM workflow_steps ws
+       JOIN workflow_runs wr ON wr.id = ws.run_id
+       LEFT JOIN outbox current_dispatch
+         ON current_dispatch.step_id = ws.id
+        AND current_dispatch.generation = ws.dispatch_generation
+        AND current_dispatch.kind = 'DISPATCH_OPERATION'
+       WHERE wr.lifecycle = 'OPEN' AND ws.status = 'READY'
+         AND (
+           current_dispatch.id IS NULL OR
+           (current_dispatch.published_at IS NOT NULL AND
+            current_dispatch.published_at <= now() - ($1 * interval '1 millisecond'))
+         )
+       ORDER BY ws.created_at, ws.id
+       LIMIT $2
+       FOR UPDATE OF ws SKIP LOCKED`,
+      [dispatchRecoveryMs, batchSize],
+    );
+
+    for (const row of stranded.rows) {
+      const generation = row.dispatch_generation + 1;
+      await transaction.query(
+        "UPDATE workflow_steps SET dispatch_generation = $1 WHERE id = $2",
+        [generation, row.id],
+      );
+      const job: OperationJob = {
+        runId: row.run_id,
+        operationId: row.id,
+        workflowVersionId: row.workflow_version_id,
+        dispatchGeneration: generation,
+      };
+      await transaction.query(
+        `INSERT INTO outbox
+           (id, run_id, step_id, generation, kind, payload_json)
+         VALUES ($1, $2, $3, $4, 'DISPATCH_OPERATION', $5::jsonb)`,
+        [randomUUID(), row.run_id, row.id, generation, JSON.stringify(job)],
+      );
+      const sequence = await nextEventSequence(transaction, row.run_id);
+      await transaction.query(
+        `INSERT INTO audit_events
+           (id, run_id, sequence, step_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, 'DISPATCH_RECOVERED', $5::jsonb)`,
+        [randomUUID(), row.run_id, sequence, row.id, JSON.stringify({ dispatchGeneration: generation })],
+      );
+      recoveredDispatches += 1;
+    }
+
+    return { expiredLeases, recoveredDispatches };
+  });
+}
+
 export function executeDeterministicOperation(
   operation: ClaimedOperation,
 ): Record<string, unknown> {
