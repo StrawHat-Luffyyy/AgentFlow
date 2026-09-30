@@ -11,6 +11,10 @@ import {
   UnknownEffectError,
 } from "@agentflow/runtime";
 import { operationJobSchema, queueName } from "@agentflow/shared";
+import {
+  executeReferenceDeterministicOperation,
+  isReferenceDeterministicHandler,
+} from "@agentflow/research";
 import { Worker, type ConnectionOptions, type Job } from "bullmq";
 
 export async function processOperationJob(
@@ -53,9 +57,13 @@ export async function processOperationJob(
   try {
     let output: Record<string, unknown>;
     try {
-      output = operation.kind === "TOOL"
-        ? await executeToolOperation(database, operation)
-        : executeDeterministicOperation(operation);
+      if (operation.kind === "TOOL") {
+        output = await executeToolOperation(database, operation);
+      } else {
+        output = isReferenceDeterministicHandler(operation.handler)
+          ? await executeReferenceDeterministicOperation(database, operation)
+          : executeDeterministicOperation(operation);
+      }
     } catch (error) {
       if (error instanceof UnknownEffectError) {
         const settlement = await settleUnknownToolOutcome(database, operation, error);

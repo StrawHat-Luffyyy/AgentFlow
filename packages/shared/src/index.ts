@@ -50,7 +50,15 @@ export type RetryPolicy = z.infer<typeof retryPolicySchema>;
 const deterministicStepDefinitionSchema = z.object({
   key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
   kind: z.literal("DETERMINISTIC").default("DETERMINISTIC"),
-  handler: z.enum(["generate-summary", "finalize"]),
+  handler: z.enum([
+    "generate-summary",
+    "finalize",
+    "select-aws-sources",
+    "select-azure-sources",
+    "select-gcp-sources",
+    "collect-sources",
+    "generate-cloud-report",
+  ]),
 });
 
 const approvalStepDefinitionSchema = z.object({
@@ -64,7 +72,7 @@ const approvalStepDefinitionSchema = z.object({
 const toolStepDefinitionSchema = z.object({
   key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
   kind: z.literal("TOOL"),
-  handler: z.literal("publish-report"),
+  handler: z.enum(["publish-report", "publish-approved-report"]),
   toolVersion: z.string().trim().min(1).max(100).default("1"),
   effectClass: z.enum([
     "RECEIVER_IDEMPOTENT_WRITE",

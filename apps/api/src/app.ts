@@ -10,6 +10,7 @@ import {
   getRun,
   getRunApprovals,
   getRunHistory,
+  getRunSources,
   getRunToolExecutions,
   reconcileToolExecution,
 } from "@agentflow/runtime";
@@ -20,6 +21,11 @@ import {
   createWorkflowVersionSchema,
   reconciliationDecisionSchema,
 } from "@agentflow/shared";
+import {
+  cloudComparisonCorpusManifest,
+  cloudComparisonSetupSchema,
+  ensureCloudComparisonWorkflow,
+} from "@agentflow/research";
 import type { Queue } from "bullmq";
 import express from "express";
 import { z } from "zod";
@@ -34,6 +40,16 @@ export function createApp(database: Database, queue: Queue): express.Express {
     await database.query("SELECT 1");
     await queue.waitUntilReady();
     response.json({ status: "ready", database: "ok", queue: "ok" });
+  });
+
+  app.get("/reference-corpora/cloud-comparison-v1", (_request, response) => {
+    response.json(cloudComparisonCorpusManifest);
+  });
+
+  app.post("/reference-workflows/cloud-comparison", async (request, response) => {
+    const setup = cloudComparisonSetupSchema.parse(request.body ?? {});
+    const result = await ensureCloudComparisonWorkflow(database, setup);
+    response.status(result.created ? 201 : 200).json(result);
   });
 
   app.post("/workflows", async (request: express.Request, response: express.Response) => {
@@ -78,6 +94,11 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.get("/runs/:id/tool-executions", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ executions: await getRunToolExecutions(database, runId) });
+  });
+
+  app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ sources: await getRunSources(database, runId) });
   });
 
   app.post("/tool-executions/:id/reconcile", async (request: express.Request, response: express.Response) => {

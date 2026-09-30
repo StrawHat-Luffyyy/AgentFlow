@@ -410,6 +410,24 @@ export async function getRunToolExecutions(database: Queryable, runId: string) {
   return executions.rows;
 }
 
+export async function getRunSources(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const sources = await database.query(
+    `SELECT rse.step_id AS "stepId", rse.ordinal,
+       rs.id, rs.corpus_version AS "corpusVersion", rs.vendor, rs.category,
+       rs.title, rs.publisher, rs.source_url AS "sourceUrl",
+       rs.retrieved_at AS "retrievedAt", rs.excerpt,
+       rs.content_hash AS "contentHash", rse.evidence_hash AS "evidenceHash",
+       rs.metadata_json AS metadata, rse.created_at AS "committedAt"
+     FROM run_source_evidence rse
+     JOIN research_sources rs ON rs.id = rse.source_id
+     WHERE rse.run_id = $1 ORDER BY rse.ordinal`,
+    [runId],
+  );
+  return sources.rows;
+}
+
 export async function reconcileToolExecution(
   database: Database,
   toolExecutionId: string,
@@ -1139,8 +1157,54 @@ export async function executeToolOperation(
   database: Database,
   operation: ClaimedOperation,
 ): Promise<Record<string, unknown>> {
-  if (operation.handler !== "publish-report") {
+  if (operation.handler !== "publish-report" && operation.handler !== "publish-approved-report") {
     throw new PermanentOperationError(`Unsupported tool handler: ${operation.handler}`);
+  }
+  if (operation.handler === "publish-approved-report") {
+    const report = operation.input.report;
+    const publication = operation.input.publication;
+    const sourceSet = operation.input.sourceSet;
+    const binding = operation.input.approvalBinding;
+    if (
+      report === null || typeof report !== "object" || Array.isArray(report) ||
+      publication === null || typeof publication !== "object" || Array.isArray(publication) ||
+      sourceSet === null || typeof sourceSet !== "object" || Array.isArray(sourceSet) ||
+      binding === null || typeof binding !== "object" || Array.isArray(binding)
+    ) {
+      throw new PermanentOperationError("Approved publication payload is malformed", "INVALID_PUBLICATION_BINDING");
+    }
+    const typedReport = report as Record<string, unknown>;
+    const typedPublication = publication as Record<string, unknown>;
+    const typedSourceSet = sourceSet as Record<string, unknown>;
+    const typedBinding = binding as Record<string, unknown>;
+    const reportContent = typedReport.content;
+    const reportHash = typedReport.sha256;
+    const publicationTarget = typedPublication.target;
+    const corpusHash = typedSourceSet.corpusHash;
+    if (
+      typeof reportContent !== "string" || typeof reportHash !== "string" ||
+      createHash("sha256").update(reportContent, "utf8").digest("hex") !== reportHash ||
+      typedBinding.reportHash !== reportHash ||
+      typedBinding.publicationTarget !== publicationTarget ||
+      typedBinding.corpusHash !== corpusHash ||
+      typedBinding.bindingHash !== hash({ reportHash, publicationTarget, corpusHash })
+    ) {
+      throw new PermanentOperationError("Publication binding does not match report, target, and corpus", "INVALID_PUBLICATION_BINDING");
+    }
+    const approval = await database.query(
+      `SELECT 1
+       FROM approvals a
+       JOIN workflow_steps approval_step ON approval_step.id = a.step_id
+       WHERE a.run_id = $1 AND a.status = 'APPROVED'
+         AND approval_step.position = $2 - 1
+         AND approval_step.status = 'SUCCEEDED'
+         AND a.payload_hash = $3
+       LIMIT 1`,
+      [operation.runId, operation.position, hash(operation.input)],
+    );
+    if (approval.rowCount !== 1) {
+      throw new PermanentOperationError("Publication is not bound to an approved payload", "PUBLICATION_NOT_APPROVED");
+    }
   }
   const intent = await prepareToolExecution(database, operation);
   let result: Awaited<ReturnType<typeof publishToControlledReceiver>>;
