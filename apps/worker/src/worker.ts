@@ -1,4 +1,5 @@
 import type { Database } from "@agentflow/db";
+import type { AgentHarness } from "@agentflow/harness";
 import {
   claimOperation,
   classifyOperationError,
@@ -16,6 +17,7 @@ import {
   isReferenceDeterministicHandler,
 } from "@agentflow/research";
 import { Worker, type ConnectionOptions, type Job } from "bullmq";
+import { executeBoundedAgentOperation } from "./agent.js";
 
 export async function processOperationJob(
   database: Database,
@@ -24,6 +26,7 @@ export async function processOperationJob(
   job: Job,
   heartbeatMs = Math.max(100, Math.floor(leaseMs / 3)),
   attemptTimeoutMs = 60_000,
+  harness?: AgentHarness,
 ) {
   const message = operationJobSchema.parse(job.data);
   const operation = await claimOperation(database, message, workerId, leaseMs, attemptTimeoutMs);
@@ -59,6 +62,9 @@ export async function processOperationJob(
     try {
       if (operation.kind === "TOOL") {
         output = await executeToolOperation(database, operation);
+      } else if (operation.kind === "AGENT") {
+        if (!harness) throw new Error("Worker has no agent harness configured");
+        output = await executeBoundedAgentOperation(database, operation, harness);
       } else {
         output = isReferenceDeterministicHandler(operation.handler)
           ? await executeReferenceDeterministicOperation(database, operation)
@@ -90,6 +96,7 @@ export function createOperationWorker(options: {
   heartbeatMs?: number;
   concurrency: number;
   queueName?: string;
+  harness?: AgentHarness;
 }) {
   return new Worker(
     options.queueName ?? queueName,
@@ -100,6 +107,7 @@ export function createOperationWorker(options: {
       job,
       options.heartbeatMs ?? Math.max(100, Math.floor(options.leaseMs / 3)),
       options.attemptTimeoutMs ?? 60_000,
+      options.harness,
     ),
     {
       connection: options.connection,

@@ -10,8 +10,10 @@ import {
   getRun,
   getRunApprovals,
   getRunHistory,
+  getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getRunUsage,
   reconcileToolExecution,
 } from "@agentflow/runtime";
 import {
@@ -94,6 +96,16 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.get("/runs/:id/tool-executions", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ executions: await getRunToolExecutions(database, runId) });
+  });
+
+  app.get("/runs/:id/harness-operations", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ operations: await getRunHarnessOperations(database, runId) });
+  });
+
+  app.get("/runs/:id/usage", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ usage: await getRunUsage(database, runId) });
   });
 
   app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {

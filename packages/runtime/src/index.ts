@@ -44,10 +44,11 @@ async function materializeStep(
   const stepId = randomUUID();
   const waitingForApproval = input.definition.kind === "APPROVAL";
   await transaction.query(
-    `INSERT INTO workflow_steps
+      `INSERT INTO workflow_steps
        (id, run_id, node_key, position, kind, handler, effect_class, tool_version,
-        status, input_json, max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14)`,
+        status, input_json, max_attempts, retry_initial_ms, retry_multiplier, retry_cap_ms,
+        agent_config_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15::jsonb)`,
     [
       stepId,
       input.runId,
@@ -63,6 +64,15 @@ async function materializeStep(
       input.policy.initialBackoffMs,
       input.policy.multiplier,
       input.policy.maxBackoffMs,
+      input.definition.kind === "AGENT" ? JSON.stringify({
+        provider: input.definition.provider,
+        model: input.definition.model,
+        instructions: input.definition.instructions,
+        allowedTools: input.definition.allowedTools,
+        maxTurns: input.definition.maxTurns,
+        ...(input.definition.maxOutputTokens === undefined
+          ? {} : { maxOutputTokens: input.definition.maxOutputTokens }),
+      }) : null,
     ],
   );
 
@@ -864,6 +874,15 @@ export interface ClaimedOperation {
   toolVersion: string;
   position: number;
   input: Record<string, unknown>;
+  attemptDeadlineAt: Date;
+  agentConfig: {
+    provider: string;
+    model: string;
+    instructions: string;
+    allowedTools: string[];
+    maxTurns: number;
+    maxOutputTokens?: number;
+  } | null;
 }
 
 export async function claimOperation(
@@ -894,13 +913,14 @@ export async function claimOperation(
       tool_version: string;
       position: number;
       input_json: Record<string, unknown>;
+      agent_config_json: ClaimedOperation["agentConfig"];
     }>(
       `SELECT wr.id AS run_id, ws.id AS operation_id,
          wr.workflow_version_id, wr.lifecycle, wr.control, wr.wait_reason,
          (wr.deadline_at > now()) AS deadline_valid, ws.status,
          ws.dispatch_generation, ws.attempt_count, ws.lease_epoch,
          ws.node_key, ws.kind, ws.handler, ws.effect_class, ws.tool_version,
-         ws.position, ws.input_json
+         ws.position, ws.input_json, ws.agent_config_json
        FROM workflow_runs wr
        JOIN workflow_steps ws ON ws.run_id = wr.id
        WHERE wr.id = $1 AND ws.id = $2
@@ -953,6 +973,8 @@ export async function claimOperation(
       toolVersion: row.tool_version,
       position: row.position,
       input: row.input_json,
+      attemptDeadlineAt: new Date(Date.now() + attemptTimeoutMs),
+      agentConfig: row.agent_config_json,
     };
   });
 }
@@ -2468,4 +2490,562 @@ export async function completeOperation(
       span.end();
     }
   });
+}
+
+export interface BeginHarnessLlmInput {
+  ordinal: number;
+  turn: number;
+  maxTurns: number;
+  provider: string;
+  adapterVersion: string;
+  model: string;
+  request: Record<string, unknown>;
+}
+
+export type BegunHarnessLlmOperation =
+  | {
+      replayed: true;
+      harnessOperationId: string;
+      output: Record<string, unknown>;
+      continuationState: Record<string, unknown> | null;
+    }
+  | {
+      replayed: false;
+      harnessOperationId: string;
+      providerCallId: string;
+      logicalOperationId: string;
+    };
+
+/**
+ * Creates one durable LLM logical operation and one physical provider-call record.
+ * A completed logical operation is replayed without contacting the provider again.
+ */
+export async function beginHarnessLlmOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  input: BeginHarnessLlmInput,
+): Promise<BegunHarnessLlmOperation> {
+  if (operation.kind !== "AGENT") throw new ConflictError("Harness LLM operation requires an agent step");
+  if (!Number.isInteger(input.ordinal) || input.ordinal < 0) {
+    throw new ConflictError("Harness operation ordinal must be a non-negative integer");
+  }
+  if (!Number.isInteger(input.turn) || !Number.isInteger(input.maxTurns) ||
+      input.turn < 1 || input.maxTurns < 1 || input.turn > input.maxTurns) {
+    throw new ConflictError("Harness operation exceeds its bounded turn policy");
+  }
+  return withTransaction(database, async (transaction) => {
+    const fence = await transaction.query<{
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      step_status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+    }>(
+      `SELECT wr.lifecycle, wr.control, (wr.deadline_at > now()) AS deadline_valid,
+         ws.status AS step_status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status
+       FROM workflow_runs wr
+       JOIN workflow_steps ws ON ws.run_id = wr.id
+       JOIN step_attempts sa ON sa.step_id = ws.id
+       WHERE wr.id = $1 AND ws.id = $2 AND sa.id = $3
+       FOR UPDATE OF wr, ws, sa`,
+      [operation.runId, operation.operationId, operation.attemptId],
+    );
+    const fenced = fence.rows[0];
+    if (
+      !fenced || fenced.lifecycle !== "OPEN" || fenced.control !== "RUN" ||
+      !fenced.deadline_valid || fenced.step_status !== "RUNNING" ||
+      fenced.lease_owner !== operation.workerId || fenced.lease_epoch !== operation.leaseEpoch ||
+      !fenced.lease_valid || fenced.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Harness operation rejected by lease fencing");
+    }
+
+    const requestHash = hash(input.request);
+    const proposedId = randomUUID();
+    await transaction.query(
+      `INSERT INTO harness_operations
+         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash)
+       VALUES ($1, $2, $3, $4, 'LLM', $5, $6, 'PENDING', $7)
+       ON CONFLICT (step_id, ordinal) DO NOTHING`,
+      [
+        proposedId,
+        operation.runId,
+        operation.operationId,
+        input.ordinal,
+        input.turn,
+        input.maxTurns,
+        requestHash,
+      ],
+    );
+    const existing = await transaction.query<{
+      id: string;
+      kind: string;
+      turn: number;
+      max_turns: number;
+      request_hash: string;
+      status: string;
+      output_json: Record<string, unknown> | null;
+      continuation_state_json: Record<string, unknown> | null;
+    }>(
+      `SELECT id, kind, turn, max_turns, request_hash, status, output_json,
+         continuation_state_json
+       FROM harness_operations WHERE step_id = $1 AND ordinal = $2 FOR UPDATE`,
+      [operation.operationId, input.ordinal],
+    );
+    const logical = existing.rows[0]!;
+    if (
+      logical.kind !== "LLM" || logical.turn !== input.turn ||
+      logical.max_turns !== input.maxTurns || logical.request_hash !== requestHash
+    ) {
+      throw new ConflictError("Harness operation identity is bound to different request data");
+    }
+    if (logical.status === "SUCCEEDED") {
+      if (!logical.output_json) throw new ConflictError("Completed harness operation has no output");
+      return {
+        replayed: true,
+        harnessOperationId: logical.id,
+        output: logical.output_json,
+        continuationState: logical.continuation_state_json,
+      };
+    }
+
+    const duplicateAttempt = await transaction.query(
+      `SELECT 1 FROM provider_calls
+       WHERE harness_operation_id = $1 AND attempt_id = $2 LIMIT 1`,
+      [logical.id, operation.attemptId],
+    );
+    if (duplicateAttempt.rowCount !== 0) {
+      throw new ConflictError("This attempt already started the provider call");
+    }
+    const unresolvedCalls = await transaction.query<{
+      id: string;
+      attempt_id: string;
+      provider: string;
+      requested_model: string;
+    }>(
+      `SELECT id, attempt_id, provider, requested_model FROM provider_calls
+       WHERE harness_operation_id = $1 AND status = 'IN_FLIGHT' FOR UPDATE`,
+      [logical.id],
+    );
+    await transaction.query(
+      `UPDATE provider_calls SET status = 'UNKNOWN', finished_at = now(),
+         error_json = '{"code":"PROVIDER_RESPONSE_LOST"}'::jsonb
+       WHERE harness_operation_id = $1 AND status = 'IN_FLIGHT'`,
+      [logical.id],
+    );
+    for (const unresolved of unresolvedCalls.rows) {
+      await transaction.query(
+        `INSERT INTO usage_records
+           (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
+            provenance, raw_usage_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'unknown',
+           '{"unknownDueTo":"PROVIDER_RESPONSE_LOST"}'::jsonb)
+         ON CONFLICT (provider_call_id) DO NOTHING`,
+        [
+          randomUUID(), operation.runId, operation.operationId, unresolved.attempt_id,
+          unresolved.id, unresolved.provider, unresolved.requested_model,
+        ],
+      );
+    }
+    const callCount = await transaction.query<{ next_call: number }>(
+      `SELECT COALESCE(MAX(call_no), 0)::integer + 1 AS next_call
+       FROM provider_calls WHERE harness_operation_id = $1`,
+      [logical.id],
+    );
+    const providerCallId = randomUUID();
+    await transaction.query(
+      `INSERT INTO provider_calls
+         (id, harness_operation_id, step_id, attempt_id, call_no, provider,
+          adapter_version, requested_model, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'IN_FLIGHT')`,
+      [
+        providerCallId,
+        logical.id,
+        operation.operationId,
+        operation.attemptId,
+        callCount.rows[0]?.next_call ?? 1,
+        input.provider,
+        input.adapterVersion,
+        input.model,
+      ],
+    );
+    await transaction.query(
+      "UPDATE harness_operations SET status = 'RUNNING' WHERE id = $1",
+      [logical.id],
+    );
+    return {
+      replayed: false,
+      harnessOperationId: logical.id,
+      providerCallId,
+      logicalOperationId: logical.id,
+    };
+  });
+}
+
+export interface CompleteHarnessLlmInput {
+  output: Record<string, unknown>;
+  continuationState: Record<string, unknown> | null;
+  providerRequestId: string | null;
+  resolvedModel: string;
+  finishReason: string;
+  usage: {
+    provenance: "reported" | "estimated" | "unknown";
+    inputTokens: number | null;
+    outputTokens: number | null;
+    cachedInputTokens: number | null;
+    reasoningTokens: number | null;
+    raw: Record<string, unknown>;
+  };
+}
+
+/** Commits response, opaque continuation state, and usage under the active lease. */
+export async function completeHarnessLlmOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  providerCallId: string,
+  input: CompleteHarnessLlmInput,
+) {
+  return withTransaction(database, async (transaction) => {
+    const locked = await transaction.query<{
+      harness_operation_id: string;
+      provider: string;
+      requested_model: string;
+      call_status: string;
+      operation_status: string;
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      step_status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+    }>(
+      `SELECT pc.harness_operation_id, pc.provider, pc.requested_model,
+         pc.status AS call_status, ho.status AS operation_status,
+         wr.lifecycle, wr.control, (wr.deadline_at > now()) AS deadline_valid,
+         ws.status AS step_status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status
+       FROM provider_calls pc
+       JOIN harness_operations ho ON ho.id = pc.harness_operation_id
+       JOIN workflow_steps ws ON ws.id = pc.step_id
+       JOIN workflow_runs wr ON wr.id = ws.run_id
+       JOIN step_attempts sa ON sa.id = pc.attempt_id
+       WHERE pc.id = $1 AND pc.attempt_id = $2 AND pc.step_id = $3
+       FOR UPDATE OF pc, ho, wr, ws, sa`,
+      [providerCallId, operation.attemptId, operation.operationId],
+    );
+    const row = locked.rows[0];
+    if (
+      !row || row.call_status !== "IN_FLIGHT" || row.operation_status !== "RUNNING" ||
+      row.lifecycle !== "OPEN" || row.control !== "RUN" || !row.deadline_valid ||
+      row.step_status !== "RUNNING" || row.lease_owner !== operation.workerId ||
+      row.lease_epoch !== operation.leaseEpoch || !row.lease_valid ||
+      row.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Provider response rejected by lease fencing");
+    }
+    await transaction.query(
+      `UPDATE provider_calls SET status = 'SUCCEEDED', provider_request_id = $1,
+         resolved_model = $2, finish_reason = $3, accepted = true, finished_at = now()
+       WHERE id = $4`,
+      [input.providerRequestId, input.resolvedModel, input.finishReason, providerCallId],
+    );
+    await transaction.query(
+      `UPDATE harness_operations SET status = 'SUCCEEDED', output_json = $1::jsonb,
+         continuation_state_json = $2::jsonb, completed_at = now()
+       WHERE id = $3`,
+      [
+        JSON.stringify(input.output),
+        input.continuationState === null ? null : JSON.stringify(input.continuationState),
+        row.harness_operation_id,
+      ],
+    );
+    await transaction.query(
+      `INSERT INTO usage_records
+         (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
+          provenance, input_tokens, output_tokens, cached_input_tokens,
+          reasoning_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)`,
+      [
+        randomUUID(),
+        operation.runId,
+        operation.operationId,
+        operation.attemptId,
+        providerCallId,
+        row.provider,
+        input.resolvedModel || row.requested_model,
+        input.usage.provenance,
+        input.usage.inputTokens,
+        input.usage.outputTokens,
+        input.usage.cachedInputTokens,
+        input.usage.reasoningTokens,
+        JSON.stringify(input.usage.raw),
+      ],
+    );
+    return { harnessOperationId: row.harness_operation_id, providerCallId };
+  });
+}
+
+/** Records billable usage from a response that lost the lease without accepting its output. */
+export async function recordUnacceptedHarnessLlmResponse(
+  database: Database,
+  operation: ClaimedOperation,
+  providerCallId: string,
+  input: CompleteHarnessLlmInput,
+) {
+  return withTransaction(database, async (transaction) => {
+    const result = await transaction.query<{
+      provider: string;
+      requested_model: string;
+      status: string;
+    }>(
+      `SELECT provider, requested_model, status FROM provider_calls
+       WHERE id = $1 AND attempt_id = $2 AND step_id = $3 FOR UPDATE`,
+      [providerCallId, operation.attemptId, operation.operationId],
+    );
+    const row = result.rows[0];
+    if (!row || row.status !== "IN_FLIGHT") return { recorded: false };
+    await transaction.query(
+      `UPDATE provider_calls SET status = 'SUCCEEDED', provider_request_id = $1,
+         resolved_model = $2, finish_reason = $3, accepted = false, finished_at = now()
+       WHERE id = $4`,
+      [input.providerRequestId, input.resolvedModel, input.finishReason, providerCallId],
+    );
+    await transaction.query(
+      `INSERT INTO usage_records
+         (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
+          provenance, input_tokens, output_tokens, cached_input_tokens,
+          reasoning_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+       ON CONFLICT (provider_call_id) DO NOTHING`,
+      [
+        randomUUID(), operation.runId, operation.operationId, operation.attemptId,
+        providerCallId, row.provider, input.resolvedModel || row.requested_model,
+        input.usage.provenance, input.usage.inputTokens, input.usage.outputTokens,
+        input.usage.cachedInputTokens, input.usage.reasoningTokens,
+        JSON.stringify(input.usage.raw),
+      ],
+    );
+    return { recorded: true };
+  });
+}
+
+export async function failHarnessLlmOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  providerCallId: string,
+  failure: { code: string; message: string; outcomeUnknown: boolean },
+) {
+  return withTransaction(database, async (transaction) => {
+    const result = await transaction.query<{
+      harness_operation_id: string;
+      provider: string;
+      requested_model: string;
+      status: string;
+    }>(
+      `SELECT harness_operation_id, provider, requested_model, status
+       FROM provider_calls
+       WHERE id = $1 AND attempt_id = $2 AND step_id = $3
+       FOR UPDATE`,
+      [providerCallId, operation.attemptId, operation.operationId],
+    );
+    const row = result.rows[0];
+    if (!row || row.status !== "IN_FLIGHT") {
+      throw new ConflictError("Provider failure is no longer authoritative");
+    }
+    const status = failure.outcomeUnknown ? "UNKNOWN" : "FAILED";
+    await transaction.query(
+      `UPDATE provider_calls SET status = $1, error_json = $2::jsonb, finished_at = now()
+       WHERE id = $3`,
+      [status, JSON.stringify({ code: failure.code, message: failure.message.slice(0, 1_000) }), providerCallId],
+    );
+    await transaction.query(
+      `UPDATE harness_operations ho SET status = 'PENDING'
+       WHERE ho.id = $1 AND ho.status = 'RUNNING'
+         AND NOT EXISTS (
+           SELECT 1 FROM provider_calls pc
+           WHERE pc.harness_operation_id = ho.id AND pc.id <> $2
+             AND pc.status IN ('IN_FLIGHT', 'SUCCEEDED')
+         )`,
+      [row.harness_operation_id, providerCallId],
+    );
+    await transaction.query(
+      `INSERT INTO usage_records
+         (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
+          provenance, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'unknown', $8::jsonb)`,
+      [
+        randomUUID(), operation.runId, operation.operationId, operation.attemptId,
+        providerCallId, row.provider, row.requested_model,
+        JSON.stringify({ unknownDueTo: failure.code }),
+      ],
+    );
+    return { providerCallId, status };
+  });
+}
+
+export interface BeginHarnessToolInput {
+  ordinal: number;
+  turn: number;
+  maxTurns: number;
+  request: Record<string, unknown>;
+}
+
+export type BegunHarnessToolOperation =
+  | { replayed: true; harnessOperationId: string; output: Record<string, unknown> }
+  | { replayed: false; harnessOperationId: string; logicalOperationId: string };
+
+export async function beginHarnessToolOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  input: BeginHarnessToolInput,
+): Promise<BegunHarnessToolOperation> {
+  if (operation.kind !== "AGENT") throw new ConflictError("Harness tool operation requires an agent step");
+  if (!Number.isInteger(input.ordinal) || input.ordinal < 0 ||
+      !Number.isInteger(input.turn) || !Number.isInteger(input.maxTurns) ||
+      input.turn < 1 || input.maxTurns < 1 || input.turn > input.maxTurns) {
+    throw new ConflictError("Invalid bounded harness tool operation identity");
+  }
+  return withTransaction(database, async (transaction) => {
+    const fence = await transaction.query<{
+      lifecycle: string;
+      control: string;
+      deadline_valid: boolean;
+      step_status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+    }>(
+      `SELECT wr.lifecycle, wr.control, (wr.deadline_at > now()) AS deadline_valid,
+         ws.status AS step_status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status
+       FROM workflow_runs wr
+       JOIN workflow_steps ws ON ws.run_id = wr.id
+       JOIN step_attempts sa ON sa.step_id = ws.id
+       WHERE wr.id = $1 AND ws.id = $2 AND sa.id = $3
+       FOR UPDATE OF wr, ws, sa`,
+      [operation.runId, operation.operationId, operation.attemptId],
+    );
+    const row = fence.rows[0];
+    if (
+      !row || row.lifecycle !== "OPEN" || row.control !== "RUN" || !row.deadline_valid ||
+      row.step_status !== "RUNNING" || row.lease_owner !== operation.workerId ||
+      row.lease_epoch !== operation.leaseEpoch || !row.lease_valid || row.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Harness tool operation rejected by lease fencing");
+    }
+    const requestHash = hash(input.request);
+    const proposedId = randomUUID();
+    await transaction.query(
+      `INSERT INTO harness_operations
+         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash)
+       VALUES ($1, $2, $3, $4, 'TOOL', $5, $6, 'PENDING', $7)
+       ON CONFLICT (step_id, ordinal) DO NOTHING`,
+      [proposedId, operation.runId, operation.operationId, input.ordinal, input.turn, input.maxTurns, requestHash],
+    );
+    const found = await transaction.query<{
+      id: string;
+      kind: string;
+      turn: number;
+      max_turns: number;
+      request_hash: string;
+      status: string;
+      output_json: Record<string, unknown> | null;
+    }>(
+      `SELECT id, kind, turn, max_turns, request_hash, status, output_json
+       FROM harness_operations WHERE step_id = $1 AND ordinal = $2 FOR UPDATE`,
+      [operation.operationId, input.ordinal],
+    );
+    const logical = found.rows[0]!;
+    if (
+      logical.kind !== "TOOL" || logical.turn !== input.turn ||
+      logical.max_turns !== input.maxTurns || logical.request_hash !== requestHash
+    ) {
+      throw new ConflictError("Harness tool identity is bound to different request data");
+    }
+    if (logical.status === "SUCCEEDED") {
+      if (!logical.output_json) throw new ConflictError("Completed harness tool operation has no output");
+      return { replayed: true, harnessOperationId: logical.id, output: logical.output_json };
+    }
+    await transaction.query(
+      "UPDATE harness_operations SET status = 'RUNNING' WHERE id = $1",
+      [logical.id],
+    );
+    return { replayed: false, harnessOperationId: logical.id, logicalOperationId: logical.id };
+  });
+}
+
+export async function completeHarnessToolOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  harnessOperationId: string,
+  output: Record<string, unknown>,
+) {
+  return withTransaction(database, async (transaction) => {
+    const updated = await transaction.query(
+      `UPDATE harness_operations ho SET status = 'SUCCEEDED', output_json = $1::jsonb,
+         completed_at = now()
+       FROM workflow_steps ws, workflow_runs wr, step_attempts sa
+       WHERE ho.id = $2 AND ho.step_id = $3 AND ho.kind = 'TOOL' AND ho.status = 'RUNNING'
+         AND ws.id = ho.step_id AND wr.id = ws.run_id AND sa.id = $4 AND sa.step_id = ws.id
+         AND wr.lifecycle = 'OPEN' AND wr.control = 'RUN' AND wr.deadline_at > now()
+         AND ws.status = 'RUNNING' AND ws.lease_owner = $5 AND ws.lease_epoch = $6
+         AND ws.lease_expires_at > now() AND sa.status = 'RUNNING'`,
+      [
+        JSON.stringify(output), harnessOperationId, operation.operationId, operation.attemptId,
+        operation.workerId, operation.leaseEpoch,
+      ],
+    );
+    if (updated.rowCount !== 1) throw new ConflictError("Harness tool result rejected by lease fencing");
+    return { harnessOperationId };
+  });
+}
+
+export async function getRunHarnessOperations(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const result = await database.query(
+    `SELECT ho.id, ho.step_id AS "stepId", ho.ordinal, ho.kind, ho.turn,
+       ho.max_turns AS "maxTurns", ho.status, ho.output_json AS output,
+       ho.continuation_state_json AS "continuationState", ho.created_at AS "createdAt",
+       ho.completed_at AS "completedAt",
+       COALESCE(jsonb_agg(jsonb_build_object(
+         'id', pc.id, 'attemptId', pc.attempt_id, 'callNo', pc.call_no,
+         'provider', pc.provider, 'adapterVersion', pc.adapter_version,
+         'requestedModel', pc.requested_model, 'resolvedModel', pc.resolved_model,
+         'status', pc.status, 'accepted', pc.accepted,
+         'providerRequestId', pc.provider_request_id,
+         'finishReason', pc.finish_reason, 'startedAt', pc.started_at,
+         'finishedAt', pc.finished_at
+       ) ORDER BY pc.call_no) FILTER (WHERE pc.id IS NOT NULL), '[]'::jsonb) AS calls
+     FROM harness_operations ho
+     JOIN workflow_steps ws ON ws.id = ho.step_id
+     LEFT JOIN provider_calls pc ON pc.harness_operation_id = ho.id
+     WHERE ho.run_id = $1
+     GROUP BY ho.id, ws.position
+     ORDER BY ws.position, ho.ordinal`,
+    [runId],
+  );
+  return result.rows;
+}
+
+export async function getRunUsage(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const result = await database.query(
+    `SELECT id, step_id AS "stepId", attempt_id AS "attemptId",
+       provider_call_id AS "providerCallId", provider, model, provenance,
+       input_tokens AS "inputTokens", output_tokens AS "outputTokens",
+       cached_input_tokens AS "cachedInputTokens", reasoning_tokens AS "reasoningTokens",
+       raw_usage_json AS raw, created_at AS "createdAt"
+     FROM usage_records WHERE run_id = $1 ORDER BY created_at, id`,
+    [runId],
+  );
+  return result.rows;
 }

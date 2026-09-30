@@ -1,5 +1,12 @@
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
+import {
+  AgentHarness,
+  OllamaProvider,
+  OpenAIResponsesProvider,
+  ProviderRegistry,
+  ToolRegistry,
+} from "@agentflow/harness";
 import type { ConnectionOptions } from "bullmq";
 import { createOperationWorker } from "./worker.js";
 
@@ -17,6 +24,16 @@ const config = loadConfig();
 const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
+const providers = new ProviderRegistry()
+  .register(new OllamaProvider({ baseUrl: config.OLLAMA_BASE_URL }));
+if (config.OPENAI_API_KEY) {
+  providers.register(new OpenAIResponsesProvider({
+    apiKey: config.OPENAI_API_KEY,
+    baseUrl: config.OPENAI_BASE_URL,
+  }));
+}
+const harness = new AgentHarness(providers, new ToolRegistry());
+
 const worker = createOperationWorker({
   database,
   connection: redisConnection(config.REDIS_URL),
@@ -25,6 +42,7 @@ const worker = createOperationWorker({
   attemptTimeoutMs: config.ATTEMPT_TIMEOUT_MS,
   heartbeatMs: config.LEASE_HEARTBEAT_MS,
   concurrency: config.WORKER_CONCURRENCY,
+  harness,
 });
 
 worker.on("completed", (job, result) => {

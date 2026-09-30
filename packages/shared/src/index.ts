@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const tracer = trace.getTracer("agentflow-runtime", "0.1.0");
 
-export const stepKinds = ["DETERMINISTIC", "APPROVAL", "TOOL"] as const;
+export const stepKinds = ["DETERMINISTIC", "APPROVAL", "TOOL", "AGENT"] as const;
 export const effectClasses = [
   "PURE",
   "REPEATABLE_READ",
@@ -80,10 +80,28 @@ const toolStepDefinitionSchema = z.object({
   ]),
 });
 
+const agentStepDefinitionSchema = z.object({
+  key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
+  kind: z.literal("AGENT"),
+  handler: z.literal("agent"),
+  provider: z.string().trim().min(1).max(100),
+  model: z.string().trim().min(1).max(200),
+  instructions: z.string().trim().min(1).max(20_000),
+  allowedTools: z.array(z.string().min(1).max(128)).max(20).default([]),
+  maxTurns: z.number().int().min(1).max(20).default(10),
+  maxOutputTokens: z.number().int().min(1).max(100_000).optional(),
+}).superRefine((definition, context) => {
+  const unique = new Set(definition.allowedTools);
+  if (unique.size !== definition.allowedTools.length) {
+    context.addIssue({ code: "custom", path: ["allowedTools"], message: "Agent tool allowlist contains duplicates" });
+  }
+});
+
 export const workflowStepDefinitionSchema = z.union([
   deterministicStepDefinitionSchema,
   approvalStepDefinitionSchema,
   toolStepDefinitionSchema,
+  agentStepDefinitionSchema,
 ]);
 
 export const workflowDefinitionSchema = z.object({

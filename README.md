@@ -1,6 +1,6 @@
 # AgentFlow
 
-AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, and a worker that executes deterministic logical operations.
+AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, and a worker that executes deterministic, tool, and bounded-agent logical operations.
 
 The Python research prototype is a separate workstream and is not embedded in this TypeScript platform.
 
@@ -14,7 +14,7 @@ PostgreSQL run + operation + checkpoint + outbox
 BullMQ / Redis
     ↓ operation reference
 Worker → PostgreSQL eligibility check and fenced claim
-    ↓ execute outside transaction
+    ↓ harness → normalized provider/tool boundary
 Atomic result + attempt + operation + checkpoint + successor + outbox
 ```
 
@@ -26,6 +26,9 @@ due time or a terminal failure. Approval gates and side-effect outcomes are also
 Tool attempts use stable logical keys and an independent controlled-receiver ledger: supported
 receivers safely deduplicate retries, while ambiguous unsupported writes enter `UNKNOWN` and
 `RECONCILIATION` without automatic resend. BullMQ does not own business retries or effect safety.
+Bounded agent nodes persist every LLM decision and permitted read-only tool call as a separate
+turn/ordinal operation. A committed decision is replayed after a worker crash; an uncommitted
+provider call may be repeated and is retained with unknown usage rather than counted as zero.
 
 ## Workspace
 
@@ -34,6 +37,7 @@ receivers safely deduplicate retries, while ambiguous unsupported writes enter `
 - `apps/web`: reserved dashboard boundary
 - `packages/config`: startup environment validation
 - `packages/db`: PostgreSQL pool, migration runner, and migrations
+- `packages/harness`: provider contract, registries, bounded-turn enforcement, and adapters
 - `packages/runtime`: durable domain transactions and execution semantics
 - `packages/shared`: schemas, queue contracts, and shared types
 - `tests/integration`: real PostgreSQL/Redis end-to-end verification
@@ -64,6 +68,29 @@ Runs accept optional `deadlineMs` and `retryPolicy` fields. Durable controls are
 `POST /runs/:id/pause`, `POST /runs/:id/resume`, and `POST /runs/:id/cancel`. The run response
 reports independent `lifecycle`, `control`, `waitReason`, and derived `publicStatus` values.
 
+An `AGENT` workflow step pins its provider, model, instructions, read-only tool allowlist, and
+turn bound in the immutable workflow version:
+
+```json
+{
+  "key": "analyze",
+  "kind": "AGENT",
+  "handler": "agent",
+  "provider": "ollama",
+  "model": "qwen3:8b",
+  "instructions": "Return a concise evidence-based answer.",
+  "allowedTools": [],
+  "maxTurns": 4
+}
+```
+
+The standard worker registers Ollama and registers OpenAI Responses when `OPENAI_API_KEY` is set.
+Adapters perform one HTTP request and do not hide SDK retries. Application-specific agent tools
+are registered through `ToolRegistry`; only `PURE` and `REPEATABLE_READ` tools are accepted, and
+their input/output schemas, allowlist membership, and target policy are checked outside the model.
+Inspect durable agent evidence at `GET /runs/:id/harness-operations` and usage at
+`GET /runs/:id/usage`.
+
 Run verification:
 
 ```powershell
@@ -83,4 +110,5 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Provider adapters, LLM operations, broader fault injection, and the React dashboard remain deferred.
+Broader fault injection, additional provider adapters, production research-tool implementations,
+cost pricing, and the React dashboard remain deferred.
