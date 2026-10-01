@@ -143,13 +143,16 @@ export async function executeBoundedAgentOperation(
     }
 
     if (response.toolCalls.length === 0) {
-      return {
+      const agentResult = {
         content: response.text,
         finishReason: response.finishReason,
         provider: config.provider,
         model: response.resolvedModel,
         turns: turn,
       };
+      return config.outputKey
+        ? { ...operation.input, [config.outputKey]: agentResult }
+        : agentResult;
     }
     if (turn === config.maxTurns) {
       throw new PermanentOperationError(

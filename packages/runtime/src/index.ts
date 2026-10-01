@@ -72,6 +72,8 @@ async function materializeStep(
         maxTurns: input.definition.maxTurns,
         ...(input.definition.maxOutputTokens === undefined
           ? {} : { maxOutputTokens: input.definition.maxOutputTokens }),
+        ...(input.definition.outputKey === undefined
+          ? {} : { outputKey: input.definition.outputKey }),
       }) : null,
     ],
   );
@@ -882,6 +884,7 @@ export interface ClaimedOperation {
     allowedTools: string[];
     maxTurns: number;
     maxOutputTokens?: number;
+    outputKey?: string;
   } | null;
 }
 

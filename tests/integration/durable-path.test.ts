@@ -1,5 +1,5 @@
 import { once } from "node:events";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createApp } from "../../apps/api/src/app.ts";
 import { createOutboxDispatcher } from "../../apps/api/src/outbox.ts";
@@ -9,9 +9,19 @@ import {
   processOperationJob,
 } from "../../apps/worker/src/worker.ts";
 import { createDatabase, migrate, type Database } from "@agentflow/db";
-import { defaultWorkflowDefinition } from "@agentflow/shared";
 import {
+  AgentHarness,
+  DeterministicFakeProvider,
+  ProviderRegistry,
+  ToolRegistry,
+  type LLMResponse,
+} from "@agentflow/harness";
+import { defaultWorkflowDefinition } from "@agentflow/shared";
+import { ScriptedResearchProvider, fixedSourceContentHash } from "@agentflow/research";
+import {
+  beginHarnessLlmOperation,
   claimOperation,
+  completeHarnessLlmOperation,
   completeOperation,
   controlRun,
   executeDeterministicOperation,
@@ -25,6 +35,7 @@ import {
 import { Queue, QueueEvents, type Job, type Worker } from "bullmq";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 const databaseUrl =
   process.env.TEST_DATABASE_URL ??
@@ -182,12 +193,22 @@ async function waitForSucceeded(runId: string) {
   throw new Error("Run did not succeed before test deadline");
 }
 
+async function waitForPublicStatus(runId: string, expected: string) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const run = await request<{ publicStatus: string }>(`/runs/${runId}`);
+    if (run.publicStatus === expected) return run;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Run did not reach ${expected} before test deadline`);
+}
+
 beforeAll(async () => {
   assertTestDatabaseUrl(databaseUrl);
   database = createDatabase(databaseUrl);
   await migrate(database);
   await database.query(`
-    TRUNCATE tool_executions, idempotency_records, controlled_publication_effects,
+    TRUNCATE research_sources, tool_executions, idempotency_records, controlled_publication_effects,
       approvals, audit_events, outbox, checkpoints, step_attempts, workflow_steps,
       workflow_runs, workflow_versions, workflows CASCADE
   `);
@@ -204,6 +225,10 @@ beforeAll(async () => {
     leaseMs: 15_000,
     concurrency: 2,
     queueName: testQueueName,
+    harness: new AgentHarness(
+      new ProviderRegistry().register(new ScriptedResearchProvider()),
+      new ToolRegistry(),
+    ),
   });
   await worker.waitUntilReady();
   dispatcher = createOutboxDispatcher(database, queue, 25);
@@ -229,6 +254,451 @@ afterAll(async () => {
 });
 
 describe("durable API → outbox → BullMQ → worker path", () => {
+  it("executes the fixed cloud-comparison workflow and publishes only its approved report", async () => {
+    const manifest = await request<{
+      version: string;
+      corpusHash: string;
+      purpose: string;
+      sources: Array<{
+        id: string;
+        corpusVersion: string;
+        vendor: "AWS" | "AZURE" | "GCP";
+        category: "PRICING" | "MANAGED_KUBERNETES";
+        title: string;
+        publisher: string;
+        sourceUrl: string;
+        retrievedAt: string;
+        excerpt: string;
+        contentHash: string;
+      }>;
+    }>("/reference-corpora/cloud-comparison-v1");
+    expect(manifest.sources).toHaveLength(6);
+    expect(manifest.corpusHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(manifest.purpose).toContain("not current purchasing guidance");
+    for (const source of manifest.sources) {
+      const { contentHash: _contentHash, ...snapshot } = source;
+      expect(source.contentHash).toBe(fixedSourceContentHash(snapshot));
+    }
+    expect(new Set(manifest.sources.map((source) => source.vendor))).toEqual(
+      new Set(["AWS", "AZURE", "GCP"]),
+    );
+
+    const reference = await request<{
+      workflowVersionId: string;
+      workflowName: string;
+      created: boolean;
+      mode: string;
+      provider: string;
+      definition: { steps: Array<{ key: string }> };
+    }>("/reference-workflows/cloud-comparison", {
+      method: "POST",
+      body: JSON.stringify({ mode: "scripted", reviewerRole: "research-reviewer" }),
+    });
+    expect(reference).toMatchObject({
+      workflowName: "cloud-comparison-scripted",
+      created: true,
+      mode: "scripted",
+      provider: "scripted-research",
+    });
+    expect(reference.definition.steps.map((step) => step.key)).toEqual([
+      "search-aws",
+      "search-azure",
+      "search-gcp",
+      "collect-sources",
+      "analyze-pricing",
+      "analyze-features",
+      "generate-report",
+      "approve-publication",
+      "publish-report",
+    ]);
+    const replayedSetup = await request<{ created: boolean; workflowVersionId: string }>(
+      "/reference-workflows/cloud-comparison",
+      { method: "POST", body: JSON.stringify({ mode: "scripted", reviewerRole: "research-reviewer" }) },
+    );
+    expect(replayedSetup).toEqual(expect.objectContaining({
+      created: false,
+      workflowVersionId: reference.workflowVersionId,
+    }));
+
+    const publicationTarget = "controlled://publications/cloud-comparison-demo";
+    const run = await request<{ id: string }>("/runs", {
+      method: "POST",
+      body: JSON.stringify({
+        workflowVersionId: reference.workflowVersionId,
+        creationKey: "reference-cloud-comparison-run",
+        deadlineMs: 60_000,
+        input: {
+          publicationTarget,
+          assumptions: {
+            scope: "Managed Kubernetes with supporting general-purpose compute",
+            geography: "Representative US region",
+            pricing: "No direct cross-vendor SKU equivalence",
+          },
+        },
+      }),
+    });
+    await waitForPublicStatus(run.id, "WAITING_APPROVAL");
+
+    const sources = await request<{
+      sources: Array<{
+        id: string;
+        ordinal: number;
+        corpusVersion: string;
+        contentHash: string;
+        evidenceHash: string;
+      }>;
+    }>(`/runs/${run.id}/sources`);
+    expect(sources.sources).toHaveLength(6);
+    expect(sources.sources.map((source) => source.ordinal)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(sources.sources.every((source) =>
+      source.corpusVersion === manifest.version && source.contentHash === source.evidenceHash
+    )).toBe(true);
+    await expect(
+      database.query(
+        "UPDATE research_sources SET excerpt = 'mutated' WHERE id = $1",
+        [sources.sources[0]!.id],
+      ),
+    ).rejects.toMatchObject({ constraint: "research_source_immutable" });
+
+    const usage = await request<{
+      usage: Array<{ provider: string; provenance: string; inputTokens: number; outputTokens: number }>;
+    }>(`/runs/${run.id}/usage`);
+    expect(usage.usage).toHaveLength(2);
+    expect(usage.usage.every((entry) =>
+      entry.provider === "scripted-research" && entry.provenance === "estimated" &&
+      entry.inputTokens > 0 && entry.outputTokens > 0
+    )).toBe(true);
+
+    const approvals = await request<{
+      approvals: Array<{
+        id: string;
+        status: string;
+        proposalHash: string;
+        payloadHash: string;
+        payload: {
+          report: { content: string; sha256: string; citations: string[] };
+          publication: { target: string };
+          sourceSet: { corpusHash: string; sourceCount: number };
+          approvalBinding: {
+            reportHash: string;
+            publicationTarget: string;
+            corpusHash: string;
+            bindingHash: string;
+          };
+        };
+      }>;
+    }>(`/runs/${run.id}/approvals`);
+    const approval = approvals.approvals[0]!;
+    expect(approval.status).toBe("PENDING");
+    const reportHash = createHash("sha256")
+      .update(approval.payload.report.content, "utf8")
+      .digest("hex");
+    expect(approval.payload).toMatchObject({
+      report: { sha256: reportHash },
+      publication: { target: publicationTarget },
+      sourceSet: { corpusHash: manifest.corpusHash, sourceCount: 6 },
+      approvalBinding: {
+        reportHash,
+        publicationTarget,
+        corpusHash: manifest.corpusHash,
+      },
+    });
+    expect(approval.payload.report.citations.sort()).toEqual(
+      manifest.sources.map((source) => source.id).sort(),
+    );
+
+    await request(`/approvals/${approval.id}/decisions`, {
+      method: "POST",
+      headers: {
+        "x-agentflow-reviewer-id": "reference-reviewer-1",
+        "x-agentflow-reviewer-role": "research-reviewer",
+      },
+      body: JSON.stringify({
+        decisionRequestId: randomUUID(),
+        decision: "APPROVE",
+        proposalHash: approval.proposalHash,
+        payloadHash: approval.payloadHash,
+      }),
+    });
+    await waitForSucceeded(run.id);
+
+    const completed = await request<{
+      lifecycle: string;
+      steps: Array<{ nodeKey: string; status: string }>;
+    }>(`/runs/${run.id}`);
+    expect(completed.lifecycle).toBe("SUCCEEDED");
+    expect(completed.steps).toHaveLength(9);
+    expect(completed.steps.every((step) => step.status === "SUCCEEDED")).toBe(true);
+    const executions = await request<{
+      executions: Array<{ toolName: string; invocationStatus: string; idempotencyStatus: string }>;
+    }>(`/runs/${run.id}/tool-executions`);
+    expect(executions.executions).toEqual([
+      expect.objectContaining({
+        toolName: "publish-approved-report",
+        invocationStatus: "SUCCEEDED",
+        idempotencyStatus: "SUCCEEDED",
+      }),
+    ]);
+    const effects = await database.query<{ count: string }>(
+      `SELECT count(*) AS count FROM controlled_publication_effects cpe
+       JOIN idempotency_records ir ON ir.request_hash = cpe.request_hash
+       WHERE ir.run_id = $1`,
+      [run.id],
+    );
+    expect(effects.rows[0]?.count).toBe("1");
+  }, 30_000);
+
+  it("runs a bounded agent node with separate durable LLM and tool operations", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "bounded-agent-workflow", description: "Bounded agent" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "analyze",
+              kind: "AGENT",
+              handler: "agent",
+              provider: "fake",
+              model: "fake-model",
+              instructions: "Return a concise final answer.",
+              allowedTools: ["lookup"],
+              maxTurns: 3,
+            }],
+          },
+        }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "bounded recovery" },
+          creationKey: "integration-bounded-agent",
+        }),
+      });
+      const toolDecision: LLMResponse = {
+        text: "",
+        toolCalls: [{ id: "lookup-1", name: "lookup", arguments: { key: "fact" } }],
+        finishReason: "tool_calls",
+        usage: {
+          provenance: "reported",
+          inputTokens: 5,
+          outputTokens: 2,
+          cachedInputTokens: 0,
+          reasoningTokens: 0,
+          raw: { input_tokens: 5, output_tokens: 2 },
+        },
+        providerRequestId: "fake-agent-request-1",
+        resolvedModel: "fake-model-v1",
+        opaqueState: { namespace: "agentflow.fake", version: 1, cursor: "tool" },
+      };
+      const response: LLMResponse = {
+        text: "Agent result",
+        toolCalls: [],
+        finishReason: "stop",
+        usage: {
+          provenance: "reported",
+          inputTokens: 9,
+          outputTokens: 3,
+          cachedInputTokens: 0,
+          reasoningTokens: 0,
+          raw: { input_tokens: 9, output_tokens: 3 },
+        },
+        providerRequestId: "fake-agent-request-2",
+        resolvedModel: "fake-model-v1",
+        opaqueState: { namespace: "agentflow.fake", version: 1, cursor: "done" },
+      };
+      const fake = new DeterministicFakeProvider([toolDecision, response]);
+      const tools = new ToolRegistry().register({
+        name: "lookup",
+        version: "1",
+        description: "Return a deterministic saved fact",
+        effectClass: "REPEATABLE_READ",
+        providerSchema: {
+          type: "object",
+          properties: { key: { type: "string" } },
+          required: ["key"],
+          additionalProperties: false,
+        },
+        inputSchema: z.object({ key: z.literal("fact") }).strict(),
+        outputSchema: z.object({ value: z.string() }),
+        execute: () => ({ value: "durable" }),
+      });
+      const harness = new AgentHarness(new ProviderRegistry().register(fake), tools);
+      const step = created.steps[0]!;
+      const result = await processOperationJob(
+        database,
+        "bounded-agent-worker",
+        15_000,
+        { data: {
+          runId: created.id,
+          operationId: step.id,
+          workflowVersionId: version.id,
+          dispatchGeneration: step.dispatchGeneration,
+        } } as Job,
+        5_000,
+        60_000,
+        harness,
+      );
+      expect(result).toMatchObject({ skipped: false, runCompleted: true });
+      expect(fake.calls).toHaveLength(2);
+      const completed = await request<{
+        lifecycle: string;
+        steps: Array<{ acceptedOutput: Record<string, unknown> }>;
+      }>(`/runs/${created.id}`);
+      expect(completed.lifecycle).toBe("SUCCEEDED");
+      expect(completed.steps[0]?.acceptedOutput).toMatchObject({
+        content: "Agent result",
+        provider: "fake",
+        turns: 2,
+      });
+      const operations = await request<{ operations: Array<{ kind: string; ordinal: number; status: string }> }>(
+        `/runs/${created.id}/harness-operations`,
+      );
+      expect(operations.operations.map(({ kind, ordinal, status }) => ({ kind, ordinal, status }))).toEqual([
+        { kind: "LLM", ordinal: 0, status: "SUCCEEDED" },
+        { kind: "TOOL", ordinal: 1, status: "SUCCEEDED" },
+        { kind: "LLM", ordinal: 2, status: "SUCCEEDED" },
+      ]);
+      const usage = await request<{ usage: Array<{ inputTokens: number; outputTokens: number }> }>(
+        `/runs/${created.id}/usage`,
+      );
+      expect(usage.usage).toEqual([
+        expect.objectContaining({ inputTokens: 5, outputTokens: 2 }),
+        expect.objectContaining({ inputTokens: 9, outputTokens: 3 }),
+      ]);
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("persists provider usage and opaque continuation state per logical operation", async () => {
+    await worker.pause(true);
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "harness-ledger-workflow", description: "Provider ledger" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "ledger-agent",
+              kind: "AGENT",
+              handler: "agent",
+              provider: "fake",
+              model: "fake-model",
+              instructions: "Test provider persistence.",
+              allowedTools: [],
+              maxTurns: 3,
+            }],
+          },
+        }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "provider persistence" },
+          creationKey: "integration-harness-ledger",
+        }),
+      });
+      const step = created.steps[0]!;
+      const claimed = await claimOperation(database, {
+        runId: created.id,
+        operationId: step.id,
+        workflowVersionId: version.id,
+        dispatchGeneration: step.dispatchGeneration,
+      }, "harness-ledger-worker", 15_000);
+      expect(claimed).not.toBeNull();
+
+      const begun = await beginHarnessLlmOperation(database, claimed!, {
+        ordinal: 0,
+        turn: 1,
+        maxTurns: 3,
+        provider: "fake",
+        adapterVersion: "1.0.0",
+        model: "fake-model",
+        request: { messages: [{ role: "user", content: "summarize" }] },
+      });
+      expect(begun.replayed).toBe(false);
+      if (begun.replayed) throw new Error("Expected a new provider call");
+      const output = { text: "persisted response", toolCalls: [], finishReason: "stop" };
+      const continuationState = { namespace: "agentflow.fake", version: 1, cursor: "opaque-1" };
+      await completeHarnessLlmOperation(database, claimed!, begun.providerCallId, {
+        output,
+        continuationState,
+        providerRequestId: "fake-request-1",
+        resolvedModel: "fake-model-v1",
+        finishReason: "stop",
+        usage: {
+          provenance: "reported",
+          inputTokens: 11,
+          outputTokens: 7,
+          cachedInputTokens: 2,
+          reasoningTokens: 1,
+          raw: { input_tokens: 11, output_tokens: 7 },
+        },
+      });
+
+      const replay = await beginHarnessLlmOperation(database, claimed!, {
+        ordinal: 0,
+        turn: 1,
+        maxTurns: 3,
+        provider: "fake",
+        adapterVersion: "1.0.0",
+        model: "fake-model",
+        request: { messages: [{ role: "user", content: "summarize" }] },
+      });
+      expect(replay).toMatchObject({ replayed: true, output, continuationState });
+
+      const ledger = await request<{
+        operations: Array<{
+          status: string;
+          turn: number;
+          maxTurns: number;
+          continuationState: Record<string, unknown>;
+          calls: Array<{ status: string; providerRequestId: string }>;
+        }>;
+      }>(`/runs/${created.id}/harness-operations`);
+      expect(ledger.operations[0]).toMatchObject({
+        status: "SUCCEEDED",
+        turn: 1,
+        maxTurns: 3,
+        continuationState,
+        calls: [{ status: "SUCCEEDED", providerRequestId: "fake-request-1" }],
+      });
+      const usage = await request<{
+        usage: Array<{ provider: string; model: string; inputTokens: number; outputTokens: number }>;
+      }>(`/runs/${created.id}/usage`);
+      expect(usage.usage).toEqual([
+        expect.objectContaining({
+          provider: "fake",
+          model: "fake-model-v1",
+          inputTokens: 11,
+          outputTokens: 7,
+        }),
+      ]);
+
+      await completeOperation(database, claimed!, output);
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
   it("commits both deterministic operations and ignores duplicate delivery", async () => {
     const workflow = await request<{ id: string }>("/workflows", {
       method: "POST",

@@ -11,6 +11,12 @@ importers:
       '@agentflow/db':
         specifier: workspace:*
         version: link:packages/db
+      '@agentflow/harness':
+        specifier: workspace:*
+        version: link:packages/harness
+      '@agentflow/research':
+        specifier: workspace:*
+        version: link:packages/research
       '@agentflow/shared':
         specifier: workspace:*
         version: link:packages/shared
@@ -35,6 +41,9 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
 
   apps/api:
     dependencies:
@@ -44,6 +53,9 @@ importers:
       '@agentflow/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@agentflow/research':
+        specifier: workspace:*
+        version: link:../../packages/research
       '@agentflow/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -57,8 +69,8 @@ importers:
         specifier: ^5.1.0
         version: 5.2.1
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: 3.23.8
+        version: 3.23.8
     devDependencies:
       tsx:
         specifier: ^4.20.6
@@ -72,6 +84,12 @@ importers:
       '@agentflow/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@agentflow/harness':
+        specifier: workspace:*
+        version: link:../../packages/harness
+      '@agentflow/research':
+        specifier: workspace:*
+        version: link:../../packages/research
       '@agentflow/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -89,8 +107,8 @@ importers:
   packages/config:
     dependencies:
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: 3.23.8
+        version: 3.23.8
     devDependencies:
       '@types/node':
         specifier: ^24.19.0
@@ -109,6 +127,35 @@ importers:
         specifier: ^4.20.6
         version: 4.23.15
 
+  packages/harness:
+    dependencies:
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.0
+        version: 24.19.0
+
+  packages/research:
+    dependencies:
+      '@agentflow/db':
+        specifier: workspace:*
+        version: link:../db
+      '@agentflow/harness':
+        specifier: workspace:*
+        version: link:../harness
+      '@agentflow/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.0
+        version: 24.19.0
+
   packages/runtime:
     dependencies:
       '@agentflow/db':
@@ -124,8 +171,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.1
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: 3.23.8
+        version: 3.23.8
 
 packages:
 
@@ -1139,8 +1186,8 @@ packages:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
 
 snapshots:
 
@@ -2072,4 +2119,4 @@ snapshots:
 
   xtend@4.0.2: {}
 
-  zod@3.25.76: {}
+  zod@3.23.8: {}

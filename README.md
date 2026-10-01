@@ -38,6 +38,7 @@ provider call may be repeated and is retained with unknown usage rather than cou
 - `packages/config`: startup environment validation
 - `packages/db`: PostgreSQL pool, migration runner, and migrations
 - `packages/harness`: provider contract, registries, bounded-turn enforcement, and adapters
+- `packages/research`: fixed reference corpus, cloud-comparison workflow, report generation, and scripted provider
 - `packages/runtime`: durable domain transactions and execution semantics
 - `packages/shared`: schemas, queue contracts, and shared types
 - `tests/integration`: real PostgreSQL/Redis end-to-end verification
@@ -91,6 +92,37 @@ their input/output schemas, allowlist membership, and target policy are checked 
 Inspect durable agent evidence at `GET /runs/:id/harness-operations` and usage at
 `GET /runs/:id/usage`.
 
+## Reference cloud-comparison workflow
+
+Milestone 6 includes a nine-step AWS/Azure/GCP research workflow:
+
+```text
+search-aws → search-azure → search-gcp → collect-sources
+→ analyze-pricing → analyze-features → generate-report
+→ approve-publication → publish-report
+```
+
+The evaluation corpus is a checked-in, versioned snapshot of six paraphrased official-source
+records. Each immutable source record includes its publisher, URL, retrieval timestamp, category,
+and a SHA-256 hash over the complete provenance snapshot. The corpus has its own aggregate hash.
+It is intended for repeatable workflow evaluation, not current purchasing guidance.
+
+Create or retrieve the scripted demonstration workflow without cloud credentials:
+
+```powershell
+$reference = Invoke-RestMethod -Method Post -Uri http://localhost:3000/reference-workflows/cloud-comparison -ContentType application/json -Body '{"mode":"scripted"}'
+$run = Invoke-RestMethod -Method Post -Uri http://localhost:3000/runs -ContentType application/json -Body (ConvertTo-Json @{ workflowVersionId = $reference.workflowVersionId; creationKey = "cloud-comparison-demo-1"; input = @{ publicationTarget = "controlled://publications/cloud-comparison-demo" } })
+Invoke-RestMethod -Uri "http://localhost:3000/runs/$($run.id)/sources"
+Invoke-RestMethod -Uri "http://localhost:3000/runs/$($run.id)/approvals"
+```
+
+The scripted provider traverses the same durable agent and usage paths as a real adapter. For a
+live run, seed with `{"mode":"live","provider":"openai","model":"<model>"}` or an available
+Ollama model. The generated Markdown report, publication target, and corpus hash are combined into
+an approval binding. Publication is created only after an authorized approval of that exact payload;
+the controlled receiver independently deduplicates retries. Inspect the public corpus manifest at
+`GET /reference-corpora/cloud-comparison-v1` and per-run evidence at `GET /runs/:id/sources`.
+
 Run verification:
 
 ```powershell
@@ -110,5 +142,5 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Broader fault injection, additional provider adapters, production research-tool implementations,
-cost pricing, and the React dashboard remain deferred.
+Broader fault injection, live search/crawl ingestion, normalized current SKU pricing, additional
+provider adapters, and the React dashboard remain deferred.

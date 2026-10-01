@@ -7,6 +7,7 @@ import {
   ProviderRegistry,
   ToolRegistry,
 } from "@agentflow/harness";
+import { ScriptedResearchProvider } from "@agentflow/research";
 import type { ConnectionOptions } from "bullmq";
 import { createOperationWorker } from "./worker.js";
 
@@ -25,6 +26,7 @@ const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
 const providers = new ProviderRegistry()
+  .register(new ScriptedResearchProvider())
   .register(new OllamaProvider({ baseUrl: config.OLLAMA_BASE_URL }));
 if (config.OPENAI_API_KEY) {
   providers.register(new OpenAIResponsesProvider({

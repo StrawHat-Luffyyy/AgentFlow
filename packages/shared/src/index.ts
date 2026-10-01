@@ -90,6 +90,7 @@ const agentStepDefinitionSchema = z.object({
   allowedTools: z.array(z.string().min(1).max(128)).max(20).default([]),
   maxTurns: z.number().int().min(1).max(20).default(10),
   maxOutputTokens: z.number().int().min(1).max(100_000).optional(),
+  outputKey: z.string().min(1).max(100).regex(/^[a-z][a-zA-Z0-9]*$/).optional(),
 }).superRefine((definition, context) => {
   const unique = new Set(definition.allowedTools);
   if (unique.size !== definition.allowedTools.length) {
