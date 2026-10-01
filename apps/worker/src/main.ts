@@ -1,3 +1,4 @@
+import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
 import {
@@ -59,6 +60,7 @@ async function shutdown(signal: string) {
   console.log(`Received ${signal}; shutting down AgentFlow worker`);
   await worker.close();
   await database.end();
+  await telemetry.shutdown();
   process.exit(0);
 }
 

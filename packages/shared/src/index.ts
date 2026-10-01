@@ -1,7 +1,50 @@
-import { trace } from "@opentelemetry/api";
+import { trace, type Span } from "@opentelemetry/api";
 import { z } from "zod";
 
 export const tracer = trace.getTracer("agentflow-runtime", "0.1.0");
+
+export const telemetrySchemaVersion = "1.0.0";
+export const traceAttributes = {
+  schemaVersion: "agentflow.telemetry.schema.version",
+  runId: "agentflow.run.id",
+  workflowVersionId: "agentflow.workflow.version.id",
+  stepId: "agentflow.step.id",
+  stepKey: "agentflow.step.key",
+  stepKind: "agentflow.step.kind",
+  attemptId: "agentflow.attempt.id",
+  attemptNumber: "agentflow.attempt.number",
+  leaseEpoch: "agentflow.attempt.lease_epoch",
+} as const;
+
+export function setExecutionSpanAttributes(
+  span: Span,
+  attributes: {
+    runId?: string;
+    workflowVersionId?: string;
+    stepId?: string;
+    stepKey?: string;
+    stepKind?: string;
+    attemptId?: string;
+    attemptNumber?: number;
+    leaseEpoch?: number;
+  },
+): void {
+  span.setAttribute(traceAttributes.schemaVersion, telemetrySchemaVersion);
+  if (attributes.runId) span.setAttribute(traceAttributes.runId, attributes.runId);
+  if (attributes.workflowVersionId) {
+    span.setAttribute(traceAttributes.workflowVersionId, attributes.workflowVersionId);
+  }
+  if (attributes.stepId) span.setAttribute(traceAttributes.stepId, attributes.stepId);
+  if (attributes.stepKey) span.setAttribute(traceAttributes.stepKey, attributes.stepKey);
+  if (attributes.stepKind) span.setAttribute(traceAttributes.stepKind, attributes.stepKind);
+  if (attributes.attemptId) span.setAttribute(traceAttributes.attemptId, attributes.attemptId);
+  if (attributes.attemptNumber !== undefined) {
+    span.setAttribute(traceAttributes.attemptNumber, attributes.attemptNumber);
+  }
+  if (attributes.leaseEpoch !== undefined) {
+    span.setAttribute(traceAttributes.leaseEpoch, attributes.leaseEpoch);
+  }
+}
 
 export const stepKinds = ["DETERMINISTIC", "APPROVAL", "TOOL", "AGENT"] as const;
 export const effectClasses = [

@@ -16,6 +16,7 @@
     "@agentflow/research": "workspace:*",
     "@agentflow/runtime": "workspace:*",
     "@agentflow/shared": "workspace:*",
+    "@agentflow/telemetry": "workspace:*",
     "bullmq": "^5.61.2"
   },
   "devDependencies": {

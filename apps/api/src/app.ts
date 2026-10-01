@@ -8,12 +8,14 @@ import {
   decideApproval,
   controlRun,
   getRun,
+  getRunAttempts,
   getRunApprovals,
   getRunHistory,
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
   getRunUsage,
+  listRuns,
   reconcileToolExecution,
 } from "@agentflow/runtime";
 import {
@@ -78,6 +80,14 @@ export function createApp(database: Database, queue: Queue): express.Express {
     response.status(201).json(run);
   });
 
+  app.get("/runs", async (request: express.Request, response: express.Response) => {
+    const query = z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
+    }).parse(request.query);
+    response.json(await listRuns(database, query));
+  });
+
   app.get("/runs/:id", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json(await getRun(database, runId));
@@ -86,6 +96,11 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.get("/runs/:id/history", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ events: await getRunHistory(database, runId) });
+  });
+
+  app.get("/runs/:id/attempts", async (request: express.Request, response: express.Response) => {
+    const runId = z.string().uuid().parse(request.params.id);
+    response.json({ attempts: await getRunAttempts(database, runId) });
   });
 
   app.get("/runs/:id/approvals", async (request: express.Request, response: express.Response) => {

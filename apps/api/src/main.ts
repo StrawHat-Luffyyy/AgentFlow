@@ -1,3 +1,4 @@
+import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
 import { queueName } from "@agentflow/shared";
@@ -31,6 +32,7 @@ async function shutdown(signal: string) {
   await scheduler.stop();
   await dispatcher.stop();
   await database.end();
+  await telemetry.shutdown();
   process.exit(0);
 }
 

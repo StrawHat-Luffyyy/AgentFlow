@@ -254,6 +254,58 @@ afterAll(async () => {
 });
 
 describe("durable API → outbox → BullMQ → worker path", () => {
+  it("lists run summaries and exposes step attempts for operations inspection", async () => {
+    const workflow = await request<{ id: string }>("/workflows", {
+      method: "POST",
+      body: JSON.stringify({ name: "observability-api", description: "Milestone 7 inspection" }),
+    });
+    const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+      method: "POST",
+      body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+    });
+    const created = await request<{ id: string }>("/runs", {
+      method: "POST",
+      body: JSON.stringify({
+        workflowVersionId: version.id,
+        input: { milestone: 7 },
+        creationKey: "observability-api-run",
+      }),
+    });
+    await waitForSucceeded(created.id);
+
+    const listed = await request<{
+      runs: Array<{
+        id: string;
+        workflowName: string;
+        publicStatus: string;
+        stepCount: number;
+        completedStepCount: number;
+        attemptCount: number;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    }>("/runs?limit=10&offset=0");
+    expect(listed.total).toBeGreaterThanOrEqual(1);
+    expect(listed.runs).toContainEqual(expect.objectContaining({
+      id: created.id,
+      workflowName: "observability-api",
+      publicStatus: "SUCCEEDED",
+      stepCount: 2,
+      completedStepCount: 2,
+      attemptCount: 2,
+    }));
+
+    const inspected = await request<{
+      attempts: Array<{ stepKey: string; attemptNo: number; status: string }>;
+    }>(`/runs/${created.id}/attempts`);
+    expect(inspected.attempts).toHaveLength(2);
+    expect(inspected.attempts).toEqual([
+      expect.objectContaining({ stepKey: "generate-summary", attemptNo: 1, status: "SUCCEEDED" }),
+      expect.objectContaining({ stepKey: "finalize", attemptNo: 1, status: "SUCCEEDED" }),
+    ]);
+  });
+
   it("executes the fixed cloud-comparison workflow and publishes only its approved report", async () => {
     const manifest = await request<{
       version: string;

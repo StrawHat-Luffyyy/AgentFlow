@@ -1,6 +1,6 @@
 # AgentFlow
 
-AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, and a worker that executes deterministic, tool, and bounded-agent logical operations.
+AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, OpenTelemetry tracing, and a React operations console.
 
 The Python research prototype is a separate workstream and is not embedded in this TypeScript platform.
 
@@ -34,7 +34,7 @@ provider call may be repeated and is retained with unknown usage rather than cou
 
 - `apps/api`: HTTP control surface and outbox dispatcher
 - `apps/worker`: BullMQ worker and deterministic operation execution
-- `apps/web`: reserved dashboard boundary
+- `apps/web`: React/Vite operations console for run control and inspection
 - `packages/config`: startup environment validation
 - `packages/db`: PostgreSQL pool, migration runner, and migrations
 - `packages/harness`: provider contract, registries, bounded-turn enforcement, and adapters
@@ -53,7 +53,11 @@ docker compose up -d postgres redis
 pnpm db:migrate
 pnpm dev:api
 pnpm dev:worker
+pnpm dev:web
 ```
+
+The dashboard is available at `http://localhost:4173` and proxies `/api` requests to the local
+control API. Set `VITE_API_BASE_URL` when the web application and API use different origins.
 
 Create the workflow through the API:
 
@@ -91,6 +95,26 @@ are registered through `ToolRegistry`; only `PURE` and `REPEATABLE_READ` tools a
 their input/output schemas, allowlist membership, and target policy are checked outside the model.
 Inspect durable agent evidence at `GET /runs/:id/harness-operations` and usage at
 `GET /runs/:id/usage`.
+
+## Observability and operations UI
+
+The API exposes the operations-console read model through:
+
+- `GET /runs?limit=50&offset=0` for newest-first run summaries and usage totals
+- `GET /runs/:id` for the ordered step table and committed input/output snapshots
+- `GET /runs/:id/attempts` for physical worker attempts and errors
+- `GET /runs/:id/history` for the durable audit history
+- `GET /runs/:id/usage` for provider-reported or estimated token records
+
+The console supports run selection, step/output inspection, attempt evidence, pause/resume/cancel,
+and approval decisions bound to the persisted proposal and payload hashes. It intentionally has no
+workflow editor.
+
+Both the API and worker initialize the OpenTelemetry Node SDK at process startup. Configure
+`OTEL_EXPORTER_OTLP_ENDPOINT` with an OTLP/HTTP collector base URL; AgentFlow appends
+`/v1/traces` when needed. Exported execution spans use the versioned `agentflow.*` attribute schema
+for run, workflow-version, step, attempt, and lease identifiers. Inputs, outputs, prompts, and other
+content are not placed in trace attributes.
 
 ## Reference cloud-comparison workflow
 
@@ -143,4 +167,4 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 ## Deliberately deferred
 
 Broader fault injection, live search/crawl ingestion, normalized current SKU pricing, additional
-provider adapters, and the React dashboard remain deferred.
+provider adapters, and a visual workflow editor remain deferred.

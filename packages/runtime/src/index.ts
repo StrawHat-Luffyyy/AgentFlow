@@ -5,6 +5,7 @@ import {
   canonicalJson,
   defaultRetryPolicy,
   operationJobSchema,
+  setExecutionSpanAttributes,
   tracer,
   workflowDefinitionSchema,
   type OperationJob,
@@ -187,6 +188,7 @@ export async function createRun(
 ) {
   return tracer.startActiveSpan("agentflow.run.create", async (span) => {
     try {
+      setExecutionSpanAttributes(span, { workflowVersionId: input.workflowVersionId });
       return await withTransaction(database, async (transaction) => {
         const retryPolicy = input.retryPolicy ?? defaultRetryPolicy;
         const deadlineMs = input.deadlineMs ?? 300_000;
@@ -222,6 +224,7 @@ export async function createRun(
             ) {
               throw new ConflictError("Creation key is already bound to different input or policy");
             }
+            setExecutionSpanAttributes(span, { runId: row.id });
             return getRun(transaction, row.id);
           }
         }
@@ -239,6 +242,7 @@ export async function createRun(
         if (!firstDefinition) throw new ConflictError("Workflow version has no steps");
 
         const runId = randomUUID();
+        setExecutionSpanAttributes(span, { runId });
         const checkpointId = randomUUID();
         const eventId = randomUUID();
 
@@ -305,6 +309,81 @@ export async function createRun(
 
 type Queryable = Pick<Database, "query"> | Pick<Transaction, "query">;
 
+export async function listRuns(
+  database: Queryable,
+  options: { limit?: number; offset?: number } = {},
+) {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const [runs, count] = await Promise.all([
+    database.query(
+      `SELECT wr.id, wr.workflow_version_id AS "workflowVersionId",
+         w.name AS "workflowName", wv.version AS "workflowVersion",
+         wr.lifecycle, wr.control, wr.wait_reason AS "waitReason",
+         wr.created_at AS "createdAt", wr.finished_at AS "finishedAt",
+         wr.deadline_at AS "deadlineAt", wr.failure_json AS failure,
+         COALESCE(step_stats.step_count, 0)::integer AS "stepCount",
+         COALESCE(step_stats.completed_step_count, 0)::integer AS "completedStepCount",
+         COALESCE(step_stats.attempt_count, 0)::integer AS "attemptCount",
+         COALESCE(step_stats.has_running, false) AS "hasRunning",
+         COALESCE(usage_stats.input_tokens, 0)::integer AS "inputTokens",
+         COALESCE(usage_stats.output_tokens, 0)::integer AS "outputTokens"
+       FROM workflow_runs wr
+       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+       JOIN workflows w ON w.id = wv.workflow_id
+       LEFT JOIN LATERAL (
+         SELECT count(*) AS step_count,
+           count(*) FILTER (WHERE status = 'SUCCEEDED') AS completed_step_count,
+           COALESCE(sum(attempt_count), 0) AS attempt_count,
+           bool_or(status = 'RUNNING') AS has_running
+         FROM workflow_steps WHERE run_id = wr.id
+       ) step_stats ON true
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(sum(input_tokens), 0) AS input_tokens,
+           COALESCE(sum(output_tokens), 0) AS output_tokens
+         FROM usage_records WHERE run_id = wr.id
+       ) usage_stats ON true
+       ORDER BY wr.created_at DESC, wr.id DESC LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    ),
+    database.query<{ total: number }>(
+      "SELECT count(*)::integer AS total FROM workflow_runs",
+    ),
+  ]);
+
+  const items = (runs.rows as Array<Record<string, unknown> & {
+    lifecycle: string;
+    control: string;
+    waitReason: string;
+    hasRunning: boolean;
+  }>).map(({ hasRunning, ...run }) => ({
+    ...run,
+    publicStatus: derivePublicStatus(run, hasRunning ? [{ status: "RUNNING" }] : []),
+  }));
+  return { runs: items, total: count.rows[0]?.total ?? 0, limit, offset };
+}
+
+function derivePublicStatus(
+  run: { lifecycle: string; control: string; waitReason: string },
+  steps: Array<{ status: string }>,
+): string {
+  return run.lifecycle !== "OPEN"
+    ? run.lifecycle
+    : run.control === "PAUSED" || run.control === "PAUSE_REQUESTED"
+      ? run.control
+      : run.control === "CANCEL_REQUESTED"
+        ? "CANCEL_REQUESTED"
+        : run.waitReason === "RECONCILIATION"
+          ? "NEEDS_ATTENTION"
+          : run.waitReason === "APPROVAL"
+            ? "WAITING_APPROVAL"
+            : run.waitReason === "RETRY"
+              ? "RETRY_WAIT"
+              : steps.some((step) => step.status === "RUNNING")
+                ? "RUNNING"
+                : "QUEUED";
+}
+
 export async function getRun(database: Queryable, runId: string) {
   const runResult = await database.query<{
     id: string;
@@ -354,22 +433,26 @@ export async function getRun(database: Queryable, runId: string) {
   ]);
 
   const stepRows = steps.rows as Array<{ status: string }>;
-  const publicStatus = run.lifecycle !== "OPEN"
-    ? run.lifecycle
-    : run.control === "PAUSED" || run.control === "PAUSE_REQUESTED"
-      ? run.control
-      : run.control === "CANCEL_REQUESTED"
-        ? "CANCEL_REQUESTED"
-        : run.waitReason === "RECONCILIATION"
-          ? "NEEDS_ATTENTION"
-          : run.waitReason === "APPROVAL"
-          ? "WAITING_APPROVAL"
-          : run.waitReason === "RETRY"
-            ? "RETRY_WAIT"
-            : stepRows.some((step) => step.status === "RUNNING")
-              ? "RUNNING"
-              : "QUEUED";
+  const publicStatus = derivePublicStatus(run, stepRows);
   return { ...run, publicStatus, steps: steps.rows, checkpoint: checkpoint.rows[0] };
+}
+
+export async function getRunAttempts(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const attempts = await database.query(
+    `SELECT sa.id, sa.step_id AS "stepId", ws.node_key AS "stepKey",
+       ws.position AS "stepPosition", sa.attempt_no AS "attemptNo", sa.epoch,
+       sa.worker_id AS "workerId", sa.status, sa.started_at AS "startedAt",
+       sa.deadline_at AS "deadlineAt", sa.finished_at AS "finishedAt",
+       sa.error_class AS "errorClass", sa.retryable, sa.error_json AS error
+     FROM step_attempts sa
+     JOIN workflow_steps ws ON ws.id = sa.step_id
+     WHERE ws.run_id = $1
+     ORDER BY ws.position, sa.attempt_no`,
+    [runId],
+  );
+  return attempts.rows;
 }
 
 export async function getRunHistory(database: Database, runId: string) {
@@ -2316,6 +2399,16 @@ export async function completeOperation(
 ) {
   return tracer.startActiveSpan("agentflow.operation.complete", async (span) => {
     try {
+      setExecutionSpanAttributes(span, {
+        runId: operation.runId,
+        workflowVersionId: operation.workflowVersionId,
+        stepId: operation.operationId,
+        stepKey: operation.nodeKey,
+        stepKind: operation.kind,
+        attemptId: operation.attemptId,
+        attemptNumber: operation.attemptNo,
+        leaseEpoch: operation.leaseEpoch,
+      });
       return await withTransaction(database, async (transaction) => {
         const locked = await transaction.query<{
           lifecycle: string;

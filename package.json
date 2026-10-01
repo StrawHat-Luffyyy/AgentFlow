@@ -11,7 +11,8 @@
     "test:integration": "vitest run tests/integration",
     "db:migrate": "tsx packages/db/src/cli.ts",
     "dev:api": "pnpm --filter @agentflow/api dev",
-    "dev:worker": "pnpm --filter @agentflow/worker dev"
+    "dev:worker": "pnpm --filter @agentflow/worker dev",
+    "dev:web": "pnpm --filter @agentflow/web dev"
   },
   "devDependencies": {
     "@agentflow/db": "workspace:*",
