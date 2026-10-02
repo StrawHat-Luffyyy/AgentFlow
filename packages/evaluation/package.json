@@ -1,0 +1,27 @@
+{
+  "name": "@agentflow/evaluation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./process-hooks": "./src/process-hooks.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "run": "tsx src/cli.ts",
+    "run:dbos": "tsx src/dbos-cli.ts"
+  },
+  "dependencies": {
+    "@agentflow/research": "workspace:*",
+    "@agentflow/runtime": "workspace:*",
+    "@agentflow/shared": "workspace:*",
+    "@dbos-inc/dbos-sdk": "5.2.11",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "tsx": "^4.20.6"
+  }
+}

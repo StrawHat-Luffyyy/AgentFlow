@@ -10,6 +10,7 @@ import {
   settleOperationFailure,
   settleUnknownToolOutcome,
   UnknownEffectError,
+  type ExecutionFaultHooks,
 } from "@agentflow/runtime";
 import {
   operationJobSchema,
@@ -32,6 +33,7 @@ export async function processOperationJob(
   heartbeatMs = Math.max(100, Math.floor(leaseMs / 3)),
   attemptTimeoutMs = 60_000,
   harness?: AgentHarness,
+  faultHooks?: ExecutionFaultHooks,
 ) {
   return tracer.startActiveSpan("agentflow.operation.execute", async (span) => {
     const message = operationJobSchema.parse(job.data);
@@ -85,11 +87,12 @@ export async function processOperationJob(
     try {
       let output: Record<string, unknown>;
       try {
+        await faultHooks?.hit("before-operation", operation);
         if (operation.kind === "TOOL") {
-          output = await executeToolOperation(database, operation);
+          output = await executeToolOperation(database, operation, faultHooks);
         } else if (operation.kind === "AGENT") {
           if (!harness) throw new Error("Worker has no agent harness configured");
-          output = await executeBoundedAgentOperation(database, operation, harness);
+          output = await executeBoundedAgentOperation(database, operation, harness, faultHooks);
         } else {
           output = isReferenceDeterministicHandler(operation.handler)
             ? await executeReferenceDeterministicOperation(database, operation)
@@ -105,7 +108,7 @@ export async function processOperationJob(
         const settlement = await settleOperationFailure(database, operation, failure);
         return { skipped: false, failed: true, failure, settlement };
       }
-      const completion = await completeOperation(database, operation, output);
+      const completion = await completeOperation(database, operation, output, faultHooks);
       return { skipped: false, ...completion };
     } finally {
       stopped = true;
@@ -125,6 +128,7 @@ export function createOperationWorker(options: {
   concurrency: number;
   queueName?: string;
   harness?: AgentHarness;
+  faultHooks?: ExecutionFaultHooks;
 }) {
   return new Worker(
     options.queueName ?? queueName,
@@ -136,6 +140,7 @@ export function createOperationWorker(options: {
       options.heartbeatMs ?? Math.max(100, Math.floor(options.leaseMs / 3)),
       options.attemptTimeoutMs ?? 60_000,
       options.harness,
+      options.faultHooks,
     ),
     {
       connection: options.connection,

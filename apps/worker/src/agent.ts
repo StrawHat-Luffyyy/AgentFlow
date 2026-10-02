@@ -18,6 +18,7 @@ import {
   failHarnessLlmOperation,
   recordUnacceptedHarnessLlmResponse,
   type ClaimedOperation,
+  type ExecutionFaultHooks,
 } from "@agentflow/runtime";
 
 function jsonRecord(value: unknown, label: string): Record<string, unknown> {
@@ -58,6 +59,7 @@ export async function executeBoundedAgentOperation(
   database: Database,
   operation: ClaimedOperation,
   harness: AgentHarness,
+  faultHooks?: ExecutionFaultHooks,
 ): Promise<Record<string, unknown>> {
   const config = operation.agentConfig;
   if (operation.kind !== "AGENT" || !config) {
@@ -109,6 +111,7 @@ export async function executeBoundedAgentOperation(
             signal: controller.signal,
           },
         });
+        await faultHooks?.hit("after-provider-response", operation);
       } catch (error) {
         const providerError = error instanceof ProviderError ? error : null;
         await failHarnessLlmOperation(database, operation, llm.providerCallId, {

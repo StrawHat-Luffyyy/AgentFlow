@@ -19,6 +19,17 @@ import {
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
 
+export type ExecutionFaultBoundary =
+  | "before-operation"
+  | "after-provider-response"
+  | "after-receiver-commit"
+  | "before-checkpoint-commit"
+  | "after-checkpoint-commit";
+
+export interface ExecutionFaultHooks {
+  hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation): void | Promise<void>;
+}
+
 function hash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
@@ -1264,6 +1275,7 @@ export async function publishToControlledReceiver(
 export async function executeToolOperation(
   database: Database,
   operation: ClaimedOperation,
+  faultHooks?: ExecutionFaultHooks,
 ): Promise<Record<string, unknown>> {
   if (operation.handler !== "publish-report" && operation.handler !== "publish-approved-report") {
     throw new PermanentOperationError(`Unsupported tool handler: ${operation.handler}`);
@@ -1318,6 +1330,7 @@ export async function executeToolOperation(
   let result: Awaited<ReturnType<typeof publishToControlledReceiver>>;
   try {
     result = await publishToControlledReceiver(database, intent, operation.input);
+    await faultHooks?.hit("after-receiver-commit", operation);
   } catch (error) {
     if (error instanceof ConflictError) {
       throw new PermanentOperationError(error.message, "TOOL_IDENTITY_CONFLICT");
@@ -2396,6 +2409,7 @@ export async function completeOperation(
   database: Database,
   operation: ClaimedOperation,
   output: Record<string, unknown>,
+  faultHooks?: ExecutionFaultHooks,
 ) {
   return tracer.startActiveSpan("agentflow.operation.complete", async (span) => {
     try {
@@ -2409,7 +2423,7 @@ export async function completeOperation(
         attemptNumber: operation.attemptNo,
         leaseEpoch: operation.leaseEpoch,
       });
-      return await withTransaction(database, async (transaction) => {
+      const completion = await withTransaction(database, async (transaction) => {
         const locked = await transaction.query<{
           lifecycle: string;
           control: string;
@@ -2494,6 +2508,7 @@ export async function completeOperation(
             [JSON.stringify(output), JSON.stringify(receipt), executionRow.idempotency_record_id],
           );
         }
+        await faultHooks?.hit("before-checkpoint-commit", operation);
         await transaction.query(
           `UPDATE workflow_steps
            SET status = 'SUCCEEDED', accepted_output_json = $1::jsonb,
@@ -2582,6 +2597,8 @@ export async function completeOperation(
         );
         return { checkpointId, successorId, runCompleted: successorId === null };
       });
+      await faultHooks?.hit("after-checkpoint-commit", operation);
+      return completion;
     } finally {
       span.end();
     }

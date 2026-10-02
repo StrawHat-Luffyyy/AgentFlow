@@ -39,6 +39,7 @@ provider call may be repeated and is retained with unknown usage rather than cou
 - `packages/db`: PostgreSQL pool, migration runner, and migrations
 - `packages/harness`: provider contract, registries, bounded-turn enforcement, and adapters
 - `packages/research`: fixed reference corpus, cloud-comparison workflow, report generation, and scripted provider
+- `packages/evaluation`: seeded fault experiments, B0/B1/A0/A1 systems, DBOS reference subset, metrics, and statistics
 - `packages/runtime`: durable domain transactions and execution semantics
 - `packages/shared`: schemas, queue contracts, and shared types
 - `tests/integration`: real PostgreSQL/Redis end-to-end verification
@@ -154,6 +155,49 @@ pnpm typecheck
 pnpm test
 ```
 
+## Milestone 8 evaluation
+
+The evaluation runner executes paired, seeded trials for B0 (volatile retries), B1 (volatile plus
+stable receiver keys), A0 (durable checkpoints without receiver-aware protection), and A1 (the full
+contract). E0-E7 have explicit named fault boundaries; faults fire by operation identity and hit
+count, not by random sleeps. Approval and write boundaries remain mandatory in the 1/2/4-operation
+checkpoint ablation.
+
+Run the default 100-trial mock matrix, or a focused ablation:
+
+```powershell
+pnpm eval:run -- --output evaluation-results/full
+pnpm eval:run -- --seed 42 --trials 20 --scenarios 'E0,E1,E5,E6' --granularity '1,2,4' --output evaluation-results/ablation
+```
+
+Each output directory contains a hashed `manifest.json`, raw canonical `results.jsonl`, tabular
+`results.csv`, Prometheus text metrics, and `summary.json`. The summary reports Wilson 95% intervals,
+median/p95 measurements, duplicates, unknown outcomes, and seeded paired-bootstrap differences for
+B0/B1/A0 versus A1. Manifests record the fault plans, fixed-corpus digest, package
+versions, source revision, retry/restart policy, and machine details.
+
+Real worker processes can arm the same deterministic hooks with `AGENTFLOW_FAULT_PLAN`. The hooks
+cover pre-operation, lost provider response, remote-effect/local-commit, and checkpoint transaction
+boundaries. A `crash` action sends an abrupt process kill; dependency actions become classified
+runtime failures. Arm crash plans only on the worker instance intended to be killed, then restart
+without the plan so the one-shot fault is not re-armed.
+
+```powershell
+$env:AGENTFLOW_FAULT_PLAN='[{"id":"e5","hook":"after-receiver-commit","action":"crash","operationId":"publish-report","occurrence":1}]'
+pnpm dev:worker
+```
+
+The pinned reference is DBOS SDK 5.2.11 with one durable DBOS step per operation in the common
+sequential JSON subset. It uses its own PostgreSQL system schema. The first command below can stop
+the process after a recorded step; rerun without `--crash-after` and the same workflow ID to observe
+DBOS recovery and output reuse.
+
+```powershell
+$env:DBOS_SYSTEM_DATABASE_URL='postgresql://agentflow:agentflow@localhost:5432/agentflow_dbos_eval'
+pnpm eval:dbos -- --workflow-id reference-e1 --crash-after analyze-pricing
+pnpm eval:dbos -- --workflow-id reference-e1 --output evaluation-results/dbos-reference.json
+```
+
 The integration suite uses the `agentflow_test` database and a dedicated BullMQ queue. `TEST_DATABASE_URL` may override the database, but its database name must end in `_test` or `-test` because the suite truncates its fixtures.
 
 To run the application services in containers as well:
@@ -166,5 +210,7 @@ PostgreSQL uses a named persistent volume so execution state survives ordinary c
 
 ## Deliberately deferred
 
-Broader fault injection, live search/crawl ingestion, normalized current SKU pricing, additional
-provider adapters, and a visual workflow editor remain deferred.
+Live search/crawl ingestion, normalized current SKU pricing, additional provider adapters, a visual
+workflow editor, and automated service-level E8-E12 orchestration remain deferred. The evaluation
+package provides the boundary mechanism needed for those service outage and race campaigns, but
+does not claim that the pure seeded model replaces abrupt multi-process integration experiments.

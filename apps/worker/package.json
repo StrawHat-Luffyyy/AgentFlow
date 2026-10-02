@@ -12,6 +12,7 @@
   "dependencies": {
     "@agentflow/config": "workspace:*",
     "@agentflow/db": "workspace:*",
+    "@agentflow/evaluation": "workspace:*",
     "@agentflow/harness": "workspace:*",
     "@agentflow/research": "workspace:*",
     "@agentflow/runtime": "workspace:*",

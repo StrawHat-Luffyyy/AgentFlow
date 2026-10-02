@@ -1,6 +1,7 @@
 import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
+import { createProcessFaultHooks, parseFaultPlan } from "@agentflow/evaluation/process-hooks";
 import {
   AgentHarness,
   OllamaProvider,
@@ -36,6 +37,8 @@ if (config.OPENAI_API_KEY) {
   }));
 }
 const harness = new AgentHarness(providers, new ToolRegistry());
+const faultPlan = process.env.AGENTFLOW_FAULT_PLAN;
+const faultHooks = faultPlan ? createProcessFaultHooks(parseFaultPlan(faultPlan)) : undefined;
 
 const worker = createOperationWorker({
   database,
@@ -46,6 +49,7 @@ const worker = createOperationWorker({
   heartbeatMs: config.LEASE_HEARTBEAT_MS,
   concurrency: config.WORKER_CONCURRENCY,
   harness,
+  ...(faultHooks ? { faultHooks } : {}),
 });
 
 worker.on("completed", (job, result) => {
