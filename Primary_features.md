@@ -1,5 +1,9 @@
 # AgentFlow — Primary Features
 
+> [!IMPORTANT]
+> **Implementation Status Note:**
+> The primary feature abstractions described in this document are implemented in the **TypeScript platform runtime** (`@agentflow/runtime`, `@agentflow/harness`, `@agentflow/db`, `apps/api`, `apps/worker`). The separate Python package structure described below represents an early conceptual design and **was not implemented in code**.
+
 ## Purpose
 
 This document defines the **primary functional features** of the AgentFlow prototype.

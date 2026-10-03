@@ -2,7 +2,7 @@
 
 AgentFlow is a durable workflow runtime for bounded AI-agent execution. The TypeScript platform includes an Express control API, PostgreSQL-authoritative execution state, a transactional dispatch outbox, BullMQ/Redis transport, durable bounded retries, run controls, deadlines, OpenTelemetry tracing, and a React operations console.
 
-The Python research prototype is a separate workstream and is not embedded in this TypeScript platform.
+The Python research prototype was an early conceptual research design and is not implemented in code in this repository. All execution runtime, state machines, tool harnesses, database migrations, and evaluation systems are implemented in TypeScript.
 
 ## Architecture in this milestone
 
@@ -154,6 +154,24 @@ Run verification:
 pnpm typecheck
 pnpm test
 ```
+
+## Empirical evaluation results
+
+The evaluation harness was verified against real PostgreSQL and Redis services using OS-level process supervision and boundary-level fault injection:
+
+1. **Acceptance DEMO:** End-to-end cloud-comparison workflow with 2 process crashes, supervisor restart across pending approval, and exactly-once publication (`evaluation-results/real-1791004304094-c27bb567/`).
+2. **Primary Real Matrix (B0, B1, A1 across E0–E7):** 120 real OS process executions (5 trials per condition) in `evaluation-results/real-primary-matrix/`. A1 achieved 0 committed re-executions, 0 repeated LLM calls on late crashes, and 0 duplicate effects on E5. On E6 (unsupported receiver idempotency), A1 safely halted in `UNKNOWN` state without duplicate sends.
+3. **Targeted A0 Ablation (E0, E5, E6):** 15 real trials in `evaluation-results/real-a0-ablation/` demonstrating that state checkpointing without receiver cooperation produces 100% duplicate side effects upon crash after remote commit.
+4. **Matched DBOS Reference (E0, E1, E2, E5, E7):** 25 real trials running `@dbos-inc/dbos-sdk` v5.2.11 on a dedicated database (`agentflow_reference_eval`) in `evaluation-results/real-dbos-reference/`.
+5. **Dedicated E5 Safety Benchmark:** 4,000 trials (1,000 trials per system: B0, B1, A0, A1) in `evaluation-results/e5-safety-1000/` confirming A1 achieved 0 duplicates (Wilson 95% CI: [0.9962, 1.0000]), while A0 and B0 duplicated in 1,000/1,000 trials.
+6. **Checkpoint Granularity Ablation:** 900 trials across granularities 1, 2, and 4 in `evaluation-results/granularity-ablation/`, demonstrating an 8–12% latency reduction with grouped checkpoints while retaining 100% duplicate-free safety.
+
+### Limitations and measurement reality
+- **Token Usage:** Token counts are labeled estimates derived from the deterministic scripted provider using a word-count estimator (1.35x), not billed provider usage.
+- **Provider Protocol vs Live Runs:** Strict provider protocol, tool call, and usage normalization are verified for OpenAI and Ollama adapters in unit test suites; live network campaigns against paid external APIs were deferred due to unconfigured API keys and local daemon availability.
+- **Sample Distribution:** The real process matrix used 5 trials per condition (120 real OS process executions), which conclusively demonstrates deterministic invariant preservation but is descriptive for latency variance.
+- **Python Prototype:** The proposed Python research prototype was not implemented in code; all functional capabilities are implemented in TypeScript.
+- **Testbed Environment:** Evaluations were conducted on a single-node host running containerized PostgreSQL and Redis.
 
 ## Milestone 8 evaluation
 

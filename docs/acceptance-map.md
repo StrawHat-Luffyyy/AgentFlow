@@ -33,3 +33,14 @@ The real runner requires separate PostgreSQL databases whose names end in `_eval
 B0/B1 restart their cursor and data from scratch. Their external event log is instrumentation and their external approval service represents the human actor; neither is consulted to resume application progress. B1 uses a stable publication key. A0 uses the production durable execution path but substitutes an evaluation-only non-deduplicating receiver invocation at the write boundary. Production A1 behavior is unchanged.
 
 The provider is the deterministic scripted adapter for controlled trials. Token counts are labelled estimates, never billed usage. A successful report-hash/citation check proves artifact integrity, not semantic report quality. A real-provider campaign, five-run performance experiment, dependency-outage campaigns, and checkpoint-granularity experiments require separate evidence; a passing mock-provider process matrix must not be substituted for them.
+
+## Final acceptance and empirical verification summary
+
+- **Authentication and Ownership:** Fully implemented with SHA-256 bearer tokens, role checks (`research-reviewer`, `operator`), and immutable ownership inherited by runs.
+- **Real Fault Injection:** Fully verified with separate OS child processes and abrupt `SIGKILL` at explicit boundaries.
+- **Primary Matrix Execution:** Executed across B0, B1, and A1 for scenarios E0–E7 (120 trials). A1 had zero committed re-executions and zero duplicates on E5.
+- **A0 Ablation:** 15 trials executed on E0, E5, E6, demonstrating the necessity of receiver cooperation.
+- **Reference Comparison:** 25 trials executed on DBOS SDK 5.2.11 against `agentflow_reference_eval`.
+- **Side-Effect Safety:** 1,000 E5 trials executed for each system (4,000 trials total); A1 produced 0 duplicates (Wilson 95% CI: [0.9962, 1.0000]).
+- **Checkpoint Granularity:** 900 trials executed across granularities 1, 2, 4 (8–12% speedup with grouped checkpoints).
+- **Accepted Limitations:** The Python prototype was not implemented in code; live provider runs against external network endpoints were deferred; real primary matrix was executed at 5 trials/condition.

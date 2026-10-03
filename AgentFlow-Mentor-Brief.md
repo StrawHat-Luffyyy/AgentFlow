@@ -16,11 +16,21 @@
 
 **Architecture summary:** Client/SDK → API/control engine → PostgreSQL state/outbox → queue → workers/harness → providers/tools → atomic result/checkpoint → history and metrics.
 
-**Technology stack:** Node.js and TypeScript; Fastify for one API; PostgreSQL; Redis-backed BullMQ; Docker Compose; OpenTelemetry; React with a lightweight build setup for the dashboard. Use one database library the team already knows. Next.js is optional if familiar, but it should not introduce a second execution backend.
+**Technology stack:** Node.js and TypeScript; Express for one API; PostgreSQL; Redis-backed BullMQ; Docker Compose; OpenTelemetry; React with a lightweight build setup (Vite) for the dashboard. Use one database library the team already knows. Next.js is optional if familiar, but it should not introduce a second execution backend.
+
+**Implementation status:** The repository implements the complete TypeScript durable platform/runtime (`@agentflow/runtime`, `@agentflow/harness`, `@agentflow/db`, `@agentflow/research`, `@agentflow/evaluation`, `apps/api`, `apps/worker`, `apps/web`). The separate Python Execute → Remember → Control research prototype discussed in conceptual documents was not implemented in code and remains an uninstantiated conceptual design.
 
 **Expected outcome:** A demonstrable runtime that recovers an interrupted research workflow, reuses committed outputs, waits safely for approval, and prevents duplicate effects when the receiver supports idempotency. Unsupported uncertain effects remain visibly blocked.
 
-**Evaluation approach:** Compare an ordinary retry-enabled volatile agent, AgentFlow, and one existing durable reference on controlled faults. Measure completion, recovery latency, repeated calls/tokens, runtime overhead, duplicate/missing effects, and approval correctness.
+**Evaluation approach & empirical status:**
+- Verified with real multi-process supervisor over PostgreSQL (`agentflow_acceptance_eval`) and Redis:
+  - **Full acceptance DEMO:** Passed with 2 crash boundaries, supervisor restart across pending approval, and exactly-once publication.
+  - **Real primary matrix:** 120 trials across B0, B1, A1 and E0–E7 (5 trials/condition). A1 achieved 0 committed re-executions and 0 duplicate effects on E5. On E6 (unsupported receiver idempotency), A1 safely halted in `UNKNOWN` state without duplicate sends.
+  - **Real A0 ablation:** 15 trials on E0, E5, E6, demonstrating that durability without receiver cooperation produces 100% duplicate side effects on ambiguous outcomes.
+  - **Matched DBOS reference:** 25 trials on E0, E1, E2, E5, E7 with DBOS SDK 5.2.11 against `agentflow_reference_eval`.
+  - **Dedicated E5 side-effect benchmark:** 4,000 trials (1,000/system) yielding 0 duplicates in 1,000 trials for A1 (Wilson 95% CI: [0.9962, 1.0000]).
+  - **Checkpoint granularity ablation:** 900 trials across granularities 1, 2, and 4 (7–12% latency reduction with grouped checkpoints).
+- **Limitations:** Token counts are labeled estimates from the deterministic scripted provider; live provider protocol tests are verified for OpenAI and Ollama adapters, but live-network end-to-end campaigns were deferred due to unconfigured credentials; single-machine testbed.
 
 **Demo narrative:** Start a cloud-comparison report; show five committed steps; kill the worker during feature analysis; restart and resume from the unfinished operation; pause for human approval across another restart; publish once despite a crash after receiver acceptance. Show the independent receiver ledger.
 

@@ -849,6 +849,25 @@ Report proportions with Wilson 95% intervals, and latency/token differences with
 
 Measure checkpoint granularity as an ablation: per-operation versus groups of two/four **repeatable read/LLM operations**. Keep approval and side-effect boundaries mandatory in every variant. Grouping can repeat returned but uncommitted calls; label those correctly. It must never be described as violating the “do not repeat committed results” invariant.
 
+### 16.8 Empirical Evaluation Status and Scope Clarifications
+
+**Implementation Architecture:**
+The AgentFlow platform is implemented exclusively in TypeScript using an Express 5 API (`apps/api`), PostgreSQL-authoritative storage, BullMQ/Redis transport, a dedicated worker (`apps/worker`), and a React/Vite operational console (`apps/web`). The Python Execute → Remember → Control prototype mentioned in early research notes was not implemented in code and remains an uninstantiated conceptual design.
+
+**Empirical Evaluation Execution:**
+The empirical evaluation was executed against real Dockerized PostgreSQL and Redis services using OS-level process supervision and boundary-level fault injection:
+1. **Real Primary Matrix (B0, B1, A1 across E0–E7):** 120 real OS process executions (5 trials per condition). A1 achieved zero committed re-executions across all trials, zero repeated LLM calls on late-stage crashes (compared to 5–10 in B0/B1), and zero duplicate effects on E5. On E6 (unsupported receiver idempotency), A1 safely transitioned to UNKNOWN state without duplicate dispatches.
+2. **Targeted A0 Ablation (E0, E5, E6):** 15 real trials demonstrating that state checkpointing without receiver cooperation produces 100% duplicate side effects upon crash after remote commit.
+3. **Matched DBOS Reference (E0, E1, E2, E5, E7):** 25 real trials running @dbos-inc/dbos-sdk v5.2.11 on a dedicated PostgreSQL database (agentflow_reference_eval), confirming step recovery invariants on a production reference system.
+4. **Dedicated E5 Safety Benchmark:** 4,000 trials (1,000 trials per system: B0, B1, A0, A1) confirming A1 achieved zero duplicates (Wilson 95% CI: [0.9962, 1.0000]), while A0 and B0 duplicated in 1,000/1,000 trials.
+5. **Checkpoint Granularity Ablation:** 900 trials across granularities 1, 2, and 4, demonstrating that grouped checkpoints reduce median latency by 8–12% while maintaining 100% duplicate-free safety.
+
+**Limitations and Measurement Reality:**
+- **Token Usage:** Token counts are labeled estimates derived from the deterministic scripted provider using a word-count estimator (1.35x), not billed provider usage.
+- **Provider Protocol vs Live Runs:** Strict provider protocol, tool call, and usage normalization are verified for OpenAI and Ollama adapters in unit test suites; live network campaigns against paid external APIs were deferred due to unconfigured API keys and local daemon availability.
+- **Sample Distribution:** The real process matrix used 5 trials per condition (120 real OS process executions), which conclusively demonstrates deterministic invariant preservation but is descriptive for latency variance.
+- **Testbed Environment:** Evaluations were conducted on a single-node host running containerized PostgreSQL and Redis; distributed cluster failovers were out of MVP scope.
+
 ### 16.7 Threats to validity
 
 Mocks do not reproduce provider billing, actual rate limits, arbitrary network paths, or model variability. Fixed corpora improve control but reduce realism. Small live samples cannot establish rare failure rates. One-machine experiments do not establish multi-region reliability. A reference system's results depend on its configuration. Equal success rates under generous budgets do not mean durability is useless—repeated work and cost may still differ—but should prevent claims of an observed completion-rate advantage in that regime.
@@ -886,7 +905,7 @@ The present research deliverable precedes implementation. The phases below descr
 
 **Architecture summary:** Client/SDK → API/control engine → PostgreSQL state/outbox → queue → workers/harness → providers/tools → atomic result/checkpoint → history and metrics.
 
-**Technology stack:** Node.js and TypeScript; Fastify for one API; PostgreSQL; Redis-backed BullMQ; Docker Compose; OpenTelemetry; React with a lightweight build setup for the dashboard. Use one database library the team already knows. Next.js is optional if familiar, but it should not introduce a second execution backend.
+**Technology stack:** Node.js and TypeScript; Express for one API; PostgreSQL; Redis-backed BullMQ; Docker Compose; OpenTelemetry; React with a lightweight build setup for the dashboard. Use one database library the team already knows. Next.js is optional if familiar, but it should not introduce a second execution backend.
 
 **Expected outcome:** A demonstrable runtime that recovers an interrupted research workflow, reuses committed outputs, waits safely for approval, and prevents duplicate effects when the receiver supports idempotency. Unsupported uncertain effects remain visibly blocked.
 

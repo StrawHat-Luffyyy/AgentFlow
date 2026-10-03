@@ -1,5 +1,9 @@
 # AgentFlow — Prototype Concept
 
+> [!IMPORTANT]
+> **Implementation Status Note:**
+> This document outlines the conceptual research design for an Execute → Remember → Control runtime. In the current AgentFlow repository, the durable runtime is implemented exclusively as the **TypeScript platform** (@agentflow/runtime, @agentflow/harness, @agentflow/db, apps/api, apps/worker, apps/web). The experimental Python prototype described herein was an early conceptual research design and **was not implemented in code** (zero .py files exist in this repository).
+
 ## 1. Overall Project
 
 **AgentFlow is an agent runtime.**
@@ -563,4 +567,4 @@ This document preserves the **concept and philosophy**, not a predetermined impl
 
 # 12. One-Sentence Definition
 
-> **AgentFlow is a model- and framework-agnostic agent runtime whose core responsibilities are Execute, Remember, and Control, with a Python prototype designed as a modular and configurable experimental platform for recreating, modifying, and evaluating different mechanisms for reliable agent execution.**
+> **AgentFlow is a model- and framework-agnostic agent runtime whose core responsibilities are Execute, Remember, and Control, with the durable runtime implemented in TypeScript, while the Python prototype remains an uninstantiated conceptual research design for recreating, modifying, and evaluating different mechanisms for reliable agent execution.**

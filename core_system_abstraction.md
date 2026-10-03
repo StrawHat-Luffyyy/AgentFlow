@@ -1,5 +1,9 @@
 # AgentFlow — Core System Abstraction
 
+> [!IMPORTANT]
+> **Implementation Status Note:**
+> The Execute → Remember → Control core abstraction defined in this document is implemented in the **TypeScript platform runtime** (`@agentflow/runtime`, `@agentflow/harness`, `@agentflow/db`, `apps/api`, `apps/worker`). The proposed Python prototype remains an uninstantiated conceptual research design.
+
 ## 1. What AgentFlow Is
 
 **AgentFlow is an agent runtime.**
