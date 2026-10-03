@@ -1,3 +1,4 @@
+import type { Credential } from "../../apps/api/src/auth.ts";
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
@@ -42,6 +43,13 @@ const databaseUrl =
   "postgresql://agentflow:agentflow@localhost:5432/agentflow_test";
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 
+const testCredentials: Credential[] = [
+  { id: "test-owner", tokenHash: createHash("sha256").update("owner-test-token").digest("hex"), roles: ["release-manager", "research-reviewer", "operator"] },
+  { id: "test-owner", tokenHash: createHash("sha256").update("reader-test-token").digest("hex"), roles: [] },
+  { id: "other-owner", tokenHash: createHash("sha256").update("other-test-token").digest("hex"), roles: ["release-manager", "operator"] },
+];
+const testAuthorization = "Bearer owner-test-token";
+
 const testQueueName = "agentflow-test-operations";
 
 function assertTestDatabaseUrl(connectionString: string): void {
@@ -64,7 +72,7 @@ let baseUrl: string;
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: { "content-type": "application/json", authorization: testAuthorization, ...init?.headers },
   });
   if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
   return response.json() as Promise<T>;
@@ -73,7 +81,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: { "content-type": "application/json", authorization: testAuthorization, ...init?.headers },
   });
 }
 
@@ -81,7 +89,7 @@ async function restartApi(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
-  server = createApp(database, queue).listen(0);
+  server = createApp(database, queue, testCredentials).listen(0);
   await once(server, "listening");
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
@@ -234,7 +242,7 @@ beforeAll(async () => {
   dispatcher = createOutboxDispatcher(database, queue, 25);
   dispatcher.start();
 
-  const app = createApp(database, queue);
+  const app = createApp(database, queue, testCredentials);
   server = app.listen(0);
   await once(server, "listening");
   const address = server.address() as AddressInfo;
@@ -254,6 +262,27 @@ afterAll(async () => {
 });
 
 describe("durable API → outbox → BullMQ → worker path", () => {
+  it("authenticates callers, isolates ownership, and ignores forged reviewer identities", async () => {
+    expect((await rawRequest("/runs", { headers: { authorization: "" } })).status).toBe(401);
+    expect((await rawRequest("/runs", { headers: { authorization: "Bearer invalid" } })).status).toBe(401);
+    const { run, approval } = await createApprovalRun("ownership-test");
+    const other = { authorization: "Bearer other-test-token" };
+    for (const suffix of ["", "/history", "/attempts", "/approvals", "/sources", "/usage", "/tool-executions", "/harness-operations"]) {
+      expect((await rawRequest(`/runs/${run.id}${suffix}`, { headers: other })).status).toBe(404);
+    }
+    for (const command of ["pause", "resume", "cancel"]) {
+      expect((await rawRequest(`/runs/${run.id}/${command}`, { method: "POST", headers: other })).status).toBe(404);
+    }
+    const listed = await request<{ runs: Array<{ id: string }> }>("/runs", { headers: other });
+    expect(listed.runs.some((entry) => entry.id === run.id)).toBe(false);
+    const decision = { decisionRequestId: randomUUID(), decision: "APPROVE", proposalHash: approval.proposalHash, payloadHash: approval.payloadHash };
+    expect((await rawRequest(`/approvals/${approval.id}/decisions`, { method: "POST", headers: other, body: JSON.stringify(decision) })).status).toBe(404);
+    expect((await rawRequest(`/approvals/${approval.id}/decisions`, { method: "POST", headers: {
+      authorization: "Bearer reader-test-token", "x-agentflow-reviewer-id": "admin", "x-agentflow-reviewer-role": "release-manager",
+    }, body: JSON.stringify(decision) })).status).toBe(403);
+    await request(`/runs/${run.id}/cancel`, { method: "POST" });
+  });
+
   it("lists run summaries and exposes step attempts for operations inspection", async () => {
     const workflow = await request<{ id: string }>("/workflows", {
       method: "POST",
@@ -1103,7 +1132,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       const step = created.steps[0]!;
       const conflictingCreation = await fetch(`${baseUrl}/runs`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: testAuthorization },
         body: JSON.stringify({
           workflowVersionId: version.id,
           input: { topic: "retry policy" },
@@ -1636,11 +1665,12 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       method: "POST",
       headers: {
         "x-agentflow-reviewer-id": "reviewer-2",
-        "x-agentflow-reviewer-role": "developer",
+        "x-agentflow-reviewer-role": "release-manager",
+        authorization: "Bearer reader-test-token",
       },
       body: JSON.stringify(baseDecision),
     });
-    expect(wrongRole.status).toBe(409);
+    expect(wrongRole.status).toBe(403);
     const wrongHash = await rawRequest(`/approvals/${approval.id}/decisions`, {
       method: "POST",
       headers: {
@@ -1829,7 +1859,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     });
     expect(rejected.approvals[0]).toMatchObject({
       status: "REJECTED",
-      decidedBy: "reviewer-6",
+      decidedBy: "test-owner",
       decidedRole: "release-manager",
     });
     const successors = await database.query<{ count: string }>(

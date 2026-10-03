@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { bearerAuthentication, readCredentials, type Credential } from "./auth.js";
 import type { Database } from "@agentflow/db";
 import {
   ConflictError,
@@ -34,7 +36,7 @@ import type { Queue } from "bullmq";
 import express from "express";
 import { z } from "zod";
 
-export function createApp(database: Database, queue: Queue): express.Express {
+export function createApp(database: Database, queue: Queue, credentials: readonly Credential[] = readCredentials()): express.Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -46,19 +48,55 @@ export function createApp(database: Database, queue: Queue): express.Express {
     response.json({ status: "ready", database: "ok", queue: "ok" });
   });
 
+  app.use(bearerAuthentication(credentials));
+  app.get("/me", (_request, response) => {
+    const principal = response.locals.principal as Credential;
+    response.json({ id: principal.id, roles: principal.roles });
+  });
+  // Run ownership is inherited through its immutable workflow-version relationship.
+  app.use(async (request, response, next) => {
+    const principal = response.locals.principal as Credential;
+    const resource = /^\/(runs|workflows|approvals|tool-executions)\/([^/]+)/.exec(request.path);
+    let sql: string | undefined;
+    let id: string | undefined;
+    if (resource) {
+      id = z.string().uuid().parse(resource[2]);
+      const kind = resource[1];
+      if (kind === "workflows") sql = "SELECT 1 FROM workflows WHERE id = $1 AND owner_id = $2";
+      else {
+        const join = kind === "approvals" ? "JOIN approvals resource ON resource.run_id = wr.id"
+          : kind === "tool-executions" ? "JOIN tool_executions resource ON resource.run_id = wr.id" : "";
+        const identity = kind === "runs" ? "wr.id" : "resource.id";
+        sql = `SELECT 1 FROM workflow_runs wr
+          JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+          JOIN workflows w ON w.id = wv.workflow_id ${join}
+          WHERE ${identity} = $1 AND w.owner_id = $2`;
+      }
+    } else if (request.method === "POST" && request.path === "/runs") {
+      id = createRunSchema.parse(request.body).workflowVersionId;
+      sql = `SELECT 1 FROM workflow_versions wv JOIN workflows w ON w.id = wv.workflow_id
+        WHERE wv.id = $1 AND w.owner_id = $2`;
+    }
+    if (sql && (await database.query(sql, [id, principal.id])).rowCount === 0) {
+      response.status(404).json({ error: "NOT_FOUND" });
+      return;
+    }
+    next();
+  });
+
   app.get("/reference-corpora/cloud-comparison-v1", (_request, response) => {
     response.json(cloudComparisonCorpusManifest);
   });
 
   app.post("/reference-workflows/cloud-comparison", async (request, response) => {
     const setup = cloudComparisonSetupSchema.parse(request.body ?? {});
-    const result = await ensureCloudComparisonWorkflow(database, setup);
+    const result = await ensureCloudComparisonWorkflow(database, setup, response.locals.principal.id);
     response.status(result.created ? 201 : 200).json(result);
   });
 
   app.post("/workflows", async (request: express.Request, response: express.Response) => {
     const body = createWorkflowSchema.parse(request.body);
-    const workflow = await createWorkflow(database, body);
+    const workflow = await createWorkflow(database, { ...body, ownerId: response.locals.principal.id });
     response.status(201).json(workflow);
   });
 
@@ -76,7 +114,13 @@ export function createApp(database: Database, queue: Queue): express.Express {
 
   app.post("/runs", async (request: express.Request, response: express.Response) => {
     const body = createRunSchema.parse(request.body);
-    const run = await createRun(database, body);
+    const run = await createRun(database, {
+      ...body,
+      // Prevent global creation-key collisions or cross-owner replay.
+      ...(body.creationKey === undefined ? {} : {
+        creationKey: createHash("sha256").update(JSON.stringify([response.locals.principal.id, body.creationKey])).digest("hex"),
+      }),
+    });
     response.status(201).json(run);
   });
 
@@ -85,7 +129,7 @@ export function createApp(database: Database, queue: Queue): express.Express {
       limit: z.coerce.number().int().min(1).max(100).default(50),
       offset: z.coerce.number().int().min(0).default(0),
     }).parse(request.query);
-    response.json(await listRuns(database, query));
+    response.json(await listRuns(database, { ...query, ownerId: response.locals.principal.id }));
   });
 
   app.get("/runs/:id", async (request: express.Request, response: express.Response) => {
@@ -130,6 +174,10 @@ export function createApp(database: Database, queue: Queue): express.Express {
 
   app.post("/tool-executions/:id/reconcile", async (request: express.Request, response: express.Response) => {
     const toolExecutionId = z.string().uuid().parse(request.params.id);
+    if (!(response.locals.principal as Credential).roles.includes("operator")) {
+      response.status(403).json({ error: "FORBIDDEN" });
+      return;
+    }
     const body = reconciliationDecisionSchema.parse(request.body);
     response.json(await reconcileToolExecution(database, toolExecutionId, body));
   });
@@ -137,10 +185,16 @@ export function createApp(database: Database, queue: Queue): express.Express {
   app.post("/approvals/:id/decisions", async (request: express.Request, response: express.Response) => {
     const approvalId = z.string().uuid().parse(request.params.id);
     const body = approvalDecisionSchema.parse(request.body);
-    const reviewer = {
-      id: z.string().trim().min(1).max(200).parse(request.header("x-agentflow-reviewer-id")),
-      role: z.string().trim().min(1).max(100).parse(request.header("x-agentflow-reviewer-role")),
-    };
+    const principal = response.locals.principal as Credential;
+    const approval = await database.query<{ reviewer_role: string }>(
+      "SELECT reviewer_role FROM approvals WHERE id = $1", [approvalId],
+    );
+    const role = approval.rows[0]?.reviewer_role;
+    if (!role || !principal.roles.includes(role)) {
+      response.status(403).json({ error: "FORBIDDEN" });
+      return;
+    }
+    const reviewer = { id: principal.id, role };
     response.json(await decideApproval(database, approvalId, body, reviewer));
   });
 

@@ -53,6 +53,7 @@ export function createProcessFaultHooks(
   });
   return {
     hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation): void {
+      if (boundary === "completion-start") return;
       try {
         controller.hit(boundary, operation.nodeKey, (options.now ?? Date.now)() - startedAt);
       } catch (error) {

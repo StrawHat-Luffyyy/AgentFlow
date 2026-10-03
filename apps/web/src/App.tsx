@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
+  setBearerToken,
   type Approval,
   type Attempt,
   type HistoryEvent,
@@ -67,7 +68,7 @@ function Metric({ label, value, detail }: { label: string; value: string | numbe
   );
 }
 
-export function App() {
+function Operations({ principal, signOut }: { principal: { id: string; roles: string[] }; signOut: () => void }) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<RunDetail | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -84,9 +85,6 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reviewerId, setReviewerId] = useState(() => localStorage.getItem("agentflow.reviewerId") || "operator-local");
-  const [reviewerRole, setReviewerRole] = useState(() => localStorage.getItem("agentflow.reviewerRole") || "reviewer");
-
   const loadRuns = useCallback(async () => {
     const response = await api.listRuns();
     setRuns(response.runs);
@@ -100,8 +98,6 @@ export function App() {
     setRun(nextRun);
     setAttempts(nextAttempts.attempts);
     setApprovals(nextApprovals.approvals);
-    const pendingRole = nextApprovals.approvals.find((approval) => approval.status === "PENDING")?.reviewerRole;
-    if (pendingRole && !localStorage.getItem("agentflow.reviewerRole")) setReviewerRole(pendingRole);
     setHistory(nextHistory.events);
     setUsage(nextUsage.usage);
     setSelectedStepId((current) => current && nextRun.steps.some((step) => step.id === current)
@@ -162,9 +158,7 @@ export function App() {
   }
 
   async function decide(approval: Approval, decision: "APPROVE" | "REJECT") {
-    localStorage.setItem("agentflow.reviewerId", reviewerId);
-    localStorage.setItem("agentflow.reviewerRole", reviewerRole);
-    await mutate(() => api.decideApproval(approval, decision, reviewerId, reviewerRole));
+    await mutate(() => api.decideApproval(approval, decision));
   }
 
   return (
@@ -176,7 +170,7 @@ export function App() {
           <span className="brand-area">Operations</span>
         </a>
         <div className="topbar-actions">
-          <span className="connection"><i /> Live API</span>
+          <span className="connection">{principal.id}</span><button className="button" onClick={signOut}>Sign out</button>
           <button className="icon-button" onClick={() => void refresh(true)} disabled={refreshing} aria-label="Refresh run data">
             <RefreshCw size={17} className={refreshing ? "spin" : ""} />
           </button>
@@ -252,11 +246,10 @@ export function App() {
                       <JsonPanel value={approval.proposal} />
                     </div>
                     <div className="approval-form">
-                      <label>Reviewer ID<input value={reviewerId} onChange={(event) => setReviewerId(event.target.value)} /></label>
-                      <label>Reviewer role<input value={reviewerRole} onChange={(event) => setReviewerRole(event.target.value)} /></label>
+                      <p>Reviewing as {principal.id}</p>
                       <div className="approval-actions">
-                        <button className="button button--danger" disabled={mutating || !reviewerId || !reviewerRole} onClick={() => void decide(approval, "REJECT")}><X size={16} /> Reject</button>
-                        <button className="button button--primary" disabled={mutating || !reviewerId || !reviewerRole} onClick={() => void decide(approval, "APPROVE")}><Check size={16} /> Approve</button>
+                        <button className="button button--danger" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "REJECT")}><X size={16} /> Reject</button>
+                        <button className="button button--primary" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "APPROVE")}><Check size={16} /> Approve</button>
                       </div>
                     </div>
                   </div>
@@ -324,4 +317,28 @@ function AttemptCard({ attempt }: { attempt: Attempt }) {
       {attempt.error && <JsonPanel value={attempt.error} />}
     </details>
   );
+}
+
+export function App() {
+  const [token, setToken] = useState("");
+  const [principal, setPrincipal] = useState<{ id: string; roles: string[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (principal) return <Operations principal={principal} signOut={() => { setBearerToken(""); setPrincipal(null); }} />;
+  return <main className="app-shell"><section className="panel">
+    <h1>Sign in to AgentFlow</h1>
+    <form onSubmit={(event) => {
+      event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
+      void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
+        .catch(() => { setBearerToken(""); setError("Sign-in failed. Check your access token and API connection."); })
+        .finally(() => setBusy(false));
+    }}>
+      <label htmlFor="access-token">Access token</label>
+      <input id="access-token" type="password" autoComplete="current-password" required value={token}
+        onChange={(event) => setToken(event.target.value)} aria-describedby="sign-in-help" />
+      <p id="sign-in-help">Use the access token provisioned by your administrator. It is kept only in memory.</p>
+      {error && <p role="alert">{error}</p>}
+      <button className="button button--primary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+    </form>
+  </section></main>;
 }

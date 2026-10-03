@@ -166,6 +166,12 @@ importers:
 
   packages/evaluation:
     dependencies:
+      '@agentflow/db':
+        specifier: workspace:*
+        version: link:../db
+      '@agentflow/harness':
+        specifier: workspace:*
+        version: link:../harness
       '@agentflow/research':
         specifier: workspace:*
         version: link:../research
@@ -178,6 +184,9 @@ importers:
       '@dbos-inc/dbos-sdk':
         specifier: 5.2.11
         version: 5.2.11
+      bullmq:
+        specifier: ^5.61.2
+        version: 5.81.5
       zod:
         specifier: 3.23.8
         version: 3.23.8

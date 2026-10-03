@@ -278,16 +278,24 @@ export async function executeReferenceDeterministicOperation(
   if (!isReferenceDeterministicHandler(operation.handler)) {
     throw new Error(`Unsupported reference handler: ${operation.handler}`);
   }
-  const state = stateFrom(operation.input);
   const vendor = operation.handler === "select-aws-sources" ? "AWS"
     : operation.handler === "select-azure-sources" ? "AZURE"
       : operation.handler === "select-gcp-sources" ? "GCP" : null;
+  if (vendor) await persistSourceEvidence(database, operation, fixedCloudComparisonCorpus.filter((source) => source.vendor === vendor));
+  return executeReferenceTransform(operation.handler, operation.input);
+}
+
+// Shared pure operation body for matched volatile/reference experiments.
+export function executeReferenceTransform(handler: string, input: Record<string, unknown>): Record<string, unknown> {
+  if (!isReferenceDeterministicHandler(handler)) throw new Error(`Unsupported reference handler: ${handler}`);
+  const state = stateFrom(input);
+  const vendor = handler === "select-aws-sources" ? "AWS"
+    : handler === "select-azure-sources" ? "AZURE"
+      : handler === "select-gcp-sources" ? "GCP" : null;
   if (vendor) {
-    const sources = fixedCloudComparisonCorpus.filter((source) => source.vendor === vendor);
-    await persistSourceEvidence(database, operation, sources);
     return selectVendor(state, vendor);
   }
-  if (operation.handler === "collect-sources") {
+  if (handler === "collect-sources") {
     verifyFixedCorpus(state);
     return {
       ...state,

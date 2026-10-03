@@ -87,6 +87,7 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
 export async function ensureCloudComparisonWorkflow(
   database: Database,
   raw: Partial<CloudComparisonSetup> = {},
+  ownerId = "legacy-unassigned",
 ) {
   const setup = cloudComparisonSetupSchema.parse(raw);
   const provider = setup.mode === "scripted" ? "scripted-research" : setup.provider!;
@@ -99,15 +100,15 @@ export async function ensureCloudComparisonWorkflow(
   return withTransaction(database, async (transaction) => {
     const workflowId = randomUUID();
     const inserted = await transaction.query<{ id: string }>(
-      `INSERT INTO workflows (id, name, description)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (name) DO NOTHING
+      `INSERT INTO workflows (id, name, description, owner_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (owner_id, name) DO NOTHING
        RETURNING id`,
-      [workflowId, workflowName, "Reference AWS/Azure/GCP comparison over the fixed evaluation corpus"],
+      [workflowId, workflowName, "Reference AWS/Azure/GCP comparison over the fixed evaluation corpus", ownerId],
     );
     const resolvedWorkflowId = inserted.rows[0]?.id ?? (await transaction.query<{ id: string }>(
-      "SELECT id FROM workflows WHERE name = $1",
-      [workflowName],
+      "SELECT id FROM workflows WHERE name = $1 AND owner_id = $2",
+      [workflowName, ownerId],
     )).rows[0]!.id;
     const proposedVersionId = randomUUID();
     const insertedVersion = await transaction.query<{ id: string; definition_hash: string }>(

@@ -9,12 +9,14 @@
     "typecheck": "pnpm --workspace-concurrency=1 -r typecheck",
     "test": "vitest run",
     "test:integration": "vitest run tests/integration",
-    "eval:run": "pnpm --filter @agentflow/evaluation run run",
-    "eval:dbos": "pnpm --filter @agentflow/evaluation run run:dbos",
+    "eval:run": "node --import tsx packages/evaluation/src/real-runner.ts",
+    "eval:dbos": "node --import tsx packages/evaluation/src/real-runner.ts --systems DBOS --scenarios E0,E1,E2,E5,E7 --trials 30",
     "db:migrate": "tsx packages/db/src/cli.ts",
     "dev:api": "pnpm --filter @agentflow/api dev",
     "dev:worker": "pnpm --filter @agentflow/worker dev",
-    "dev:web": "pnpm --filter @agentflow/web dev"
+    "dev:web": "pnpm --filter @agentflow/web dev",
+    "eval:simulate": "pnpm --filter @agentflow/evaluation run simulate",
+    "eval:demo": "node --import tsx packages/evaluation/src/real-runner.ts --systems A1 --scenarios DEMO --lease-ms 15000"
   },
   "devDependencies": {
     "@agentflow/db": "workspace:*",

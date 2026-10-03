@@ -23,6 +23,7 @@ export type ExecutionFaultBoundary =
   | "before-operation"
   | "after-provider-response"
   | "after-receiver-commit"
+  | "completion-start"
   | "before-checkpoint-commit"
   | "after-checkpoint-commit";
 
@@ -145,15 +146,15 @@ async function nextEventSequence(transaction: Transaction, runId: string): Promi
 
 export async function createWorkflow(
   database: Database,
-  input: { name: string; description: string },
+  input: { name: string; description: string; ownerId?: string },
 ) {
   const id = randomUUID();
   return one<{ id: string; name: string; description: string; createdAt: Date }>(
     database,
-    `INSERT INTO workflows (id, name, description)
-     VALUES ($1, $2, $3)
+    `INSERT INTO workflows (id, name, description, owner_id)
+     VALUES ($1, $2, $3, $4)
      RETURNING id, name, description, created_at AS "createdAt"`,
-    [id, input.name, input.description],
+    [id, input.name, input.description, input.ownerId ?? "legacy-unassigned"],
   );
 }
 
@@ -322,7 +323,7 @@ type Queryable = Pick<Database, "query"> | Pick<Transaction, "query">;
 
 export async function listRuns(
   database: Queryable,
-  options: { limit?: number; offset?: number } = {},
+  options: { limit?: number; offset?: number; ownerId?: string } = {},
 ) {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
   const offset = Math.max(options.offset ?? 0, 0);
@@ -354,11 +355,15 @@ export async function listRuns(
            COALESCE(sum(output_tokens), 0) AS output_tokens
          FROM usage_records WHERE run_id = wr.id
        ) usage_stats ON true
+       WHERE ($3::text IS NULL OR w.owner_id = $3)
        ORDER BY wr.created_at DESC, wr.id DESC LIMIT $1 OFFSET $2`,
-      [limit, offset],
+      [limit, offset, options.ownerId ?? null],
     ),
     database.query<{ total: number }>(
-      "SELECT count(*)::integer AS total FROM workflow_runs",
+      `SELECT count(*)::integer AS total FROM workflow_runs wr
+       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+       JOIN workflows w ON w.id = wv.workflow_id
+       WHERE ($1::text IS NULL OR w.owner_id = $1)`, [options.ownerId ?? null],
     ),
   ]);
 
@@ -2423,6 +2428,7 @@ export async function completeOperation(
         attemptNumber: operation.attemptNo,
         leaseEpoch: operation.leaseEpoch,
       });
+      await faultHooks?.hit("completion-start", operation);
       const completion = await withTransaction(database, async (transaction) => {
         const locked = await transaction.query<{
           lifecycle: string;

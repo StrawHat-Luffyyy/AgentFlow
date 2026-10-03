@@ -10,15 +10,19 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "run": "tsx src/cli.ts",
-    "run:dbos": "tsx src/dbos-cli.ts"
+    "run": "tsx src/real-runner.ts",
+    "run:dbos": "tsx src/dbos-cli.ts",
+    "simulate": "tsx src/cli.ts"
   },
   "dependencies": {
     "@agentflow/research": "workspace:*",
     "@agentflow/runtime": "workspace:*",
     "@agentflow/shared": "workspace:*",
     "@dbos-inc/dbos-sdk": "5.2.11",
-    "zod": "3.23.8"
+    "zod": "3.23.8",
+    "@agentflow/db": "workspace:*",
+    "@agentflow/harness": "workspace:*",
+    "bullmq": "^5.61.2"
   },
   "devDependencies": {
     "@types/node": "^24.19.0",

@@ -1,3 +1,4 @@
+import { readCredentials } from "./auth.js";
 import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
@@ -9,6 +10,8 @@ import { redisConnection } from "./redis.js";
 import { createRecoveryScheduler } from "./scheduler.js";
 
 const config = loadConfig();
+const credentials = readCredentials();
+if (credentials.length === 0) throw new Error("Configure AGENTFLOW_AUTH_CREDENTIALS before starting the API");
 const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
@@ -19,7 +22,7 @@ const scheduler = createRecoveryScheduler(
   config.SCHEDULER_POLL_MS,
   config.DISPATCH_RECOVERY_MS,
 );
-const app = createApp(database, queue);
+const app = createApp(database, queue, credentials);
 const server = app.listen(config.API_PORT, () => {
   console.log(`AgentFlow API listening on port ${config.API_PORT}`);
 });

@@ -1,3 +1,6 @@
+let bearerToken = "";
+export function setBearerToken(value: string): void { bearerToken = value; }
+
 const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export interface RunSummary {
@@ -115,7 +118,7 @@ export interface UsageRecord {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: { "content-type": "application/json", authorization: `Bearer ${bearerToken}`, ...init?.headers },
   });
   const body = await response.json().catch(() => ({})) as { message?: string };
   if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`);
@@ -123,6 +126,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  me: () => request<{ id: string; roles: string[] }>("/me"),
   listRuns: () => request<{ runs: RunSummary[]; total: number }>("/runs?limit=100"),
   getRun: (id: string) => request<RunDetail>(`/runs/${id}`),
   getAttempts: (id: string) => request<{ attempts: Attempt[] }>(`/runs/${id}/attempts`),
@@ -134,14 +138,8 @@ export const api = {
   decideApproval: (
     approval: Approval,
     decision: "APPROVE" | "REJECT",
-    reviewerId: string,
-    reviewerRole: string,
   ) => request(`/approvals/${approval.id}/decisions`, {
     method: "POST",
-    headers: {
-      "x-agentflow-reviewer-id": reviewerId,
-      "x-agentflow-reviewer-role": reviewerRole,
-    },
     body: JSON.stringify({
       decisionRequestId: crypto.randomUUID(),
       decision,
