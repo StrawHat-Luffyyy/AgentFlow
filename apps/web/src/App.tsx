@@ -124,7 +124,7 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     window.history.replaceState(null, "", `/runs/${selectedRunId}`);
   }, [selectedRunId]);
   useEffect(() => {
-    const timer = window.setInterval(() => void refresh(true), 5_000);
+    const timer = window.setInterval(() => void refresh(true), 1_500);
     return () => window.clearInterval(timer);
   }, [refresh]);
 
@@ -325,20 +325,35 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (principal) return <Operations principal={principal} signOut={() => { setBearerToken(""); setPrincipal(null); }} />;
-  return <main className="app-shell"><section className="panel">
-    <h1>Sign in to AgentFlow</h1>
-    <form onSubmit={(event) => {
-      event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
-      void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
-        .catch(() => { setBearerToken(""); setError("Sign-in failed. Check your access token and API connection."); })
-        .finally(() => setBusy(false));
-    }}>
-      <label htmlFor="access-token">Access token</label>
-      <input id="access-token" type="password" autoComplete="current-password" required value={token}
-        onChange={(event) => setToken(event.target.value)} aria-describedby="sign-in-help" />
-      <p id="sign-in-help">Use the access token provisioned by your administrator. It is kept only in memory.</p>
-      {error && <p role="alert">{error}</p>}
-      <button className="button button--primary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-    </form>
-  </section></main>;
+  return (
+    <main className="auth-shell">
+      <section className="panel auth-panel">
+        <div className="auth-header">
+          <div className="brand-mark" style={{ width: 42, height: 42, borderRadius: 10 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h1>Sign in to AgentFlow</h1>
+        </div>
+        <form className="auth-form" onSubmit={(event) => {
+          event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
+          void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
+            .catch(() => { setBearerToken(""); setError("Sign-in failed. Check your access token and API connection."); })
+            .finally(() => setBusy(false));
+        }}>
+          <div>
+            <label htmlFor="access-token">Access token</label>
+            <input id="access-token" type="password" autoComplete="current-password" required value={token}
+              onChange={(event) => setToken(event.target.value)} aria-describedby="sign-in-help" style={{ marginTop: 8 }} />
+          </div>
+          <p id="sign-in-help">Use the access token provisioned by your administrator. It is kept only in memory.</p>
+          {error && <p role="alert">{error}</p>}
+          <button className="button button--primary" disabled={busy} style={{ width: "100%", marginTop: 8, height: 44, fontSize: 15 }}>
+            {busy ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
 }

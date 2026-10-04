@@ -23,19 +23,28 @@ if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
     scenarios.some((s) => !["E0","E1","E2","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
 const campaign = `real-${Date.now()}-${randomUUID().slice(0, 8)}`;
 const output = resolve(argument("--output", `evaluation-results/${campaign}`));
+const isDemo = scenarios.includes("DEMO");
+const defaultPort = isDemo ? "3000" : "0";
+const apiPort = Number(process.env.AGENTFLOW_API_PORT || argument("--api-port", defaultPort));
+const token = process.env.AGENTFLOW_DEMO_TOKEN || argument("--token", "") || (isDemo ? "agentflow-demo-token-12345678901234567890123456789012" : randomBytes(32).toString("hex"));
+const isInteractive = isDemo && argument("--non-interactive", "") === "";
+const interactiveTimeoutMs = Number(argument("--approval-timeout-ms", "120000"));
+const approvalDelayMs = Number(argument("--approval-delay-ms", isDemo ? "6000" : "0"));
+const defaultDelayMs = isDemo ? "500" : "0";
+const keepAlive = isDemo ? argument("--no-keep-alive", "") === "" : (argument("--keep-alive", "") !== "" || process.env.AGENTFLOW_KEEP_ALIVE === "true");
 const base: RealConfig = {
   trialId: campaign, system: "A1", scenario: "E0",
   databaseUrl: process.env.EVALUATION_DATABASE_URL ?? "postgresql://agentflow:agentflow@localhost:5432/agentflow_acceptance_eval",
   dbosUrl: process.env.DBOS_SYSTEM_DATABASE_URL ?? "postgresql://agentflow:agentflow@localhost:5432/agentflow_reference_eval",
   redisUrl: process.env.EVALUATION_REDIS_URL ?? "redis://localhost:6379", queue: `agentflow-${campaign}`,
   leaseMs: Number(argument("--lease-ms", "1000")), retryMs: 20,
-  operationDelayMs: Number(argument("--operation-delay-ms", "0")), observationMs: Number(argument("--observation-ms", "120000")),
+  operationDelayMs: Number(argument("--operation-delay-ms", defaultDelayMs)), observationMs: Number(argument("--observation-ms", isDemo ? "600000" : "120000")),
+  apiPort,
 };
 if (!new URL(base.dbosUrl).pathname.endsWith("_eval")) throw new Error("DBOS database must end in _eval");
 await mkdir(output, { recursive: true });
 const db = evidenceDatabase(base.databaseUrl);
 await migrate(db); await installEvidenceSchema(db);
-const token = randomBytes(32).toString("hex");
 const credentials = JSON.stringify([{ id: "acceptance-owner", tokenHash: createHash("sha256").update(token).digest("hex"), roles: ["research-reviewer", "operator"] }]);
 const children = new Set<ChildProcess>();
 const logs: string[] = [];
@@ -63,6 +72,16 @@ async function stop(child: ChildProcess): Promise<void> {
   await new Promise<void>((resolveExit) => { child.once("exit", () => resolveExit()); child.kill("SIGKILL"); });
 }
 let api = await launch("api", base);
+if (isDemo) {
+  console.log(`\n======================================================`);
+  console.log(`  AgentFlow Real Acceptance DEMO Supervisor Started   `);
+  console.log(`======================================================`);
+  console.log(`  API Endpoint:   http://127.0.0.1:${api.port}`);
+  console.log(`  Operations UI:  http://localhost:4173`);
+  console.log(`  Access Token:   ${token}`);
+  console.log(`  Lease Duration: ${base.leaseMs}ms`);
+  console.log(`======================================================\n`);
+}
 async function request(path: string, body?: unknown): Promise<any> {
   const response = await fetch(`http://127.0.0.1:${api.port}${path}`, {
     method: body === undefined ? "GET" : "POST",
@@ -108,6 +127,10 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
     });
     config.runId = run.id;
     await db.query("UPDATE evaluation_trials SET run_id=$2 WHERE id=$1", [config.trialId, run.id]);
+    if (isDemo) {
+      console.log(`[DEMO] Workflow Run Created: ${run.id}`);
+      console.log(`[DEMO] Direct Dashboard Link: http://localhost:4173/runs/${run.id}`);
+    }
   }
   const started = Date.now();
   await evidence.event("observation-start");
@@ -134,13 +157,16 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
       }
       if (process.exitCode !== null || process.signalCode !== null) {
         if (++restarts > 3) { outcome = "FAILED"; error = "Restart budget exhausted"; break; }
+        if (isDemo) console.log(`[DEMO] Worker crash detected. Supervisor spawning replacement worker (restart #${restarts})...`);
         await evidence.event("supervisor-restart");
         process = (await launch(durable ? "worker" : "baseline", config)).child;
       }
       if (approval && !approved) {
         if (["E7", "DEMO"].includes(scenario) && !approvalRestarted) {
           await evidence.event("pending-approval-before-restart", "approve-publication", { id: approval.id ?? null, payloadHash: approval.payloadHash });
+          if (isDemo) console.log(`[DEMO] Approval pending. Simulating abrupt API and Worker termination...`);
           await stop(process); await stop(api.child);
+          await delay(200);
           api = await launch("api", base);
           process = (await launch(durable ? "worker" : "baseline", config)).child;
           approvalRestarted = true; restarts++;
@@ -149,15 +175,52 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
             if (pending?.status !== "PENDING" || pending.payloadHash !== approval.payloadHash) throw new Error("Pending approval changed across restart");
           }
           await evidence.event("pending-approval-after-restart", "approve-publication", { payloadHash: approval.payloadHash });
+          if (isDemo) {
+            console.log(`[DEMO] Both API and Worker restarted. Approval preserved with hash: ${approval.payloadHash.slice(0, 16)}...`);
+            console.log(`[DEMO] Workflow is in WAITING_APPROVAL state.`);
+            console.log(`[DEMO] Review proposal & approve live in dashboard: http://localhost:4173/runs/${config.runId}`);
+          }
         }
+        let userApproved = false;
+        if (isInteractive && durable) {
+          console.log(`[DEMO] Waiting for dashboard approval at http://localhost:4173/runs/${config.runId} (timeout in ${Math.round(interactiveTimeoutMs / 1000)}s)...`);
+          const waitStart = Date.now();
+          while (Date.now() - waitStart < interactiveTimeoutMs) {
+            const approvalsList = (await request(`/runs/${config.runId}/approvals`)).approvals;
+            const current = approvalsList.find((a: any) => a.id === approval.id);
+            if (current && current.status === "APPROVED") {
+              userApproved = true;
+              console.log(`[DEMO] Approval received from Dashboard UI!`);
+              break;
+            }
+            await delay(400);
+          }
+          if (!userApproved) {
+            console.log(`[DEMO] Interactive timeout elapsed without dashboard action; proceeding with supervisor approval fallback...`);
+          }
+        } else if (isDemo && approvalDelayMs > 0) {
+          console.log(`[DEMO] Pausing ${approvalDelayMs / 1000}s for UI review...`);
+          await delay(approvalDelayMs);
+        }
+
         await evidence.event("approval-decision", "approve-publication", { payloadHash: approval.payloadHash });
         await db.query("UPDATE evaluation_trials SET approved_hash=$2 WHERE id=$1", [config.trialId, approval.payloadHash]);
         if (durable) {
-          const decision = { decisionRequestId: randomUUID(), decision: "APPROVE", proposalHash: approval.proposalHash, payloadHash: approval.payloadHash };
-          const first = await request(`/approvals/${approval.id}/decisions`, decision);
-          const second = await request(`/approvals/${approval.id}/decisions`, decision);
-          if (first.replayed || !second.replayed) throw new Error("Approval request deduplication failed");
-          await evidence.event("duplicate-approval-verified", "approve-publication");
+          if (userApproved) {
+            const row = (await db.query<{ decision_request_id: string }>("SELECT decision_request_id FROM approvals WHERE id=$1", [approval.id])).rows[0];
+            const replayDecision = { decisionRequestId: row?.decision_request_id, decision: "APPROVE", proposalHash: approval.proposalHash, payloadHash: approval.payloadHash };
+            const replayResult = await request(`/approvals/${approval.id}/decisions`, replayDecision);
+            if (!replayResult.replayed) throw new Error("Approval request deduplication failed");
+            await evidence.event("duplicate-approval-verified", "approve-publication");
+            if (isDemo) console.log(`[DEMO] Duplicate approval decision verified idempotent.`);
+          } else {
+            const decision = { decisionRequestId: randomUUID(), decision: "APPROVE", proposalHash: approval.proposalHash, payloadHash: approval.payloadHash };
+            const first = await request(`/approvals/${approval.id}/decisions`, decision);
+            const second = await request(`/approvals/${approval.id}/decisions`, decision);
+            if (first.replayed || !second.replayed) throw new Error("Approval request deduplication failed");
+            await evidence.event("duplicate-approval-verified", "approve-publication");
+            if (isDemo) console.log(`[DEMO] Approval submitted and duplicate decision verified idempotent.`);
+          }
         }
         approved = true;
       }
@@ -230,6 +293,16 @@ try {
     for (const system of random.shuffle(systems)) await trial(system,scenario,index);
   }
 } finally {
+  if (keepAlive) {
+    console.log(`\n======================================================`);
+    console.log(`  AgentFlow DEMO Completed Successfully!             `);
+    console.log(`======================================================`);
+    console.log(`  API Server kept alive at: http://127.0.0.1:${api.port}`);
+    console.log(`  Explore dashboard at:     http://localhost:4173`);
+    console.log(`  Press Ctrl+C when finished recording.`);
+    console.log(`======================================================\n`);
+    await new Promise(() => {});
+  }
   await Promise.all([...children].map(stop));
   await db.end();
   const groups = systems.flatMap((system) => scenarios.map((scenario) => {

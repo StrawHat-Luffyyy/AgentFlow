@@ -42,10 +42,28 @@ if (role === "api") {
   const queue = new Queue(config.queue, { connection });
   const dispatcher = createOutboxDispatcher(db, queue, 20);
   const scheduler = createRecoveryScheduler(db, 50, 300);
-  const server = createApp(db, queue, readCredentials()).listen(0, "127.0.0.1", () => {
-    const address = server.address();
-    notify({ ready: true, port: typeof address === "object" ? address?.port : null });
-  });
+  const port = Number(process.env.AGENTFLOW_API_PORT || config.apiPort || 0);
+  const app = createApp(db, queue, readCredentials());
+  const maxAttempts = 15;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const server = app.listen(port, "0.0.0.0", () => {
+          const address = server.address();
+          notify({ ready: true, port: typeof address === "object" && address ? address.port : port });
+          resolve();
+        });
+        server.once("error", (err) => reject(err));
+      });
+      break;
+    } catch (error: any) {
+      if (error?.code === "EADDRINUSE" && attempt < maxAttempts) {
+        await delay(300);
+        continue;
+      }
+      throw error;
+    }
+  }
   dispatcher.start(); scheduler.start();
 } else if (role === "worker") {
   const starts = new Map<string, number>();

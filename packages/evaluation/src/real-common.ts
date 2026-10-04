@@ -12,6 +12,7 @@ export interface RealConfig {
   trialId: string; system: RealSystem; scenario: RealScenario; databaseUrl: string;
   dbosUrl: string; queue: string; redisUrl: string; runId?: string;
   leaseMs: number; retryMs: number; operationDelayMs: number; observationMs: number;
+  apiPort?: number;
 }
 export const definition = cloudComparisonWorkflowDefinition();
 export const digest = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");
