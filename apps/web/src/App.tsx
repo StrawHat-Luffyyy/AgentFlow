@@ -1,8 +1,11 @@
 import {
-  Activity,
   Check,
   ChevronRight,
-  Database,
+  Eye,
+  EyeOff,
+  Inbox,
+  KeyRound,
+  LogOut,
   Pause,
   Play,
   RefreshCw,
@@ -12,6 +15,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApiError,
   api,
   setBearerToken,
   type Approval,
@@ -22,18 +26,23 @@ import {
   type RunSummary,
   type UsageRecord,
 } from "./api.js";
+import {
+  BrandMark,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  IconButton,
+  InlineAlert,
+  Panel,
+  ProgressBar,
+  Skeleton,
+  StatusBadge,
+  Tabs,
+  humanize,
+  statusTone,
+} from "./ui.js";
 
-function statusTone(status: string): string {
-  if (["SUCCEEDED", "APPROVED"].includes(status)) return "success";
-  if (["FAILED", "CANCELLED", "TIMED_OUT", "REJECTED", "EXPIRED"].includes(status)) return "danger";
-  if (["WAITING_APPROVAL", "NEEDS_ATTENTION", "RETRY_WAIT", "PAUSED", "PAUSE_REQUESTED"].includes(status)) return "warning";
-  if (["RUNNING", "QUEUED", "READY"].includes(status)) return "active";
-  return "neutral";
-}
-
-function Status({ value }: { value: string }) {
-  return <span className={`status status--${statusTone(value)}`}>{value.replaceAll("_", " ")}</span>;
-}
+type Principal = { id: string; roles: string[] };
 
 function shortId(value: string): string {
   return value.slice(0, 8);
@@ -46,6 +55,21 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    .format(new Date(value));
+}
+
+function formatRelative(value: string, now: number): string {
+  const seconds = Math.round((now - new Date(value).getTime()) / 1_000);
+  if (seconds < 45) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return formatDate(value);
+}
+
 function formatDuration(start: string, end: string | null): string {
   const milliseconds = Math.max(0, new Date(end ?? Date.now()).getTime() - new Date(start).getTime());
   if (milliseconds < 1_000) return `${milliseconds} ms`;
@@ -55,20 +79,55 @@ function formatDuration(start: string, end: string | null): string {
 
 function JsonPanel({ value, empty = "No output committed yet." }: { value: JsonValue | null; empty?: string }) {
   if (value === null) return <div className="empty-inline">{empty}</div>;
-  return <pre className="json-panel">{JSON.stringify(value, null, 2)}</pre>;
+  return <pre className="code-block" tabIndex={0}>{JSON.stringify(value, null, 2)}</pre>;
 }
 
-function Metric({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
+function Stat({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
   return (
-    <div className="metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {detail && <small>{detail}</small>}
+    <div className="stat">
+      <dt>{label}</dt>
+      <dd>
+        <span className="stat-value">{value}</span>
+        {detail && <span className="stat-detail">{detail}</span>}
+      </dd>
     </div>
   );
 }
 
-function Operations({ principal, signOut }: { principal: { id: string; roles: string[] }; signOut: () => void }) {
+function historyTone(type: string): string {
+  // Lease expiry is a recovery signal, not a terminal failure.
+  if (/UNKNOWN|LEASE|RETRY|ABANDON|CANCEL|PAUSE/.test(type)) return "warning";
+  if (/FAILED|EXPIRED|TIMED_OUT|REJECTED/.test(type)) return "danger";
+  if (/SUCCEEDED|APPROVED|RESUMED/.test(type)) return "success";
+  return "neutral";
+}
+
+function RunListSkeleton() {
+  return (
+    <div className="run-list" aria-hidden="true">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div className="run-item run-item--skeleton" key={index}>
+          <Skeleton width="70%" height={12} />
+          <Skeleton width="45%" height={10} />
+          <Skeleton width="100%" height={4} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="detail-skeleton" aria-label="Loading run" role="status">
+      <Skeleton width="36%" height={20} />
+      <Skeleton width="58%" height={12} />
+      <div className="stats stats--skeleton">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={44} />)}</div>
+      <Skeleton height={220} />
+    </div>
+  );
+}
+
+function Operations({ principal, signOut }: { principal: Principal; signOut: () => void }) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<RunDetail | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -82,12 +141,17 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [inspectTab, setInspectTab] = useState<"output" | "input" | "failure">("output");
   const [loading, setLoading] = useState(true);
+  const [runsLoaded, setRunsLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const loadRuns = useCallback(async () => {
     const response = await api.listRuns();
     setRuns(response.runs);
+    setRunsLoaded(true);
     if (!selectedRunId && response.runs[0]) setSelectedRunId(response.runs[0].id);
   }, [selectedRunId]);
 
@@ -115,6 +179,7 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     try {
       setError(null);
       await Promise.all([loadRuns(), ...(selectedRunId ? [loadDetail(selectedRunId)] : [])]);
+      setLastUpdated(Date.now());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load AgentFlow data");
     } finally {
@@ -132,10 +197,18 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     const timer = window.setInterval(() => void refresh(true), 1_500);
     return () => window.clearInterval(timer);
   }, [refresh]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const selectedStep = useMemo(
     () => run?.steps.find((step) => step.id === selectedStepId) ?? null,
     [run, selectedStepId],
+  );
+  const stepKeys = useMemo(
+    () => new Map((run?.steps ?? []).map((step) => [step.id, step.nodeKey])),
+    [run],
   );
   const selectedAttempts = attempts.filter((attempt) => attempt.stepId === selectedStepId);
   const pendingApprovals = approvals.filter((approval) => approval.status === "PENDING");
@@ -143,6 +216,13 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     input: totals.input + (record.inputTokens ?? 0),
     output: totals.output + (record.outputTokens ?? 0),
   }), { input: 0, output: 0 });
+  const usageEstimated = usage.length > 0 && usage.every((record) => record.provenance !== "reported");
+  const runSummary = run ? runs.find((item) => item.id === run.id) : undefined;
+  const committedSteps = run?.steps.filter((step) => step.status === "SUCCEEDED").length ?? 0;
+  const materializedSteps = run?.steps.length ?? 0;
+  const failedAttempts = attempts.filter((item) => item.status === "FAILED").length;
+  const abandonedAttempts = attempts.filter((item) => item.status === "ABANDONED").length;
+  const stale = error !== null && lastUpdated !== null;
 
   async function mutate(action: () => Promise<unknown>) {
     setMutating(true);
@@ -173,146 +253,219 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="AgentFlow operations home">
-          <span className="brand-mark"><Activity size={18} strokeWidth={2.4} /></span>
-          <span>AgentFlow</span>
+          <BrandMark size={24} />
+          <span className="brand-name">AgentFlow</span>
+          <span className="brand-divider" aria-hidden="true">/</span>
           <span className="brand-area">Operations</span>
         </a>
         <div className="topbar-actions">
-          <span className="connection">{principal.id}</span><button className="button" onClick={signOut}>Sign out</button>
-          <button className="icon-button" onClick={() => void refresh(true)} disabled={refreshing} aria-label="Refresh run data">
-            <RefreshCw size={17} className={refreshing ? "spin" : ""} />
-          </button>
+          <span className={`live-indicator ${stale ? "live-indicator--stale" : ""}`} role="status" aria-live="polite">
+            <span className="live-dot" aria-hidden="true" />
+            {stale ? "Connection lost" : lastUpdated ? `Live · updated ${formatRelative(new Date(lastUpdated).toISOString(), now)}` : "Connecting…"}
+          </span>
+          <IconButton label="Refresh now" onClick={() => void refresh(true)} disabled={refreshing}>
+            <RefreshCw size={15} className={refreshing ? "spin" : ""} />
+          </IconButton>
+          <span className="topbar-separator" aria-hidden="true" />
+          <span className="principal" title={principal.roles.length ? `Roles: ${principal.roles.join(", ")}` : "No roles"}>
+            <span className="principal-avatar" aria-hidden="true">{principal.id.charAt(0).toUpperCase()}</span>
+            <span className="principal-id">{principal.id}</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={signOut} icon={<LogOut size={14} />}>Sign out</Button>
         </div>
       </header>
 
       <aside className="run-rail" aria-label="Workflow runs">
-        <div className="rail-heading">
-          <div><span className="eyebrow">Workspace</span><h1>Runs</h1></div>
-          <span className="count">{runs.length}</span>
+        <div className="rail-header">
+          <h1>Runs</h1>
+          <span className="count" aria-label={`${runs.length} runs`}>{runs.length}</span>
         </div>
-        <div className="run-list">
-          {runs.map((item) => (
-            <button
-              key={item.id}
-              className={`run-item ${item.id === selectedRunId ? "run-item--selected" : ""}`}
-              onClick={() => selectRun(item.id)}
-              aria-current={item.id === selectedRunId ? "page" : undefined}
-            >
-              <span className="run-item-top"><strong>{item.workflowName}</strong><ChevronRight size={15} /></span>
-              <span className="run-item-meta"><code>{shortId(item.id)}</code><Status value={item.publicStatus} /></span>
-              <span className="run-item-bottom">{formatDate(item.createdAt)} · {item.completedStepCount}/{item.stepCount} steps</span>
-            </button>
-          ))}
-          {!loading && runs.length === 0 && <div className="empty-rail">No runs yet. Create one through the API.</div>}
-        </div>
+        {!runsLoaded && error ? (
+          <div className="rail-message">
+            <InlineAlert action={<Button size="sm" onClick={() => void refresh()}>Retry</Button>}>Runs could not be loaded.</InlineAlert>
+          </div>
+        ) : !runsLoaded ? (
+          <RunListSkeleton />
+        ) : runs.length === 0 ? (
+          <EmptyState icon={<Inbox size={20} />} title="No runs yet">Runs you create through the API appear here.</EmptyState>
+        ) : (
+          <nav className="run-list">
+            {runs.map((item) => (
+              <button
+                key={item.id}
+                className={`run-item ${item.id === selectedRunId ? "run-item--selected" : ""}`}
+                onClick={() => selectRun(item.id)}
+                aria-current={item.id === selectedRunId ? "page" : undefined}
+              >
+                <span className="run-item-row">
+                  <span className="run-item-name" title={item.workflowName}>{item.workflowName}</span>
+                  <StatusBadge value={item.publicStatus} size="sm" />
+                </span>
+                <span className="run-item-row run-item-meta">
+                  <code>{shortId(item.id)}</code>
+                  <time dateTime={item.createdAt} title={formatDate(item.createdAt)}>{formatRelative(item.createdAt, now)}</time>
+                </span>
+                <span className="run-item-row run-item-progress">
+                  <ProgressBar value={item.completedStepCount} total={item.stepCount} label={`${item.workflowName} progress`} />
+                  <span>{item.completedStepCount}/{item.stepCount}</span>
+                </span>
+              </button>
+            ))}
+          </nav>
+        )}
       </aside>
 
       <main className="main-content">
-        {error && <div className="error-banner" role="alert"><X size={17} />{error}</div>}
+        {error && (
+          <InlineAlert action={<Button size="sm" onClick={() => void refresh(true)}>Retry</Button>}>
+            {stale ? `Showing data from ${formatTime(new Date(lastUpdated!).toISOString())}. ` : ""}{error}
+          </InlineAlert>
+        )}
         {loading && !run ? (
-          <div className="loading-state"><RefreshCw className="spin" /> Loading operations…</div>
+          <DetailSkeleton />
         ) : !run ? (
-          <div className="blank-state"><Database size={28} /><h2>No run selected</h2><p>Run activity will appear here.</p></div>
+          <EmptyState icon={<Inbox size={22} />} title="No run selected">Select a run to inspect its steps, attempts, and history.</EmptyState>
         ) : (
           <>
             <section className="run-header" aria-labelledby="run-title">
-              <div>
-                <div className="title-row"><span className="eyebrow">Run {shortId(run.id)}</span><Status value={run.publicStatus} /></div>
-                <h2 id="run-title">{runs.find((item) => item.id === run.id)?.workflowName ?? "Workflow run"}</h2>
-                <p className="run-identity"><code>{run.id}</code> · revision {run.stateRevision}</p>
+              <div className="run-header-main">
+                <nav className="breadcrumb" aria-label="Breadcrumb"><span>Runs</span><ChevronRight size={12} aria-hidden="true" /><code>{shortId(run.id)}</code></nav>
+                <div className="run-title-row">
+                  <h2 id="run-title" title={runSummary?.workflowName}>{runSummary?.workflowName ?? "Workflow run"}</h2>
+                  <StatusBadge value={run.publicStatus} />
+                </div>
+                <dl className="run-meta">
+                  <div><dt>Run ID</dt><dd><code>{run.id}</code></dd></div>
+                  <div><dt>Created</dt><dd>{formatDate(run.createdAt)}</dd></div>
+                  <div><dt>{run.finishedAt ? "Finished" : "Deadline"}</dt><dd>{formatDate(run.finishedAt ?? run.deadlineAt)}</dd></div>
+                  <div><dt>Revision</dt><dd>{run.stateRevision}</dd></div>
+                </dl>
               </div>
-              <div className="control-group" aria-label="Run controls">
+              <div className="run-controls" aria-label="Run controls">
                 {run.lifecycle === "OPEN" && run.control === "RUN" && (
-                  <button className="button button--secondary" disabled={mutating} onClick={() => void mutate(() => api.controlRun(run.id, "pause"))}><Pause size={16} /> Pause</button>
+                  <Button disabled={mutating} onClick={() => void mutate(() => api.controlRun(run.id, "pause"))} icon={<Pause size={14} />}>Pause</Button>
                 )}
                 {run.lifecycle === "OPEN" && run.control === "PAUSED" && (
-                  <button className="button button--primary" disabled={mutating} onClick={() => void mutate(() => api.controlRun(run.id, "resume"))}><Play size={16} /> Resume</button>
+                  <Button variant="primary" disabled={mutating} onClick={() => void mutate(() => api.controlRun(run.id, "resume"))} icon={<Play size={14} />}>Resume</Button>
                 )}
                 {run.lifecycle === "OPEN" && (
-                  <button className="button button--danger" disabled={mutating || run.control === "CANCEL_REQUESTED"} onClick={() => {
-                    if (window.confirm("Cancel this run? This action cannot be resumed.")) void mutate(() => api.controlRun(run.id, "cancel"));
-                  }}><Square size={15} /> Cancel</button>
+                  <Button variant="danger" disabled={mutating || run.control === "CANCEL_REQUESTED"} onClick={() => setConfirmCancel(true)} icon={<Square size={13} />}>Cancel run</Button>
                 )}
               </div>
             </section>
 
-            <section className="metrics" aria-label="Run summary">
-              <Metric label="Progress" value={`${run.steps.filter((step) => step.status === "SUCCEEDED").length}/${run.steps.length}`} detail="committed steps" />
-              <Metric label="Attempts" value={attempts.length} detail={`${attempts.filter((item) => item.status === "FAILED").length} failed · ${attempts.filter((item) => item.status === "ABANDONED").length} abandoned`} />
-              <Metric label="Tokens" value={(tokenTotals.input + tokenTotals.output).toLocaleString()} detail={`${tokenTotals.input.toLocaleString()} in · ${tokenTotals.output.toLocaleString()} out`} />
-              <Metric label="Elapsed" value={formatDuration(run.createdAt, run.finishedAt)} detail={`deadline ${formatDate(run.deadlineAt)}`} />
-            </section>
+            <div className="run-progress">
+              <ProgressBar value={committedSteps} total={materializedSteps} label="Committed steps" tone={statusTone(run.publicStatus)} />
+              <span>{committedSteps} committed · {materializedSteps} materialized</span>
+            </div>
+
+            <dl className="stats" aria-label="Run summary">
+              <Stat label="Committed steps" value={`${committedSteps}/${materializedSteps}`} detail="of materialized steps" />
+              <Stat label="Attempts" value={attempts.length} detail={`${failedAttempts} failed · ${abandonedAttempts} abandoned`} />
+              <Stat label="Tokens" value={(tokenTotals.input + tokenTotals.output).toLocaleString()}
+                detail={`${tokenTotals.input.toLocaleString()} in · ${tokenTotals.output.toLocaleString()} out${usageEstimated ? " · estimated" : ""}`} />
+              <Stat label="Elapsed" value={formatDuration(run.createdAt, run.finishedAt)} detail={run.finishedAt ? "completed" : "in progress"} />
+            </dl>
 
             {pendingApprovals.length > 0 && (
-              <section className="panel approval-panel" aria-labelledby="approval-title">
-                <div className="panel-heading"><div><span className="eyebrow">Human checkpoint</span><h3 id="approval-title">Approval required</h3></div><ShieldCheck size={21} /></div>
-                {pendingApprovals.map((approval) => (
-                  <div className="approval-grid" key={approval.id}>
-                    <div>
-                      <p>Review the exact persisted proposal before continuing this run.</p>
-                      <dl className="detail-list"><div><dt>Required role</dt><dd>{approval.reviewerRole}</dd></div><div><dt>Expires</dt><dd>{formatDate(approval.expiresAt)}</dd></div><div><dt>Payload hash</dt><dd><code>{approval.payloadHash.slice(0, 16)}…</code></dd></div></dl>
-                      <JsonPanel value={approval.proposal} />
-                    </div>
-                    <div className="approval-form">
-                      <p>Reviewing as {principal.id}</p>
-                      {!principal.roles.includes(approval.reviewerRole) && (
-                        <p role="note">Your credential lacks the <code>{approval.reviewerRole}</code> role required to decide.</p>
-                      )}
-                      <div className="approval-actions">
-                        <button className="button button--danger" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "REJECT")}><X size={16} /> Reject</button>
-                        <button className="button button--primary" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "APPROVE")}><Check size={16} /> Approve</button>
+              <Panel title="Approval required" meta="Human checkpoint" tone="warning" actions={<ShieldCheck size={16} aria-hidden="true" />}>
+                {pendingApprovals.map((approval) => {
+                  const canDecide = principal.roles.includes(approval.reviewerRole);
+                  return (
+                    <div className="approval" key={approval.id}>
+                      <div className="approval-proposal">
+                        <p className="approval-lead">Review the exact persisted proposal. Your decision is bound to its payload hash.</p>
+                        <dl className="kv">
+                          <div><dt>Required role</dt><dd><code>{approval.reviewerRole}</code></dd></div>
+                          <div><dt>Expires</dt><dd>{formatDate(approval.expiresAt)}</dd></div>
+                          <div><dt>Payload hash</dt><dd><code title={approval.payloadHash}>{approval.payloadHash.slice(0, 16)}…</code></dd></div>
+                        </dl>
+                        <JsonPanel value={approval.proposal} />
+                      </div>
+                      <div className="approval-decision">
+                        <span className="approval-reviewer">Reviewing as <strong>{principal.id}</strong></span>
+                        {!canDecide && (
+                          <p className="approval-note" role="note">Your credential lacks the <code>{approval.reviewerRole}</code> role required to decide.</p>
+                        )}
+                        <div className="approval-actions">
+                          <Button variant="danger" disabled={mutating || !canDecide} onClick={() => void decide(approval, "REJECT")} icon={<X size={14} />}>Reject</Button>
+                          <Button variant="primary" loading={mutating} disabled={!canDecide} onClick={() => void decide(approval, "APPROVE")} icon={<Check size={14} />}>Approve</Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </section>
+                  );
+                })}
+              </Panel>
             )}
 
-            <section className="panel" aria-labelledby="steps-title">
-              <div className="panel-heading"><div><span className="eyebrow">Execution</span><h3 id="steps-title">Steps</h3></div><span className="panel-note">Select a step to inspect</span></div>
+            <Panel title="Steps" meta="Materialized as the run advances" labelledBy="steps-title">
               <div className="table-wrap">
-                <table>
-                  <thead><tr><th>#</th><th>Step</th><th>Kind</th><th>Status</th><th>Attempts</th><th>Duration</th><th><span className="sr-only">Inspect</span></th></tr></thead>
+                <table className="table">
+                  <thead><tr><th className="col-index">#</th><th>Step</th><th className="col-kind">Kind</th><th>Status</th><th className="col-num">Attempts</th><th className="col-num col-duration">Duration</th></tr></thead>
                   <tbody>{run.steps.map((step) => (
-                    <tr key={step.id} className={step.id === selectedStepId ? "row-selected" : ""}>
-                      <td>{String(step.position + 1).padStart(2, "0")}</td>
-                      <td><button className="step-link" onClick={() => setSelectedStepId(step.id)}>{step.nodeKey}<small>{step.handler}</small></button></td>
-                      <td>{step.kind}</td><td><Status value={step.status} /></td><td>{step.attemptCount}/{step.maxAttempts}</td>
-                      <td>{formatDuration(step.createdAt, step.completedAt)}</td>
-                      <td><button className="icon-button icon-button--small" onClick={() => setSelectedStepId(step.id)} aria-label={`Inspect ${step.nodeKey}`}><ChevronRight size={16} /></button></td>
+                    <tr key={step.id} className={step.id === selectedStepId ? "is-selected" : ""} onClick={() => setSelectedStepId(step.id)}>
+                      <td className="col-index">{String(step.position + 1).padStart(2, "0")}</td>
+                      <td>
+                        <button className="step-link" onClick={(event) => { event.stopPropagation(); setSelectedStepId(step.id); }}
+                          aria-pressed={step.id === selectedStepId}>
+                          <span>{step.nodeKey}</span><code>{step.handler}</code>
+                        </button>
+                      </td>
+                      <td className="col-kind"><span className="tag">{humanize(step.kind)}</span></td>
+                      <td><StatusBadge value={step.status} size="sm" /></td>
+                      <td className="col-num">{step.attemptCount}/{step.maxAttempts}</td>
+                      <td className="col-num col-duration">{formatDuration(step.createdAt, step.completedAt ?? run.finishedAt)}</td>
                     </tr>
                   ))}</tbody>
                 </table>
               </div>
-            </section>
+            </Panel>
 
             {selectedStep && (
-              <section className="inspection-grid" aria-label={`Inspection for ${selectedStep.nodeKey}`}>
-                <div className="panel">
-                  <div className="panel-heading"><div><span className="eyebrow">Step inspection</span><h3>{selectedStep.nodeKey}</h3></div><Status value={selectedStep.status} /></div>
-                  <div className="tabs" role="tablist" aria-label="Step data">
-                    {(["output", "input", "failure"] as const).map((tab) => <button key={tab} role="tab" aria-selected={inspectTab === tab} onClick={() => setInspectTab(tab)}>{tab}</button>)}
+              <section className="inspection" aria-label={`Inspection for ${selectedStep.nodeKey}`}>
+                <Panel title={selectedStep.nodeKey} meta="Step data" actions={<StatusBadge value={selectedStep.status} size="sm" />}>
+                  <Tabs tabs={["output", "input", "failure"] as const} value={inspectTab} onChange={setInspectTab} label="Step data" idPrefix="step-data" />
+                  <div id="step-data-panel" role="tabpanel" aria-labelledby={`step-data-tab-${inspectTab}`}>
+                    <JsonPanel value={inspectTab === "output" ? selectedStep.acceptedOutput : inspectTab === "input" ? selectedStep.input : selectedStep.failure} empty={`No ${inspectTab} recorded.`} />
                   </div>
-                  <JsonPanel value={inspectTab === "output" ? selectedStep.acceptedOutput : inspectTab === "input" ? selectedStep.input : selectedStep.failure} empty={`No ${inspectTab} recorded.`} />
-                </div>
-                <div className="panel">
-                  <div className="panel-heading"><div><span className="eyebrow">Physical execution</span><h3>Attempts</h3></div><span className="count">{selectedAttempts.length}</span></div>
+                </Panel>
+                <Panel title="Attempts" meta={`${selectedAttempts.length} for this step`}>
                   <div className="attempt-list">
-                    {selectedAttempts.map((attempt) => <AttemptCard key={attempt.id} attempt={attempt} />)}
+                    {selectedAttempts.map((attempt) => <AttemptRow key={attempt.id} attempt={attempt} />)}
                     {selectedAttempts.length === 0 && <div className="empty-inline">This step has no worker attempts.</div>}
                   </div>
-                </div>
+                </Panel>
               </section>
             )}
 
-            <section className="panel" aria-labelledby="history-title">
-              <div className="panel-heading"><div><span className="eyebrow">Durable audit log</span><h3 id="history-title">History</h3></div><span className="panel-note">{history.length} events</span></div>
-              <ol className="timeline">
-                {history.slice().reverse().map((event) => (
-                  <li key={event.id}><span className="timeline-dot" /><div><div className="timeline-head"><strong>{event.type.replaceAll("_", " ")}</strong><time>{formatDate(event.createdAt)}</time></div><span>Sequence {event.sequence}{event.attemptId ? ` · attempt ${shortId(event.attemptId)}` : ""}</span></div></li>
-                ))}
-              </ol>
-            </section>
+            <Panel title="History" meta={`${history.length} durable events`} labelledBy="history-title">
+              {history.length === 0 ? <div className="empty-inline">No events recorded.</div> : (
+                <ol className="history">
+                  {history.slice().reverse().map((event) => (
+                    <li key={event.id} className={`history-row history-row--${historyTone(event.type)}`}>
+                      <span className="history-seq">#{event.sequence}</span>
+                      <time dateTime={event.createdAt} title={formatDate(event.createdAt)}>{formatTime(event.createdAt)}</time>
+                      <span className="history-type"><span className="history-dot" aria-hidden="true" />{humanize(event.type)}</span>
+                      <span className="history-context">
+                        {event.stepId && stepKeys.get(event.stepId) && <code>{stepKeys.get(event.stepId)}</code>}
+                        {event.attemptId && <span>attempt {shortId(event.attemptId)}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Panel>
+
+            <ConfirmDialog
+              open={confirmCancel}
+              title="Cancel this run?"
+              confirmLabel="Cancel run"
+              dismissLabel="Keep running"
+              onClose={() => setConfirmCancel(false)}
+              onConfirm={() => void mutate(() => api.controlRun(run.id, "cancel"))}
+            >
+              Unfinished steps will be cancelled and the run cannot be resumed. Committed steps and receiver effects are kept.
+            </ConfirmDialog>
           </>
         )}
       </main>
@@ -320,51 +473,81 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
   );
 }
 
-function AttemptCard({ attempt }: { attempt: Attempt }) {
+function AttemptRow({ attempt }: { attempt: Attempt }) {
   return (
-    <details className="attempt-card">
-      <summary><span><strong>Attempt {attempt.attemptNo}</strong><small>{attempt.workerId}</small></span><Status value={attempt.status} /></summary>
-      <dl className="detail-list"><div><dt>Started</dt><dd>{formatDate(attempt.startedAt)}</dd></div><div><dt>Duration</dt><dd>{formatDuration(attempt.startedAt, attempt.finishedAt)}</dd></div><div><dt>Lease epoch</dt><dd>{attempt.epoch}</dd></div><div><dt>Retryable</dt><dd>{attempt.retryable === null ? "—" : String(attempt.retryable)}</dd></div></dl>
+    <details className="attempt">
+      <summary>
+        <ChevronRight size={14} className="attempt-chevron" aria-hidden="true" />
+        <span className="attempt-title">Attempt {attempt.attemptNo}</span>
+        <code className="attempt-worker" title={attempt.workerId}>{attempt.workerId}</code>
+        <StatusBadge value={attempt.status} size="sm" />
+      </summary>
+      <dl className="kv kv--compact">
+        <div><dt>Started</dt><dd>{formatDate(attempt.startedAt)}</dd></div>
+        <div><dt>Duration</dt><dd>{formatDuration(attempt.startedAt, attempt.finishedAt)}</dd></div>
+        <div><dt>Lease epoch</dt><dd>{attempt.epoch}</dd></div>
+        <div><dt>Retryable</dt><dd>{attempt.retryable === null ? "—" : String(attempt.retryable)}</dd></div>
+        {attempt.errorClass && <div><dt>Error class</dt><dd>{humanize(attempt.errorClass)}</dd></div>}
+      </dl>
       {attempt.error && <JsonPanel value={attempt.error} />}
     </details>
   );
 }
 
+function signInError(cause: unknown): string {
+  if (cause instanceof ApiError) {
+    if (cause.status === 401) return "This access token was not accepted. Check that it is current and complete.";
+    if (cause.status === 0 || cause.status >= 500) return "The AgentFlow API could not be reached. Check that it is running.";
+    if (cause.status === 404) return "The server at the API address is not an AgentFlow API. Check that the AgentFlow API is running on the configured port.";
+  }
+  return "Sign-in failed. Check your access token and API connection.";
+}
+
 export function App() {
   const [token, setToken] = useState("");
-  const [principal, setPrincipal] = useState<{ id: string; roles: string[] } | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [principal, setPrincipal] = useState<Principal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (principal) return <Operations principal={principal} signOut={() => { setBearerToken(""); setPrincipal(null); }} />;
   return (
     <main className="auth-shell">
-      <section className="panel auth-panel">
-        <div className="auth-header">
-          <div className="brand-mark" style={{ width: 42, height: 42, borderRadius: 10 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <h1>Sign in to AgentFlow</h1>
-        </div>
-        <form className="auth-form" onSubmit={(event) => {
-          event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
-          void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
-            .catch(() => { setBearerToken(""); setError("Sign-in failed. Check your access token and API connection."); })
-            .finally(() => setBusy(false));
-        }}>
-          <div>
-            <label htmlFor="access-token">Access token</label>
-            <input id="access-token" type="password" autoComplete="current-password" required value={token}
-              onChange={(event) => setToken(event.target.value)} aria-describedby="sign-in-help" style={{ marginTop: 8 }} />
-          </div>
-          <p id="sign-in-help">Use the access token provisioned by your administrator. It is kept only in memory.</p>
-          {error && <p role="alert">{error}</p>}
-          <button className="button button--primary" disabled={busy} style={{ width: "100%", marginTop: 8, height: 44, fontSize: 15 }}>
-            {busy ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-      </section>
+      <div className="auth-container">
+        <div className="auth-brand"><BrandMark size={28} /><span>AgentFlow</span></div>
+        <section className="auth-card" aria-labelledby="sign-in-title">
+          <header className="auth-header">
+            <h1 id="sign-in-title">Sign in to Operations</h1>
+            <p>Inspect, control, and approve durable agent workflow runs.</p>
+          </header>
+          <form className="auth-form" noValidate={false} onSubmit={(event) => {
+            event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
+            void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
+              .catch((cause: unknown) => { setBearerToken(""); setError(signInError(cause)); })
+              .finally(() => setBusy(false));
+          }}>
+            <div className="field">
+              <label htmlFor="access-token">Access token</label>
+              <div className={`input-group ${error ? "input-group--invalid" : ""}`}>
+                <KeyRound size={15} className="input-icon" aria-hidden="true" />
+                <input id="access-token" type={revealed ? "text" : "password"} autoComplete="current-password" required
+                  spellCheck={false} autoCapitalize="off" value={token} disabled={busy}
+                  aria-invalid={error ? true : undefined} aria-describedby={error ? "sign-in-error sign-in-help" : "sign-in-help"}
+                  onChange={(event) => setToken(event.target.value)} />
+                <IconButton type="button" label={revealed ? "Hide token" : "Show token"} className="input-action"
+                  onClick={() => setRevealed((value) => !value)}>
+                  {revealed ? <EyeOff size={15} /> : <Eye size={15} />}
+                </IconButton>
+              </div>
+              <p id="sign-in-help" className="field-help">Use the bearer token provisioned for your identity.</p>
+            </div>
+            {error && <div id="sign-in-error"><InlineAlert>{error}</InlineAlert></div>}
+            <Button type="submit" variant="primary" size="lg" loading={busy} disabled={token.length === 0}>
+              {busy ? "Verifying token…" : "Sign in"}
+            </Button>
+          </form>
+        </section>
+        <p className="auth-footnote">The token is kept in memory only and is cleared when you sign out or reload.</p>
+      </div>
     </main>
   );
 }

@@ -115,15 +115,27 @@ export interface UsageRecord {
   createdAt: string;
 }
 
+/** HTTP status 0 means the API could not be reached at all. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", authorization: `Bearer ${bearerToken}`, ...init?.headers },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      ...init,
+      headers: { "content-type": "application/json", authorization: `Bearer ${bearerToken}`, ...init?.headers },
+    });
+  } catch {
+    throw new ApiError("AgentFlow API is unreachable", 0);
+  }
   const body = await response.json().catch(() => ({})) as { message?: string; error?: string };
   if (!response.ok) {
     const reason = body.message || body.error;
-    throw new Error(reason ? `${reason} (${response.status})` : `Request failed (${response.status})`);
+    throw new ApiError(reason ? `${reason} (${response.status})` : `Request failed (${response.status})`, response.status);
   }
   return body as T;
 }
