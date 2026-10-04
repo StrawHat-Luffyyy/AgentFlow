@@ -1,0 +1,111 @@
+{
+  "groups": [
+    {
+      "system": "A0",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1784,
+      "p95ElapsedMs": 1831.6,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 33.75142500000013,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A0",
+      "scenario": "E5",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2933,
+      "p95ElapsedMs": 3076.2,
+      "p95RecoveryMs": 1244.8,
+      "p95CheckpointMs": 32.539484999999985,
+      "repeatedLlmCalls": 0,
+      "duplicates": 5,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A0",
+      "scenario": "E6",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2921,
+      "p95ElapsedMs": 3033.4,
+      "p95RecoveryMs": 1178.8,
+      "p95CheckpointMs": 25.92056999999993,
+      "repeatedLlmCalls": 0,
+      "duplicates": 5,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "E0",
+      "baseline": "A0",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E5",
+      "baseline": "A0",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E6",
+      "baseline": "A0",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    }
+  ]
+}

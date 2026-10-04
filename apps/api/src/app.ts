@@ -219,6 +219,15 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
         response.status(409).json({ error: "CONFLICT", message: error.message });
         return;
       }
+      // Body-parser rejections (malformed JSON, oversized payloads) carry a 4xx status.
+      const clientError = error as { status?: unknown; type?: unknown };
+      if (typeof clientError.status === "number" && clientError.status >= 400 && clientError.status < 500) {
+        response.status(clientError.status).json({
+          error: clientError.status === 413 ? "PAYLOAD_TOO_LARGE" : "INVALID_REQUEST_BODY",
+          ...(typeof clientError.type === "string" ? { message: clientError.type } : {}),
+        });
+        return;
+      }
       const databaseError = error as { code?: string; constraint?: string };
       if (databaseError.code === "23505") {
         response.status(409).json({

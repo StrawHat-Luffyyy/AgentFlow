@@ -1,0 +1,231 @@
+{
+  "groups": [
+    {
+      "system": "A0",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "trials": 1000,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 2.168404344971009e-19,
+        "upper": 0.0038267584855551234,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 181,
+      "p95ElapsedMs": 185,
+      "medianRepeatedOperations": 1,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 1000,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "trials": 1000,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 181,
+      "p95ElapsedMs": 185,
+      "medianRepeatedOperations": 1,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "B0",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "trials": 1000,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 2.168404344971009e-19,
+        "upper": 0.0038267584855551234,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 268,
+      "p95ElapsedMs": 268,
+      "medianRepeatedOperations": 9,
+      "p95CheckpointMs": null,
+      "duplicateEffects": 1000,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "B1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "trials": 1000,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.996173241514445,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 268,
+      "p95ElapsedMs": 268,
+      "medianRepeatedOperations": 9,
+      "p95CheckpointMs": null,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    }
+  ],
+  "pairedComparisons": [
+    {
+      "baseline": "B0",
+      "treatment": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "pairs": 1000,
+      "completionDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "elapsedMsDifference": {
+        "estimate": -86.952,
+        "lower": -87.102025,
+        "upper": -86.803,
+        "confidence": 0.95
+      },
+      "repeatedOperationsDifference": {
+        "estimate": -8,
+        "lower": -8,
+        "upper": -8,
+        "confidence": 0.95
+      },
+      "llmCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      },
+      "tokenDifference": {
+        "estimate": -2520,
+        "lower": -2520,
+        "upper": -2520,
+        "confidence": 0.95
+      },
+      "duplicateEffectsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    },
+    {
+      "baseline": "B1",
+      "treatment": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "pairs": 1000,
+      "completionDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "elapsedMsDifference": {
+        "estimate": -86.952,
+        "lower": -87.10302499999999,
+        "upper": -86.804975,
+        "confidence": 0.95
+      },
+      "repeatedOperationsDifference": {
+        "estimate": -8,
+        "lower": -8,
+        "upper": -8,
+        "confidence": 0.95
+      },
+      "llmCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      },
+      "tokenDifference": {
+        "estimate": -2520,
+        "lower": -2520,
+        "upper": -2520,
+        "confidence": 0.95
+      },
+      "duplicateEffectsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "baseline": "A0",
+      "treatment": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "pairs": 1000,
+      "completionDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "elapsedMsDifference": {
+        "estimate": -0.044,
+        "lower": -0.254025,
+        "upper": 0.17502499999999985,
+        "confidence": 0.95
+      },
+      "repeatedOperationsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "llmCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "tokenDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      },
+      "duplicateEffectsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    }
+  ]
+}

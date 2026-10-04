@@ -1,0 +1,33 @@
+{
+  "groups": [
+    {
+      "system": "A1",
+      "scenario": "DEMO",
+      "trials": 1,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.20654931437723745,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.20654931437723745,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 63823,
+      "p95ElapsedMs": 63823,
+      "p95RecoveryMs": 15159.45,
+      "p95CheckpointMs": 39.28660999999998,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 1
+      }
+    }
+  ],
+  "comparisons": []
+}

@@ -1,0 +1,950 @@
+{
+  "groups": [
+    {
+      "system": "B0",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1301,
+      "p95ElapsedMs": 1325.8,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2308,
+      "p95ElapsedMs": 2822.6,
+      "p95RecoveryMs": 1136.8,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 5,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2142,
+      "p95ElapsedMs": 2247.6,
+      "p95RecoveryMs": 1062.2,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E3",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1256,
+      "p95ElapsedMs": 1268.3999999999999,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E4",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1281,
+      "p95ElapsedMs": 1477,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E5",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2258,
+      "p95ElapsedMs": 2300.6,
+      "p95RecoveryMs": 1087,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 5,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E6",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2241,
+      "p95ElapsedMs": 2388.8,
+      "p95RecoveryMs": 1145,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 5,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B0",
+      "scenario": "E7",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 3135,
+      "p95ElapsedMs": 3285.4,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1257,
+      "p95ElapsedMs": 1281,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2175,
+      "p95ElapsedMs": 2298.7999999999997,
+      "p95RecoveryMs": 1054,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 5,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2184,
+      "p95ElapsedMs": 2211.7999999999997,
+      "p95RecoveryMs": 1030,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E3",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1282,
+      "p95ElapsedMs": 1304.6000000000001,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E4",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1234,
+      "p95ElapsedMs": 1356.6,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E5",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2309,
+      "p95ElapsedMs": 2344.4,
+      "p95RecoveryMs": 1067.4,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E6",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2191,
+      "p95ElapsedMs": 2501,
+      "p95RecoveryMs": 1096.4,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 5,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "B1",
+      "scenario": "E7",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 3203,
+      "p95ElapsedMs": 3234.7999999999997,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 10,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1758,
+      "p95ElapsedMs": 1810,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 23.80447999999992,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2962,
+      "p95ElapsedMs": 3064.6,
+      "p95RecoveryMs": 1228,
+      "p95CheckpointMs": 31.663294999999987,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2927,
+      "p95ElapsedMs": 3221.2,
+      "p95RecoveryMs": 1208.6,
+      "p95CheckpointMs": 29.685420000000008,
+      "repeatedLlmCalls": 5,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E3",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1964,
+      "p95ElapsedMs": 1988.4,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 29.17590499999988,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E4",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1948,
+      "p95ElapsedMs": 2108.8,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 24.84967499999984,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E5",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2887,
+      "p95ElapsedMs": 2959.4,
+      "p95RecoveryMs": 1190.4,
+      "p95CheckpointMs": 26.99501000000016,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E6",
+      "trials": 5,
+      "completion": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0.43448246478317476,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2742,
+      "p95ElapsedMs": 2867,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 30.8073800000001,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "UNKNOWN": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E7",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 3742,
+      "p95ElapsedMs": 4134,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 27.91309999999989,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "E0",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 471.2,
+        "lower": 436.6,
+        "upper": 526.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E0",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 521,
+        "lower": 494.4,
+        "upper": 547.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 571.8,
+        "lower": 267,
+        "upper": 821.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 787.4,
+        "lower": 716.2,
+        "upper": 842,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 817,
+        "lower": 736.8,
+        "upper": 928.4,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 821.8,
+        "lower": 697.4,
+        "upper": 960.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -1,
+        "lower": -1,
+        "upper": -1,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E3",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 666.6,
+        "lower": 585.8,
+        "upper": 738.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E3",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 643,
+        "lower": 559.4,
+        "upper": 723.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E4",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 645.8,
+        "lower": 593.2,
+        "upper": 697.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E4",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 682.4,
+        "lower": 536.6,
+        "upper": 818.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E5",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 614.4,
+        "lower": 547.8,
+        "upper": 681,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E5",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 586.4,
+        "lower": 465.6,
+        "upper": 703,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E6",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 517.2,
+        "lower": 412.4,
+        "upper": 596.4,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E6",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 510.6,
+        "lower": 343.2,
+        "upper": 638.4,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E7",
+      "baseline": "B0",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 684,
+        "lower": 567.2,
+        "upper": 828.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E7",
+      "baseline": "B1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 664.6,
+        "lower": 514.6,
+        "upper": 848.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    }
+  ]
+}

@@ -58,9 +58,16 @@ worker.on("completed", (job, result) => {
 worker.on("failed", (job, error) => {
   console.error("Operation delivery failed", { jobId: job?.id, error });
 });
+// Without a listener, a Redis connection error would terminate the worker process.
+worker.on("error", (error) => {
+  console.error("Operation worker error", error);
+});
 console.log(`AgentFlow worker ${config.WORKER_ID} started`);
 
+let shuttingDown = false;
 async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`Received ${signal}; shutting down AgentFlow worker`);
   await worker.close();
   await database.end();

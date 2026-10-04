@@ -2,7 +2,7 @@
 
 AgentFlow is a model- and framework-agnostic runtime that executes, persists, monitors, and controls AI-agent workflows. It provides an execution layer between an AI agent and external systems (tools, APIs, human reviewers), ensuring that long-running agent workflows survive process crashes, preserve committed progress, enforce human-in-the-loop approvals, and avoid duplicate side effects upon restart.
 
-The runtime is implemented as a production-grade TypeScript platform with an Express control API, PostgreSQL-authoritative state, BullMQ/Redis transport, worker lease fencing, outbox dispatching, and a React operations dashboard.
+The runtime is implemented in TypeScript with an Express control API, PostgreSQL-authoritative state, BullMQ/Redis transport, worker lease fencing, outbox dispatching, and a React operations dashboard.
 
 ---
 
@@ -61,7 +61,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 - **Atomic Operation Checkpoints:** Every operation commit atomically updates step status, stores input/output snapshots, records execution attempts, and queues successor dispatches in an outbox transaction.
 - **Worker Leases & Fencing Epochs:** Workers claim execution through time-bounded database leases (`claim_expires_at`) renewed via heartbeats. Fencing epochs ensure that completions from stale or partition-delayed workers are rejected.
 - **Recovery Scheduler:** A background API scheduler continuously scans for expired worker leases, due retries, and timed-out runs, reclaiming abandoned steps and rebuilding missing queue deliveries.
-- **Retries, Backoff & Deadlines:** Structured error classification distinguishes `TRANSIENT`, `PERMANENT`, `TIMEOUT`, and `DEPENDENCY` failures. Transient errors follow exponential backoff with jitter; whole-run deadlines enforce hard bounds.
+- **Retries, Backoff & Deadlines:** Structured error classification distinguishes `TRANSIENT`, `PERMANENT`, and `TIMEOUT` failures; ambiguous external writes are handled separately as `UNKNOWN`. Transient errors follow exponential backoff with jitter; whole-run deadlines enforce hard bounds.
 - **Durable Approvals:** First-class human-in-the-loop gates persist suspended workflow runs in `WAITING` state without consuming worker processes. Pending approvals survive full API and worker restarts and enforce role-gated reviewer permissions (`research-reviewer`).
 - **Idempotent Side Effects:** Dedicated `RECEIVER_IDEMPOTENT_WRITE` contracts derive deterministic idempotency keys from the workflow envelope, enabling cooperating external receivers to deduplicate retried side effects upon crash recovery.
 - **UNKNOWN & Reconciliation:** For unsupported receivers (`UNSAFE_WRITE`), ambiguous post-crash outcomes are safely transitioned to `UNKNOWN` with a `RECONCILIATION` wait reason, preventing dangerous automated duplicate dispatches.
@@ -121,8 +121,8 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 
 - **Runtime & Language:** Node.js v24+, TypeScript 5.9 (strict ESM)
 - **API Framework:** Express 5.1
-- **Database & Storage:** PostgreSQL 16 (via `pg` pool, schema migrations in `packages/db`)
-- **Queue & Transport:** Redis 7, BullMQ 5.61, `ioredis`
+- **Database & Storage:** PostgreSQL 17 (Docker Compose image; via `pg` pool, schema migrations in `packages/db`)
+- **Queue & Transport:** Redis 7, BullMQ 5
 - **Reference Durable System:** DBOS TypeScript SDK 5.2.11 (`@dbos-inc/dbos-sdk`)
 - **Operations Console:** React 19, Vite 7, Lucide Icons
 - **Validation & Schemas:** Zod 3.23
@@ -142,17 +142,17 @@ AgentFlow/
 ├── packages/
 │   ├── config/              # Environment configuration & validation
 │   ├── db/                  # PostgreSQL pool, migrations, schema migrations
-│   ├── evaluation/          # Multi-process evaluation harness, fault hooks, DBOS runner
+│   ├── evaluation/          # Real multi-process runner, fault hooks, DBOS runner, seeded simulator
 │   ├── harness/             # LLM provider registry, adapters (OpenAI, Ollama), tools
 │   ├── research/            # Fixed evaluation corpus, cloud-comparison workflow, scripted provider
 │   ├── runtime/             # Core durable domain transactions, state machine, leases
 │   ├── shared/              # Canonical JSON, queue contracts, shared schemas
 │   └── telemetry/           # OpenTelemetry span exporters and attribute schemas
-├── evaluation-results/      # Empirical evaluation evidence, logs, manifests, and CSVs
+├── evaluation-results/      # Evaluation evidence (real campaigns and labelled simulator output)
 ├── tests/
 │   ├── unit/                # Unit tests for harness, research workflow, evaluation
 │   └── integration/         # Real PostgreSQL + Redis end-to-end integration suite
-└── docker-compose.yml       # Local PostgreSQL 16 and Redis 7 services
+└── docker-compose.yml       # Local PostgreSQL 17 and Redis 7 services
 ```
 
 ---
@@ -174,7 +174,7 @@ analyze-pricing (AGENT - LLM)
     ↓
 analyze-features (AGENT - LLM)
     ↓
-generate-report (DETERMINISTIC / AGENT)
+generate-report (DETERMINISTIC)
     ↓
 approve-publication (APPROVAL GATE - Human Reviewer)
     ↓
@@ -182,7 +182,7 @@ publish-report (CONTROLLED SIDE EFFECT - Idempotent Receiver)
 ```
 
 - **Fixed Deterministic Corpus:** Uses six versioned, immutable provider source records (`cloud-comparison-2026-09-30.v1`, hash `79b076dd...`). This prevents changing live web content from confounding reliability benchmarks.
-- **Approval Gate:** The generated Markdown report, source citations, and publication target are cryptographically bound into an approval proposal. The run suspends in `WAITING` until an authorized reviewer (`research-reviewer` role) approves the exact payload hash.
+- **Approval Gate:** The generated Markdown report, source citations, and publication target are bound by SHA-256 hashes into an approval proposal. The run suspends in `WAITING` until an authorized reviewer (`research-reviewer` role) approves the exact payload hash.
 - **Idempotent Publication:** Calls `publishToControlledReceiver` with `RECEIVER_IDEMPOTENT_WRITE`. The independent receiver commits the receipt into its own ledger (`controlled_publication_effects`).
 
 ---
@@ -204,66 +204,80 @@ AgentFlow does **not** claim universal exactly-once execution across arbitrary u
 
 ## 8. Evaluation
 
-AgentFlow was evaluated across real multi-process operating system trials against live PostgreSQL and Redis services, using boundary-level fault injection (`SIGKILL`) at named execution hooks.
+The evidence comes from two different kinds of campaign, and they must not be conflated:
+
+- **Real campaigns (measured):** separate API, worker, and baseline OS processes (`packages/evaluation/src/real-runner.ts`) against live PostgreSQL and Redis, with abrupt `SIGKILL` at named execution boundaries and an independent receiver ledger. Latencies, recovery times, LLM-call counts, and duplicate effects are measured from persisted events.
+- **Seeded simulator (modelled):** an in-process deterministic model of the same nine-operation workload (`packages/evaluation/src/cli.ts`, `pnpm eval:simulate`). Its latencies are fixed per-operation constants plus a sampled 2–4 ms checkpoint cost, and its receiver/checkpoint behaviour is encoded in the model. It explores design trade-offs; it is **not** runtime acceptance evidence.
 
 ### Evaluated Systems
 - **B0 (Volatile Baseline):** Standard in-memory agent loop with bounded retries. On crash, process restarts from step 1, repeating all prior work; non-idempotent writes.
 - **B1 (Volatile Baseline + Stable Keys):** Restarts from step 1 on crash, but uses a stable receiver key to isolate receiver deduplication from checkpoint recovery.
-- **A0 (AgentFlow Ablation):** Full AgentFlow checkpoint durability, but with receiver cooperation disabled (`UNSAFE_WRITE`).
-- **A1 (Full AgentFlow Platform):** Full AgentFlow sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
-- **DBOS (Industry Reference):** Matched common subset executed using the official DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
+- **A0 (AgentFlow Ablation):** Full AgentFlow checkpoint durability, but with receiver cooperation disabled (`UNSAFE_WRITE`) by an evaluation-only adapter.
+- **A1 (Full AgentFlow):** The production sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
+- **DBOS (Reference):** Matched common subset executed using the DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
 
-### Injected Fault Scenarios (E0–E7)
+### Injected Fault Scenarios (E0–E7, real runner)
 - **E0:** No fault (baseline overhead, checkpoint latency).
-- **E1:** Late-stage crash at step 6 (`analyze-features`) before operation execution.
-- **E2:** Crash after provider response, before local checkpoint commit.
-- **E3:** Injected transient provider 503 error (2 retries).
-- **E4:** Tool read timeout (50 ms).
+- **E1:** Crash before executing step 6 (`analyze-features`), after five committed steps.
+- **E2:** Crash after the `analyze-features` provider response, before its local checkpoint commit.
+- **E3:** Injected transient provider 503 on `analyze-pricing` (two failures, then success).
+- **E4:** Read timeout (50 ms) on `search-azure`.
 - **E5:** Remote success / local crash (worker killed after receiver commit, before step checkpoint).
-- **E6:** Unsupported receiver idempotency with post-commit crash.
-- **E7:** Worker and API supervisor restart during pending approval.
+- **E6:** Same crash as E5, but the publication is declared `UNSAFE_WRITE` (no receiver idempotency).
+- **E7:** API and worker processes killed and restarted while an approval is pending.
+
+The simulator uses the same scenario names, but its fault positions are not identical (for example, simulator E1 crashes after the `collect-sources` checkpoint).
 
 ---
 
 ## 9. Results
 
-Empirical results across all executed campaigns:
+### Real campaigns (measured)
 
-| Campaign | Systems | Scenarios | Executed Trials | Key Empirical Finding |
+| Campaign | Systems | Scenarios | Trials | Finding |
 |---|---|---|---|---|
-| **Primary Real Matrix** | B0, B1, A1 | E0–E7 | **120 trials** (5/cond) | **0 committed re-executions** in A1. A1 skipped 100% of committed inference on late crashes (0 repeated LLM calls vs 5–10 in B0/B1). |
-| **Targeted A0 Ablation** | A0 | E0, E5, E6 | **15 trials** (5/cond) | A0 preserves checkpoints but produced **100% duplicate side effects** on E5/E6, proving checkpoint durability alone cannot prevent duplicate actions without receiver cooperation. |
-| **DBOS Reference** | DBOS | E0, E1, E2, E5, E7 | **25 trials** (5/cond) | Confirmed that AgentFlow's step durability invariants match an established production framework on the common subset (DBOS recovery: 2.39–2.47s). |
-| **Dedicated E5 Safety** | B0, B1, A0, A1 | E5 | **4,000 trials** (1,000/sys) | A1 produced **0 duplicates in 1,000 trials** (Wilson 95% CI: `[0.9962, 1.0000]`), while B0 and A0 duplicated in 1,000/1,000 trials. |
-| **Granularity Ablation** | A1 | E0, E1, E5 | **900 trials** (g=1, 2, 4) | Grouping checkpoints across non-side-effecting operations reduced median latency by **8–12%** while retaining 100% duplicate-free safety. |
+| **Primary Real Matrix** | B0, B1, A1 | E0–E7 | **120** (5/condition) | A1: **0 committed re-executions** and **0 duplicate effects** in all 40 trials; all E0–E5 and E7 trials `SUCCEEDED`, all E6 trials ended `UNKNOWN`. A1 repeated **0** LLM calls on E1, E5, E6, E7 versus 5–10 per condition for B0/B1. On E2 A1 repeated the one uncommitted call per trial (5 total), as designed. |
+| **Targeted A0 Ablation** | A0 | E0, E5, E6 | **15** (5/condition) | A0 preserved checkpoints but produced a duplicate effect in **5/5** E5 and **5/5** E6 trials: checkpoint durability alone does not prevent duplicate effects after a remote-success/local-crash. |
+| **DBOS Reference** | DBOS | E0, E1, E2, E5, E7 | **25** (5/condition) | DBOS also showed 0 committed re-executions and 0 duplicates on the common subset; p95 crash-to-resume 2.39–2.47 s (includes process relaunch; not a like-for-like latency comparison). |
+| **Acceptance DEMO** | A1 | DEMO | **1** | See [Demo](#10-demo). |
 
-### Measured Latency & Overhead
-- **Checkpoint Commit Latency:** p95 checkpoint latency was **25–34 ms** on local PostgreSQL (well below the 100 ms target).
-- **Crash Recovery Latency:** p95 crash-to-dispatch recovery was **1.19–1.23 seconds** with a 1,000 ms lease.
-- **Side-Effect Safety on E6:** In unsupported receiver scenarios, A1 safely yielded `UNKNOWN` outcomes with **0 duplicate effects**, whereas B0, B1, and A0 blindly resent and duplicated side effects.
+- **Checkpoint commit latency (A1):** p95 per condition **24–32 ms** on local PostgreSQL (A0: 26–34 ms). Instrumentation overhead is included.
+- **Crash recovery (A1, 1,000 ms lease):** p95 crash-to-resumed-operation **1.19–1.23 s**.
+- **E6 (unsupported receiver):** A1 halted in `UNKNOWN`/`RECONCILIATION` with **0 duplicate effects** in 5/5 trials; B0, B1, and A0 each duplicated in 5/5 trials.
+- **Sample size:** with 5 trials per condition, a 0/5 failure count bounds the per-trial failure rate only loosely (Wilson 95% upper bound ≈ 43%). These results show the invariants held in every observed trial; they are not statistical guarantees, and latency percentiles are descriptive.
+
+### Seeded simulator (modelled, not measured)
+
+| Campaign | Systems | Scenarios | Simulated trials | Model output |
+|---|---|---|---|---|
+| **E5 model sweep** | B0, B1, A0, A1 | E5 | 4,000 (1,000/system) | A1 and B1: 0 duplicates; A0 and B0: duplicates in 1,000/1,000. The model is deterministic for this condition, so the trial count adds no statistical evidence about the real runtime. |
+| **Checkpoint granularity model** | A1 | E0, E1, E5 | 900 (g = 1, 2, 4) | Grouping checkpoints over non-side-effecting operations reduced *modelled* median elapsed time by 7–8% (g=2) and 10–12% (g=4), with 0 modelled duplicates. Production AgentFlow always checkpoints per operation; grouping is not implemented in the runtime. |
 
 > [!NOTE]
-> Token counts in the evaluation matrix are labeled estimates derived from the scripted research provider (`usageProvenance: "estimated-scripted-provider"`, 1.35x word-count model), not billed provider usage.
+> Token counts are labelled estimates from the scripted research provider (`usageProvenance: "estimated-scripted-provider"`, word count × 1.35), not billed provider usage.
 
 ---
 
 ## 10. Demo
 
-The repository includes a fully validated, reproducible end-to-end acceptance demo (`pnpm eval:demo`) exercising the full cloud-comparison research workflow against real PostgreSQL and Redis:
+`pnpm eval:demo` runs the nine-step cloud-comparison workflow as one A1 run against real PostgreSQL and Redis, with the API, worker, and supervisor as separate OS processes:
 
-1. **Workflow Initiation:** Workflow starts over the 6-document corpus.
-2. **Progress Checkpointing:** First 5 operations (`search-aws` through `analyze-pricing`) commit checkpoints to PostgreSQL.
-3. **Fault 1 (Worker Crash):** Worker abruptly killed via `SIGKILL` at `before-operation` on `analyze-features` (PID 23096).
-4. **Recovery 1:** Supervisor restarts worker (PID 9580); worker skips 5 committed steps, resumes step 6, and completes feature analysis.
-5. **Approval Gate:** Report generated; workflow transitions to `WAITING` state.
-6. **Fault 2 (API & Worker Restart):** Both API and worker supervisor processes are terminated while approval is pending.
-7. **Recovery 2:** Services restart; pending approval reloads intact from PostgreSQL with matching proposal hash (`32eb1c...`).
-8. **Role-Gated Approval:** Reviewer submits approval using bearer token credentials; duplicate approval submission is verified as idempotent.
-9. **Fault 3 (Crash after Receiver Commit):** Worker executes `publish-report`; receiver commits payload to `controlled_publication_effects`; worker killed via `SIGKILL` before local checkpoint commit (PID 24072).
-10. **Recovery 3:** Supervisor restarts worker (PID 10644); lease expires and is recovered; attempt 2 presents stable idempotency key; receiver deduplicates and returns existing receipt; final checkpoint commits.
-11. **Ledger Truth:** Independent receiver ledger confirms exactly 1 publication effect (`duplicateEffects = 0`).
+1. **Workflow initiation:** the run starts over the fixed six-document corpus.
+2. **Progress checkpointing:** the first five operations (`search-aws` through `analyze-pricing`) commit checkpoints.
+3. **Fault 1 (worker crash):** the worker is killed with `SIGKILL` at `before-operation` on `analyze-features`.
+4. **Recovery 1:** the supervisor starts a replacement worker; after the 15 s lease expires the step is re-dispatched at a new fencing epoch, and the five committed steps are not re-executed.
+5. **Approval gate:** the report is generated and the run waits (`WAITING_APPROVAL`).
+6. **Fault 2 (API and worker restart):** both processes are killed while the approval is pending.
+7. **Recovery 2:** after restart the pending approval is reloaded from PostgreSQL with an unchanged payload hash.
+8. **Role-gated approval:** a reviewer holding `research-reviewer` approves (in the dashboard, or by the supervisor after a 120 s timeout); resubmitting the same decision is verified to be an idempotent replay.
+9. **Fault 3 (crash after receiver commit):** the receiver commits the publication to `controlled_publication_effects`, then the worker is killed before its local checkpoint commit.
+10. **Recovery 3:** after lease expiry, attempt 2 presents the same idempotency key; the receiver returns the existing receipt and the final checkpoint commits.
+11. **Ledger truth:** the independent receiver ledger holds exactly one publication effect (`duplicateEffects = 0`) and the run ends `SUCCEEDED`.
 
-Demo evidence is preserved in [`evaluation-results/real-1791004304094-c27bb567/`](evaluation-results/real-1791004304094-c27bb567/).
+Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit when the run finishes. Evidence:
+
+- [`evaluation-results/real-1791004304094-c27bb567/`](evaluation-results/real-1791004304094-c27bb567/) — original acceptance run (revision `a2fdfed`, supervisor approval).
+- [`evaluation-results/real-demo-audit-20261004/`](evaluation-results/real-demo-audit-20261004/) — re-run during the final audit (revision `06cbe43` plus the audit diff, approval submitted through the dashboard): `SUCCEEDED`, 0 committed re-executions, 0 repeated LLM calls, 1 receiver effect, crash-to-resume 14.7–15.2 s with the 15 s lease.
 
 ---
 
@@ -271,10 +285,13 @@ Demo evidence is preserved in [`evaluation-results/real-1791004304094-c27bb567/`
 
 - **Python Prototype Unimplemented:** An early conceptual Execute → Remember → Control research prototype was described in design documents, but was **not implemented in code** (zero `.py` files exist). The functional implementation is entirely in TypeScript.
 - **Live Provider End-to-End Campaigns Deferred:** Provider adapters (`OpenAIResponsesProvider`, `OllamaProvider`) are implemented and pass strict wire-protocol, schema normalization, and usage tests in Vitest. However, live-network end-to-end campaigns against paid external APIs were deferred due to unconfigured API keys and local daemon availability.
-- **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions), which conclusively demonstrates deterministic invariant preservation but is descriptive for latency variance.
+- **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions). The invariants held in every observed trial, but five trials cannot bound rare failure rates, and latency percentiles are descriptive.
+- **Large-Sample Results Are Simulated:** The 4,000-trial E5 sweep and the 900-trial granularity study come from the deterministic seeded simulator, not the runtime. No large-sample real campaign was run, and checkpoint grouping is not implemented in the runtime.
 - **DBOS Sample Count:** The DBOS reference system was evaluated over 25 trials on the common subset.
 - **Single-Machine Testbed:** All experiments were conducted on a single host running containerized PostgreSQL and Redis. Distributed cluster partitions and multi-region failovers were outside the MVP scope.
 - **Token Count Estimates:** Token figures from the scripted provider are estimates based on word count, not billed provider tokens.
+- **Report Quality Not Evaluated:** The report-hash and citation checks prove artifact integrity, not semantic report quality.
+- **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
 
 ---
 
@@ -299,43 +316,61 @@ The project's research contribution lies in:
 
 ### 1. Environment Setup
 ```powershell
-# Clone and install dependencies
 pnpm install
 
-# Start PostgreSQL and Redis containers
+# Start PostgreSQL 17 and Redis 7. A fresh volume also creates agentflow_test,
+# agentflow_acceptance_eval, and agentflow_reference_eval (infra/docker/init).
 docker compose up -d postgres redis
 ```
 
-### 2. Database Migrations
+On an existing PostgreSQL volume, create any missing databases once:
+
+```powershell
+docker compose exec postgres psql -U agentflow -d agentflow -c "CREATE DATABASE agentflow_test" -c "CREATE DATABASE agentflow_acceptance_eval" -c "CREATE DATABASE agentflow_reference_eval"
+```
+
+The processes read configuration from environment variables (defaults match `.env.example`); `.env` is not loaded automatically.
+
+### 2. Configure an API Credential
+The API refuses to start without at least one credential. Generate a random token and provision only its SHA-256 hash:
+
+```powershell
+node -e "const c=require('crypto');const t=c.randomBytes(32).toString('hex');console.log('token:',t);console.log(JSON.stringify([{id:'local-owner',tokenHash:c.createHash('sha256').update(t).digest('hex'),roles:['research-reviewer','operator']}]))"
+$env:AGENTFLOW_AUTH_CREDENTIALS = '<JSON array printed above>'
+```
+
+See [`docs/acceptance-map.md`](docs/acceptance-map.md#authentication) for the credential format.
+
+### 3. Database Migrations
 ```powershell
 pnpm db:migrate
 ```
 
-### 3. Start Development Services
+### 4. Start Development Services
 ```powershell
-# Terminal 1: Start Express API
+# Terminal 1: Express API on port 3000 (needs AGENTFLOW_AUTH_CREDENTIALS)
 pnpm dev:api
 
-# Terminal 2: Start BullMQ Worker
+# Terminal 2: BullMQ worker
 pnpm dev:worker
 
-# Terminal 3: Start Operations Console
+# Terminal 3: Operations console
 pnpm dev:web
 ```
-The operations dashboard will be available at `http://localhost:5173`.
+The operations dashboard is served at `http://localhost:4173` and proxies `/api` to `http://127.0.0.1:3000`. Sign in with the raw token.
 
-### 4. Run Test Suites
+### 5. Run Test Suites
+PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only.
+
 ```powershell
-# Run all unit tests (18 tests)
+# All tests: 24 unit + 25 integration (49 total)
 pnpm test
 
-# Run real PostgreSQL + Redis integration tests (24 tests)
+# Real PostgreSQL + Redis integration tests only (25 tests)
 pnpm test:integration
 
-# Run workspace typecheck
+# Workspace typecheck and build
 pnpm typecheck
-
-# Run production build
 pnpm build
 ```
 
@@ -343,10 +378,10 @@ pnpm build
 
 ## 14. Evaluation Commands
 
-All evaluation campaigns can be reproduced using existing package scripts:
+Real campaigns need PostgreSQL databases ending in `_eval` (see Getting Started). The DEMO binds the API to port 3000.
 
 ```powershell
-# 1. Run the real acceptance DEMO (10-step cloud comparison with crash recovery)
+# 1. Real acceptance DEMO (nine-step cloud comparison with crash recovery)
 pnpm eval:demo
 
 # 2. Run the primary real evaluation matrix (B0, B1, A1 across E0–E7)
@@ -358,10 +393,10 @@ node --import tsx packages/evaluation/src/real-runner.ts --systems A0 --scenario
 # 4. Run the matched DBOS reference campaign
 pnpm eval:dbos
 
-# 5. Run the dedicated 1,000-trial E5 side-effect safety benchmark (4,000 trials total)
+# 5. SIMULATOR: E5 model sweep (4,000 simulated trials)
 node --import tsx packages/evaluation/src/cli.ts --systems B0,B1,A0,A1 --scenarios E5 --trials 1000 --output evaluation-results/e5-safety-1000
 
-# 6. Run the checkpoint granularity experiment (900 trials)
+# 6. SIMULATOR: checkpoint granularity model (900 simulated trials)
 node --import tsx packages/evaluation/src/cli.ts --systems A1 --scenarios E0,E1,E5 --granularity 1,2,4 --trials 100 --output evaluation-results/granularity-ablation
 ```
 
@@ -369,29 +404,28 @@ node --import tsx packages/evaluation/src/cli.ts --systems A1 --scenarios E0,E1,
 
 ## 15. Evidence
 
-All raw evaluation artifacts are committed and inspectable in [`evaluation-results/`](evaluation-results/):
+The cited campaign directories under [`evaluation-results/`](evaluation-results/) are tracked in git; other local scratch runs are ignored.
 
-- **[`real-1791004304094-c27bb567/`](evaluation-results/real-1791004304094-c27bb567/):** Real acceptance DEMO execution artifacts.
-- **[`real-primary-matrix/`](evaluation-results/real-primary-matrix/):** 120 primary real process trial records.
-- **[`real-a0-ablation/`](evaluation-results/real-a0-ablation/):** 15 real A0 ablation trial records.
-- **[`real-dbos-reference/`](evaluation-results/real-dbos-reference/):** 25 real DBOS reference trial records.
-- **[`e5-safety-1000/`](evaluation-results/e5-safety-1000/):** 4,000-trial side-effect safety benchmark results.
-- **[`granularity-ablation/`](evaluation-results/granularity-ablation/):** 900-trial checkpoint granularity results.
+Real (measured):
+- **[`real-1791004304094-c27bb567/`](evaluation-results/real-1791004304094-c27bb567/):** original acceptance DEMO.
+- **[`real-demo-audit-20261004/`](evaluation-results/real-demo-audit-20261004/):** DEMO re-run during the final audit.
+- **[`real-primary-matrix/`](evaluation-results/real-primary-matrix/):** 120 primary trials.
+- **[`real-a0-ablation/`](evaluation-results/real-a0-ablation/):** 15 A0 ablation trials.
+- **[`real-dbos-reference/`](evaluation-results/real-dbos-reference/):** 25 DBOS reference trials.
 
-Each experiment directory contains:
-- `manifest.json`: Hardware specifications, OS details, git commit hash, corpus hash, seed, and policy parameters.
-- `results.jsonl` & `results.csv`: Per-trial raw metrics (latency, recovery time, checkpoint latency, duplicates, LLM calls).
-- `summary.json`: Aggregated statistics with Wilson 95% confidence intervals and paired bootstrap differences.
-- `evidence.jsonl`: Chronological audit event streams, receipts, and runtime state snapshots.
-- `process.log`: Supervisor logs and background lease recovery traces.
+Simulated (modelled):
+- **[`e5-safety-1000/`](evaluation-results/e5-safety-1000/):** 4,000-trial E5 model sweep.
+- **[`granularity-ablation/`](evaluation-results/granularity-ablation/):** 900-trial granularity model.
+
+Real campaign directories contain `manifest.json` (source revision, hash of the uncommitted diff, hardware, corpus hash, seed, policy), `results.jsonl`/`results.csv` (per-trial measurements), `summary.json` (Wilson intervals, paired bootstrap differences), `evidence.jsonl` (raw boundary events, receiver rows, runtime snapshots), and `process.log`. Simulator directories contain `manifest.json`, `results.jsonl`/`results.csv`, `summary.json`, and `metrics.prom`.
 
 ---
 
 ## 16. Status
 
-- **TypeScript AgentFlow Platform:** **COMPLETE & EMPIRICALLY EVALUATED**  
-  All core durable state machines, outbox dispatches, worker lease fencing, role-gated approvals, and receiver contracts are fully implemented and verified with 42 unit/integration tests and clean builds.
-- **Research & Evaluation Artifacts:** **COMPLETED FOR THE TYPESCRIPT PLATFORM**  
-  Full empirical evidence generated across real process matrices, DBOS reference benchmarks, and large-sample safety suites.
+- **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
+  Durable state machine, outbox dispatch, lease fencing, role-gated approvals, and receiver contracts are implemented and covered by 49 unit/integration tests, a clean typecheck, and a clean build.
+- **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
+  Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  
   The Python prototype remains a conceptual research design documented in early design notes; zero Python code exists in this repository.

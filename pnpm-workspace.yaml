@@ -5,3 +5,5 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  # OpenTelemetry dependency; its install script is not needed and is not run locally.
+  protobufjs: false

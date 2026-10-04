@@ -283,6 +283,18 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     await request(`/runs/${run.id}/cancel`, { method: "POST" });
   });
 
+  it("rejects malformed and oversized request bodies as client errors", async () => {
+    const malformed = await rawRequest("/workflows", { method: "POST", body: "{not json" });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({ error: "INVALID_REQUEST_BODY" });
+    const oversized = await rawRequest("/workflows", {
+      method: "POST",
+      body: JSON.stringify({ name: "x", description: "y".repeat(1_100_000) }),
+    });
+    expect(oversized.status).toBe(413);
+    expect((await rawRequest("/runs/not-a-uuid")).status).toBe(400);
+  });
+
   it("lists run summaries and exposes step attempts for operations inspection", async () => {
     const workflow = await request<{ id: string }>("/workflows", {
       method: "POST",
@@ -530,7 +542,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 30_000);
 
   it("runs a bounded agent node with separate durable LLM and tool operations", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -662,7 +674,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("persists provider usage and opaque continuation state per logical operation", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -875,7 +887,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("abandons an expired lease, fences the stale worker, and dispatches a new epoch", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -968,7 +980,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("recreates missing and expired dispatches that did not lead to a claim", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1048,7 +1060,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("settles a permanent worker execution failure in the application ledger", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1101,7 +1113,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("persists bounded retry policy, sampled backoff, and terminal exhaustion", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1233,7 +1245,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("honors pause and resume across an active-operation boundary", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1304,7 +1316,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("fences an attempt deadline and persists a retry wait", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1375,13 +1387,15 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await expect(
         completeOperation(database, claim!, executeDeterministicOperation(claim!)),
       ).rejects.toThrow("lease fencing");
+      // Do not leave a retry that becomes due during later tests' global repair assertions.
+      await controlRun(database, created.id, "cancel");
     } finally {
       await worker.resume();
     }
   }, 20_000);
 
   it("serializes resume with a due retry without duplicate dispatch", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1460,7 +1474,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("serializes cancellation and timeout against worker completion", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1526,7 +1540,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("allows only one concurrent repair to reclaim an expired lease", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const workflow = await request<{ id: string }>("/workflows", {
         method: "POST",
@@ -1607,7 +1621,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("persists an approval across API restart and replays an exact decision once", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const { run, approval } = await createApprovalRun("approval-restart-workflow");
       expect(run.publicStatus).toBe("WAITING_APPROVAL");
@@ -1766,7 +1780,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   });
 
   it("serializes concurrent double approval into one continuation dispatch", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const { run, approval } = await createApprovalRun("approval-double-workflow");
       const decide = (decisionRequestId: string) => rawRequest(`/approvals/${approval.id}/decisions`, {
@@ -1798,7 +1812,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("records approval while paused without dispatching or implicitly resuming", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const { run, approval } = await createApprovalRun("approval-paused-workflow");
       await request(`/runs/${run.id}/pause`, { method: "POST" });
@@ -1899,7 +1913,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("reuses a stable receiver key after remote success and a local crash", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const { version, run } = await createPublicationRun(
         "idempotent-publication-workflow",
@@ -1999,7 +2013,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
   }, 20_000);
 
   it("moves an unsupported ambiguous receiver to UNKNOWN without resending", async () => {
-    await worker.pause(true);
+    await worker.pause();
     try {
       const { version, run } = await createPublicationRun(
         "unsafe-publication-workflow",

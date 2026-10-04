@@ -1,0 +1,77 @@
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1791004304094-c27bb567 api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}

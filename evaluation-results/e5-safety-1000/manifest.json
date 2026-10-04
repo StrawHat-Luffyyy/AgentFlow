@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "agentflow-eval-20260901-be4813c21975",
+  "createdAt": "2026-10-03T05:40:58.406Z",
+  "seed": 20260901,
+  "trials": 1000,
+  "randomizedSystemOrder": true,
+  "systems": [
+    "B0",
+    "B1",
+    "A0",
+    "A1"
+  ],
+  "scenarios": [
+    "E5"
+  ],
+  "checkpointGranularities": [
+    1
+  ],
+  "workload": {
+    "id": "cloud-comparison-evaluation",
+    "version": "1.0.0",
+    "corpusHash": "79b076dd173ee73b95f0c65627500bcd64042f6488cfeadafa2982cad31f4c9e",
+    "operationCount": 9,
+    "digest": "2b08cbd29627e33211dc369aa96a9b7afd486037f4845dc2235fa23ebf946d93"
+  },
+  "implementation": {
+    "agentFlowVersion": "0.1.0",
+    "sourceRevision": "a2fdfed2a8522ac4994a3dcff8b1fe19b49149fa",
+    "node": "v24.11.1",
+    "platform": "win32",
+    "architecture": "x64",
+    "cpus": 12,
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "totalMemoryBytes": 16870006784
+  },
+  "policy": {
+    "maxAttempts": 3,
+    "maxRestarts": 3,
+    "recoveryDelayMs": 20
+  },
+  "reference": {
+    "system": "DBOS",
+    "package": "@dbos-inc/dbos-sdk",
+    "version": "5.2.11",
+    "subset": "sequential deterministic JSON operations with one DBOS step per AgentFlow operation"
+  },
+  "conditions": {
+    "E5": {
+      "scenario": "E5",
+      "faults": [
+        {
+          "id": "e5-effect-committed",
+          "hook": "after-receiver-commit",
+          "action": "crash",
+          "operationId": "publish-report",
+          "occurrence": 1
+        }
+      ],
+      "receiverSupportsIdempotency": true,
+      "recoveryDelayMs": 20,
+      "maxRestarts": 3,
+      "maxAttempts": 3
+    }
+  },
+  "manifestHash": "acd57d7075a92b1e08c3189819acf5491d2982396ea3508754c19cafb5a17b24"
+}

@@ -1,0 +1,46 @@
+{
+  "campaign": "real-1791006476768-0973624a",
+  "seed": 42,
+  "trials": 5,
+  "systems": [
+    "DBOS"
+  ],
+  "scenarios": [
+    "E0",
+    "E1",
+    "E2",
+    "E5",
+    "E7"
+  ],
+  "sourceRevision": "a2fdfed2a8522ac4994a3dcff8b1fe19b49149fa",
+  "sourceDiffHash": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+  "node": "v24.11.1",
+  "hardware": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "logicalCpus": 12,
+    "memoryBytes": 16870006784
+  },
+  "corpusHash": "79b076dd173ee73b95f0c65627500bcd64042f6488cfeadafa2982cad31f4c9e",
+  "dbosVersion": "5.2.11",
+  "policy": {
+    "leaseMs": 1000,
+    "schedulerPollMs": 50,
+    "outboxPollMs": 20,
+    "retryInitialMs": 20,
+    "maxAttempts": 3,
+    "maxRestarts": 3,
+    "observationMs": 120000,
+    "workerConcurrency": 1,
+    "operationDelayMs": 0
+  },
+  "method": "real processes; PostgreSQL; BullMQ; shared deterministic corpus and scripted provider; independent receiver transaction",
+  "limitations": [
+    "Scripted provider token counts are estimates, not billed tokens",
+    "Instrumentation overhead is included",
+    "Serial trials include process startup",
+    "DBOS common subset uses durable steps and an external approval service",
+    "No production checkpoint grouping is changed",
+    "Receiver shares PostgreSQL with the runtime but commits independently"
+  ],
+  "manifestHash": "4f1fad48e2fea60d04a4adc6497851e6e365aee916b1ed4e603b8ec879ec5693"
+}

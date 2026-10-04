@@ -120,8 +120,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "content-type": "application/json", authorization: `Bearer ${bearerToken}`, ...init?.headers },
   });
-  const body = await response.json().catch(() => ({})) as { message?: string };
-  if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`);
+  const body = await response.json().catch(() => ({})) as { message?: string; error?: string };
+  if (!response.ok) {
+    const reason = body.message || body.error;
+    throw new Error(reason ? `${reason} (${response.status})` : `Request failed (${response.status})`);
+  }
   return body as T;
 }
 

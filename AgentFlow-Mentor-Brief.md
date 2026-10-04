@@ -24,13 +24,12 @@
 
 **Evaluation approach & empirical status:**
 - Verified with real multi-process supervisor over PostgreSQL (`agentflow_acceptance_eval`) and Redis:
-  - **Full acceptance DEMO:** Passed with 2 crash boundaries, supervisor restart across pending approval, and exactly-once publication.
-  - **Real primary matrix:** 120 trials across B0, B1, A1 and E0–E7 (5 trials/condition). A1 achieved 0 committed re-executions and 0 duplicate effects on E5. On E6 (unsupported receiver idempotency), A1 safely halted in `UNKNOWN` state without duplicate sends.
-  - **Real A0 ablation:** 15 trials on E0, E5, E6, demonstrating that durability without receiver cooperation produces 100% duplicate side effects on ambiguous outcomes.
+  - **Full acceptance DEMO:** Passed with 2 crash boundaries, API and worker restart across a pending approval, and exactly one receiver effect for the publication (re-run successfully during the final audit, approved through the dashboard).
+  - **Real primary matrix:** 120 trials across B0, B1, A1 and E0–E7 (5 trials/condition). A1 had 0 committed re-executions and 0 duplicate effects in all 40 trials. On E6 (unsupported receiver idempotency), A1 halted in `UNKNOWN` in 5/5 trials without resending.
+  - **Real A0 ablation:** 15 trials on E0, E5, E6; durability without receiver cooperation duplicated the effect in 5/5 E5 and 5/5 E6 trials.
   - **Matched DBOS reference:** 25 trials on E0, E1, E2, E5, E7 with DBOS SDK 5.2.11 against `agentflow_reference_eval`.
-  - **Dedicated E5 side-effect benchmark:** 4,000 trials (1,000/system) yielding 0 duplicates in 1,000 trials for A1 (Wilson 95% CI: [0.9962, 1.0000]).
-  - **Checkpoint granularity ablation:** 900 trials across granularities 1, 2, and 4 (7–12% latency reduction with grouped checkpoints).
-- **Limitations:** Token counts are labeled estimates from the deterministic scripted provider; live provider protocol tests are verified for OpenAI and Ollama adapters, but live-network end-to-end campaigns were deferred due to unconfigured credentials; single-machine testbed.
+- **Simulator (modelled, not runtime evidence):** a deterministic seeded model produced a 4,000-trial E5 sweep (0 modelled duplicates for A1) and a 900-trial checkpoint-granularity study (7–12% lower modelled latency with grouping). These explore design trade-offs only; grouping is not implemented in the runtime.
+- **Limitations:** Five real trials per condition show the invariants held in every observed run but cannot bound rare failure rates; token counts are labeled estimates from the deterministic scripted provider; provider adapters are verified by protocol tests, but live-network end-to-end campaigns were not run; single-machine testbed.
 
 **Demo narrative:** Start a cloud-comparison report; show five committed steps; kill the worker during feature analysis; restart and resume from the unfinished operation; pause for human approval across another restart; publish once despite a crash after receiver acceptance. Show the independent receiver ledger.
 

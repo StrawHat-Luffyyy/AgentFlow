@@ -1,0 +1,181 @@
+{
+  "groups": [
+    {
+      "system": "DBOS",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 1589,
+      "p95ElapsedMs": 1659.6,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4739,
+      "p95ElapsedMs": 4937.4,
+      "p95RecoveryMs": 2467.3999999999996,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4762,
+      "p95ElapsedMs": 4883,
+      "p95RecoveryMs": 2388.8,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 5,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E5",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5016,
+      "p95ElapsedMs": 5052.2,
+      "p95RecoveryMs": 2449.2,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E7",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5783,
+      "p95ElapsedMs": 6108.599999999999,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "E0",
+      "baseline": "DBOS",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E1",
+      "baseline": "DBOS",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E2",
+      "baseline": "DBOS",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E5",
+      "baseline": "DBOS",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    },
+    {
+      "scenario": "E7",
+      "baseline": "DBOS",
+      "pairs": 0,
+      "elapsedDifference": null,
+      "repeatedCallsDifference": null
+    }
+  ]
+}

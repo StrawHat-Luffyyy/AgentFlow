@@ -15,6 +15,7 @@ export function createOutboxDispatcher(
 ): OutboxDispatcher {
   let timer: NodeJS.Timeout | undefined;
   let stopping = false;
+  let activeDispatch: Promise<number> | undefined;
 
   async function dispatchOnce(): Promise<number> {
     const candidates = await database.query<{
@@ -60,9 +61,11 @@ export function createOutboxDispatcher(
 
   async function tick(): Promise<void> {
     if (stopping) return;
-    await dispatchOnce().catch((error) => {
+    activeDispatch = dispatchOnce();
+    await activeDispatch.catch((error) => {
       console.error("Outbox dispatch failed", error);
     });
+    activeDispatch = undefined;
     if (!stopping) timer = setTimeout(tick, pollMs);
   }
 
@@ -74,6 +77,7 @@ export function createOutboxDispatcher(
     async stop() {
       stopping = true;
       if (timer) clearTimeout(timer);
+      await activeDispatch?.catch(() => undefined);
       await queue.close();
     },
   };

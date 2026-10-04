@@ -9,6 +9,9 @@ COPY apps/worker/package.json apps/worker/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/evaluation/package.json packages/evaluation/package.json
+COPY packages/harness/package.json packages/harness/package.json
+COPY packages/research/package.json packages/research/package.json
 COPY packages/runtime/package.json packages/runtime/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/telemetry/package.json packages/telemetry/package.json

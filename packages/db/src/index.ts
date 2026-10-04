@@ -8,7 +8,12 @@ export type Database = pg.Pool;
 export type Transaction = PoolClient;
 
 export function createDatabase(connectionString: string): Database {
-  return new Pool({ connectionString, max: 10 });
+  const pool = new Pool({ connectionString, max: 10 });
+  // An idle client can fail when PostgreSQL restarts; without a listener the process crashes.
+  pool.on("error", (error) => {
+    console.error("PostgreSQL idle client error", error);
+  });
+  return pool;
 }
 
 export async function withTransaction<T>(
@@ -16,16 +21,22 @@ export async function withTransaction<T>(
   work: (transaction: Transaction) => Promise<T>,
 ): Promise<T> {
   const client = await database.connect();
+  let releaseError: Error | undefined;
   try {
     await client.query("BEGIN");
     const result = await work(client);
     await client.query("COMMIT");
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      // A connection that cannot roll back must not be returned to the pool.
+      releaseError = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
     throw error;
   } finally {
-    client.release();
+    client.release(releaseError);
   }
 }
 

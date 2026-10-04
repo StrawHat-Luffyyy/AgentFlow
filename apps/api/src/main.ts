@@ -16,6 +16,10 @@ const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
 const queue = new Queue(queueName, { connection: redisConnection(config.REDIS_URL) });
+// Redis outages surface here; PostgreSQL outbox rows remain the durable dispatch intent.
+queue.on("error", (error) => {
+  console.error("Operation queue connection error", error);
+});
 const dispatcher = createOutboxDispatcher(database, queue, config.OUTBOX_POLL_MS);
 const scheduler = createRecoveryScheduler(
   database,
@@ -29,9 +33,12 @@ const server = app.listen(config.API_PORT, () => {
 dispatcher.start();
 scheduler.start();
 
+let shuttingDown = false;
 async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`Received ${signal}; shutting down AgentFlow API`);
-  server.close();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   await scheduler.stop();
   await dispatcher.stop();
   await database.end();

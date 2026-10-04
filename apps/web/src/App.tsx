@@ -10,7 +10,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   setBearerToken,
@@ -91,10 +91,15 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
     if (!selectedRunId && response.runs[0]) setSelectedRunId(response.runs[0].id);
   }, [selectedRunId]);
 
+  const selectedRunRef = useRef(selectedRunId);
+  selectedRunRef.current = selectedRunId;
+
   const loadDetail = useCallback(async (id: string) => {
     const [nextRun, nextAttempts, nextApprovals, nextHistory, nextUsage] = await Promise.all([
       api.getRun(id), api.getAttempts(id), api.getApprovals(id), api.getHistory(id), api.getUsage(id),
     ]);
+    // A slow response for a previously selected run must not replace the current selection.
+    if (selectedRunRef.current !== id) return;
     setRun(nextRun);
     setAttempts(nextAttempts.attempts);
     setApprovals(nextApprovals.approvals);
@@ -153,8 +158,11 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
   }
 
   function selectRun(id: string) {
+    if (id === selectedRunId) return;
     setSelectedRunId(id);
     setSelectedStepId(null);
+    setRun(null);
+    setLoading(true);
   }
 
   async function decide(approval: Approval, decision: "APPROVE" | "REJECT") {
@@ -230,7 +238,7 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
 
             <section className="metrics" aria-label="Run summary">
               <Metric label="Progress" value={`${run.steps.filter((step) => step.status === "SUCCEEDED").length}/${run.steps.length}`} detail="committed steps" />
-              <Metric label="Attempts" value={attempts.length} detail={`${attempts.filter((item) => item.status === "FAILED").length} failed`} />
+              <Metric label="Attempts" value={attempts.length} detail={`${attempts.filter((item) => item.status === "FAILED").length} failed · ${attempts.filter((item) => item.status === "ABANDONED").length} abandoned`} />
               <Metric label="Tokens" value={(tokenTotals.input + tokenTotals.output).toLocaleString()} detail={`${tokenTotals.input.toLocaleString()} in · ${tokenTotals.output.toLocaleString()} out`} />
               <Metric label="Elapsed" value={formatDuration(run.createdAt, run.finishedAt)} detail={`deadline ${formatDate(run.deadlineAt)}`} />
             </section>
@@ -247,6 +255,9 @@ function Operations({ principal, signOut }: { principal: { id: string; roles: st
                     </div>
                     <div className="approval-form">
                       <p>Reviewing as {principal.id}</p>
+                      {!principal.roles.includes(approval.reviewerRole) && (
+                        <p role="note">Your credential lacks the <code>{approval.reviewerRole}</code> role required to decide.</p>
+                      )}
                       <div className="approval-actions">
                         <button className="button button--danger" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "REJECT")}><X size={16} /> Reject</button>
                         <button className="button button--primary" disabled={mutating || !principal.roles.includes(approval.reviewerRole)} onClick={() => void decide(approval, "APPROVE")}><Check size={16} /> Approve</button>

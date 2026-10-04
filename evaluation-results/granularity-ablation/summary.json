@@ -1,0 +1,221 @@
+{
+  "groups": [
+    {
+      "system": "A1",
+      "scenario": "E0",
+      "checkpointGranularity": 1,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 151,
+      "p95ElapsedMs": 154,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E0",
+      "checkpointGranularity": 2,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 139,
+      "p95ElapsedMs": 141.04999999999998,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E0",
+      "checkpointGranularity": 4,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 133,
+      "p95ElapsedMs": 136,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E1",
+      "checkpointGranularity": 1,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 172,
+      "p95ElapsedMs": 176,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E1",
+      "checkpointGranularity": 2,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 159,
+      "p95ElapsedMs": 162,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E1",
+      "checkpointGranularity": 4,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 153,
+      "p95ElapsedMs": 155,
+      "medianRepeatedOperations": 0,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 1,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 181.5,
+      "p95ElapsedMs": 185,
+      "medianRepeatedOperations": 1,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 2,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 169,
+      "p95ElapsedMs": 171.05,
+      "medianRepeatedOperations": 1,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    },
+    {
+      "system": "A1",
+      "scenario": "E5",
+      "checkpointGranularity": 4,
+      "trials": 100,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.9630065017930143,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 163,
+      "p95ElapsedMs": 165,
+      "medianRepeatedOperations": 1,
+      "p95CheckpointMs": 4,
+      "duplicateEffects": 0,
+      "unknownOutcomes": 0
+    }
+  ],
+  "pairedComparisons": []
+}

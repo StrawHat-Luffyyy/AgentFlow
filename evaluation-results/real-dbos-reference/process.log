@@ -1,0 +1,585 @@
+real-1791006476768-0973624a-E0-0-DBOS baseline (node:12156) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E0-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E0-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E0-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E0-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E0-1-DBOS baseline (node:23100) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E0-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E0-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E0-1-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E0-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E0-2-DBOS baseline (node:11508) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E0-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E0-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E0-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E0-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E0-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E0-3-DBOS baseline (node:2096) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E0-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E0-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E0-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E0-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E0-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E0-4-DBOS baseline (node:21596) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E0-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E0-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E0-4-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E0-4-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E0-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-0-DBOS baseline (node:5536) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E1-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E1-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-0-DBOS baseline (node:23824) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-0-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E1-0-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E1-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-0-DBOS baseline Workflow (real-1791006476768-0973624a-E1-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E1-1-DBOS baseline (node:8564) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-1-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E1-1-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E1-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-1-DBOS baseline (node:10360) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-1-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E1-1-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E1-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-1-DBOS baseline Workflow (real-1791006476768-0973624a-E1-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E1-2-DBOS baseline (node:6668) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E1-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E1-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-2-DBOS baseline (node:5256) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E1-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E1-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-2-DBOS baseline Workflow (real-1791006476768-0973624a-E1-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E1-3-DBOS baseline (node:1512) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-3-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E1-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-3-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E1-3-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-3-DBOS baseline (node:9560) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E1-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E1-3-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-3-DBOS baseline Workflow (real-1791006476768-0973624a-E1-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E1-4-DBOS baseline (node:22732) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-4-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E1-4-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E1-4-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E1-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-4-DBOS baseline (node:21596) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E1-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E1-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E1-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E1-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E1-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E1-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E1-4-DBOS baseline Workflow (real-1791006476768-0973624a-E1-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E2-0-DBOS baseline (node:18504) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E2-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E2-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E2-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-0-DBOS baseline (node:8840) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E2-0-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E2-0-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E2-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E2-0-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E2-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-0-DBOS baseline Workflow (real-1791006476768-0973624a-E2-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E2-1-DBOS baseline (node:460) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E2-1-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E2-1-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E2-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-1-DBOS baseline (node:10704) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E2-1-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E2-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E2-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E2-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-1-DBOS baseline Workflow (real-1791006476768-0973624a-E2-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E2-2-DBOS baseline (node:11604) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E2-2-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E2-2-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E2-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E2-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-2-DBOS baseline (node:6684) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E2-2-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E2-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E2-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E2-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-2-DBOS baseline Workflow (real-1791006476768-0973624a-E2-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E2-3-DBOS baseline (node:17172) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E2-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E2-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E2-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-3-DBOS baseline (node:21416) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-3-DBOS baseline Initializing DBOS (v5.2.11)
+System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E2-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E2-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-3-DBOS baseline Workflow (real-1791006476768-0973624a-E2-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E2-4-DBOS baseline (node:21788) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E2-4-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E2-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-4-DBOS baseline (node:18488) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E2-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E2-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E2-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E2-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E2-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E2-4-DBOS baseline Workflow (real-1791006476768-0973624a-E2-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E5-0-DBOS baseline (node:18524) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E5-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-0-DBOS baseline (node:11784) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-0-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E5-0-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E5-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E5-0-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-0-DBOS baseline Workflow (real-1791006476768-0973624a-E5-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E5-1-DBOS baseline (node:22920) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-1-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E5-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-1-DBOS baseline (node:11108) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-1-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E5-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-1-DBOS baseline Workflow (real-1791006476768-0973624a-E5-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E5-2-DBOS baseline (node:23992) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E5-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-2-DBOS baseline (node:14312) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E5-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-2-DBOS baseline Workflow (real-1791006476768-0973624a-E5-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E5-3-DBOS baseline (node:23640) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-3-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E5-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E5-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E5-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-3-DBOS baseline (node:18060) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-3-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E5-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E5-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E5-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-3-DBOS baseline Workflow (real-1791006476768-0973624a-E5-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E5-4-DBOS baseline (node:23972) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-4-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E5-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-4-DBOS baseline (node:1324) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E5-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E5-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E5-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E5-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E5-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E5-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E5-4-DBOS baseline Workflow (real-1791006476768-0973624a-E5-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E7-0-DBOS baseline (node:22768) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E7-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-0-DBOS baseline (node:23276) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E7-0-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-0-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-0-DBOS baseline Workflow (real-1791006476768-0973624a-E7-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E7-1-DBOS baseline (node:21904) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E7-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-1-DBOS baseline (node:18872) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-1-DBOS baseline Executor ID: local
+real-1791006476768-0973624a-E7-1-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E7-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E7-1-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-1-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-1-DBOS baseline Workflow (real-1791006476768-0973624a-E7-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E7-2-DBOS baseline (node:21832) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-2-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E7-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-2-DBOS baseline (node:17324) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E7-2-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-2-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-2-DBOS baseline Workflow (real-1791006476768-0973624a-E7-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E7-3-DBOS baseline (node:15560) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-3-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1791006476768-0973624a-E7-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-3-DBOS baseline (node:14272) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1791006476768-0973624a-E7-3-DBOS baseline Application version: acceptance-v1
+real-1791006476768-0973624a-E7-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E7-3-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-3-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-3-DBOS baseline Workflow (real-1791006476768-0973624a-E7-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)
+real-1791006476768-0973624a-E7-4-DBOS baseline (node:7216) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-4-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1791006476768-0973624a-E7-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-4-DBOS baseline (node:11172) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1791006476768-0973624a-E7-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1791006476768-0973624a-E7-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1791006476768-0973624a-E7-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1791006476768-0973624a-E7-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1791006476768-0973624a-E7-4-DBOS baseline DBOS launched!
+real-1791006476768-0973624a-E7-4-DBOS baseline Listening to 0 queues:
+real-1791006476768-0973624a-E7-4-DBOS baseline Workflow (real-1791006476768-0973624a-E7-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:99:22)

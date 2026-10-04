@@ -40,6 +40,7 @@ async function boundedOperation(step: typeof definition.steps[number], input: Re
 if (role === "api") {
   await migrate(db);
   const queue = new Queue(config.queue, { connection });
+  queue.on("error", (error) => console.error(error));
   const dispatcher = createOutboxDispatcher(db, queue, 20);
   const scheduler = createRecoveryScheduler(db, 50, 300);
   const port = Number(process.env.AGENTFLOW_API_PORT || config.apiPort || 0);

@@ -293,18 +293,7 @@ try {
     for (const system of random.shuffle(systems)) await trial(system,scenario,index);
   }
 } finally {
-  if (keepAlive) {
-    console.log(`\n======================================================`);
-    console.log(`  AgentFlow DEMO Completed Successfully!             `);
-    console.log(`======================================================`);
-    console.log(`  API Server kept alive at: http://127.0.0.1:${api.port}`);
-    console.log(`  Explore dashboard at:     http://localhost:4173`);
-    console.log(`  Press Ctrl+C when finished recording.`);
-    console.log(`======================================================\n`);
-    await new Promise(() => {});
-  }
-  await Promise.all([...children].map(stop));
-  await db.end();
+  // Write aggregate artifacts before an optional keep-alive wait so DEMO evidence is complete.
   const groups = systems.flatMap((system) => scenarios.map((scenario) => {
     const group = results.filter((r) => r.system===system && r.scenario===scenario);
     return { system,scenario,trials:group.length,completion:wilsonInterval(group.filter((r)=>r.outcome==="SUCCEEDED").length,group.length),
@@ -328,5 +317,18 @@ try {
     const csv=(value: unknown)=>`"${String(typeof value === "object" ? JSON.stringify(value) : value).replaceAll('"','""')}"`;
     await writeFile(join(output,"results.csv"),[columns.join(","),...results.map((r)=>columns.map((c)=>csv(r[c])).join(","))].join("\n")+"\n");
   }
+  if (keepAlive) {
+    console.log(`\n======================================================`);
+    const succeeded = results.length > 0 && results.every((r) => r.outcome === "SUCCEEDED");
+    console.log(succeeded ? `  AgentFlow DEMO Completed Successfully!             ` : `  AgentFlow DEMO finished with outcome: ${results.map((r) => r.outcome).join(", ") || "NONE"}`);
+    console.log(`======================================================`);
+    console.log(`  API Server kept alive at: http://127.0.0.1:${api.port}`);
+    console.log(`  Explore dashboard at:     http://localhost:4173`);
+    console.log(`  Press Ctrl+C when finished recording.`);
+    console.log(`======================================================\n`);
+    await new Promise(() => {});
+  }
+  await Promise.all([...children].map(stop));
+  await db.end();
 }
 console.log(`Evidence: ${output}`);

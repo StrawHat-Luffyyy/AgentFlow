@@ -38,9 +38,8 @@ The provider is the deterministic scripted adapter for controlled trials. Token 
 
 - **Authentication and Ownership:** Fully implemented with SHA-256 bearer tokens, role checks (`research-reviewer`, `operator`), and immutable ownership inherited by runs.
 - **Real Fault Injection:** Fully verified with separate OS child processes and abrupt `SIGKILL` at explicit boundaries.
-- **Primary Matrix Execution:** Executed across B0, B1, and A1 for scenarios E0–E7 (120 trials). A1 had zero committed re-executions and zero duplicates on E5.
-- **A0 Ablation:** 15 trials executed on E0, E5, E6, demonstrating the necessity of receiver cooperation.
-- **Reference Comparison:** 25 trials executed on DBOS SDK 5.2.11 against `agentflow_reference_eval`.
-- **Side-Effect Safety:** 1,000 E5 trials executed for each system (4,000 trials total); A1 produced 0 duplicates (Wilson 95% CI: [0.9962, 1.0000]).
-- **Checkpoint Granularity:** 900 trials executed across granularities 1, 2, 4 (8–12% speedup with grouped checkpoints).
-- **Accepted Limitations:** The Python prototype was not implemented in code; live provider runs against external network endpoints were deferred; real primary matrix was executed at 5 trials/condition.
+- **Primary Matrix Execution:** Executed across B0, B1, and A1 for scenarios E0–E7 (120 real trials). A1 had zero committed re-executions and zero duplicate effects in all 40 trials.
+- **A0 Ablation:** 15 real trials on E0, E5, E6; A0 duplicated the effect in every E5 and E6 trial, demonstrating the necessity of receiver cooperation.
+- **Reference Comparison:** 25 real trials on DBOS SDK 5.2.11 against `agentflow_reference_eval`.
+- **Simulator sweeps (not acceptance evidence):** `eval:simulate` produced a 4,000-trial E5 model sweep and a 900-trial checkpoint-granularity model (7–12% lower modelled latency). Per the evidence boundary above, these are model outputs and are not substituted for real campaigns.
+- **Accepted Limitations:** The Python prototype was not implemented in code; live provider runs against external network endpoints were not run; real campaigns were executed at 5 trials/condition; no large-sample real side-effect campaign and no runtime checkpoint-granularity experiment were run.

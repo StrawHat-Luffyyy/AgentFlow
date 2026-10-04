@@ -4,5 +4,14 @@ dist/
 .env
 coverage/
 *.log
-evaluation-results/
+# Local scratch campaigns are ignored; the campaigns cited in README.md are tracked.
+evaluation-results/*
+!evaluation-results/real-1791004304094-c27bb567/
+!evaluation-results/real-demo-audit-20261004/
+!evaluation-results/real-primary-matrix/
+!evaluation-results/real-a0-ablation/
+!evaluation-results/real-dbos-reference/
+!evaluation-results/e5-safety-1000/
+!evaluation-results/granularity-ablation/
+!evaluation-results/*/process.log
 .DS_Store
