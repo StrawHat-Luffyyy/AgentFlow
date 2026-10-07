@@ -8,7 +8,7 @@ import { claimOperation, classifyOperationError, completeOperation, prepareToolE
   publishToControlledReceiver, type ExecutionFaultHooks } from "@agentflow/runtime";
 import { operationJobSchema } from "@agentflow/shared";
 import { createApp } from "../../../apps/api/src/app.js";
-import { readCredentials } from "../../../apps/api/src/auth.js";
+import { ensureAdminUser, readCredentials } from "../../../apps/api/src/auth.js";
 import { createOutboxDispatcher } from "../../../apps/api/src/outbox.js";
 import { createRecoveryScheduler } from "../../../apps/api/src/scheduler.js";
 import { redisConnection } from "../../../apps/api/src/redis.js";
@@ -39,6 +39,9 @@ async function boundedOperation(step: typeof definition.steps[number], input: Re
 
 if (role === "api") {
   await migrate(db);
+  if (process.env.AGENTFLOW_ADMIN_PASSWORD) {
+    await ensureAdminUser(db, process.env.AGENTFLOW_ADMIN_PASSWORD, process.env.AGENTFLOW_ADMIN_USERNAME || "admin");
+  }
   const queue = new Queue(config.queue, { connection });
   queue.on("error", (error) => console.error(error));
   const dispatcher = createOutboxDispatcher(db, queue, 20);

@@ -46,12 +46,18 @@ await mkdir(output, { recursive: true });
 const db = evidenceDatabase(base.databaseUrl);
 await migrate(db); await installEvidenceSchema(db);
 const credentials = JSON.stringify([{ id: "acceptance-owner", tokenHash: createHash("sha256").update(token).digest("hex"), roles: ["research-reviewer", "operator"] }]);
+const demoAdminPassword = process.env.AGENTFLOW_ADMIN_PASSWORD || (isDemo ? "demo-operator-2026" : undefined);
 const children = new Set<ChildProcess>();
 const logs: string[] = [];
 async function launch(role: string, config: RealConfig): Promise<{ child: ChildProcess; port?: number }> {
   const child = fork(fileURLToPath(new URL("./real-child.ts", import.meta.url)), [role], {
     execArgv: ["--import", "tsx"], windowsHide: true, silent: true,
-    env: { ...process.env, AGENTFLOW_EVALUATION_CONFIG: JSON.stringify(config), AGENTFLOW_AUTH_CREDENTIALS: credentials },
+    env: {
+      ...process.env,
+      AGENTFLOW_EVALUATION_CONFIG: JSON.stringify(config),
+      AGENTFLOW_AUTH_CREDENTIALS: credentials,
+      ...(demoAdminPassword ? { AGENTFLOW_ADMIN_PASSWORD: demoAdminPassword } : {}),
+    },
   });
   children.add(child);
   child.on("exit", () => children.delete(child));
@@ -78,6 +84,8 @@ if (isDemo) {
   console.log(`======================================================`);
   console.log(`  API Endpoint:   http://127.0.0.1:${api.port}`);
   console.log(`  Operations UI:  http://localhost:4173`);
+  console.log(`  Username:       admin`);
+  console.log(`  Password:       ${demoAdminPassword}`);
   console.log(`  Access Token:   ${token}`);
   console.log(`  Lease Duration: ${base.leaseMs}ms`);
   console.log(`======================================================\n`);

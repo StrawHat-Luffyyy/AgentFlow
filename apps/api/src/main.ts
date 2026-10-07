@@ -1,4 +1,4 @@
-import { readCredentials } from "./auth.js";
+import { ensureAdminUser, readCredentials } from "./auth.js";
 import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
@@ -11,9 +11,12 @@ import { createRecoveryScheduler } from "./scheduler.js";
 
 const config = loadConfig();
 const credentials = readCredentials();
-if (credentials.length === 0) throw new Error("Configure AGENTFLOW_AUTH_CREDENTIALS before starting the API");
+if (credentials.length === 0 && !config.AGENTFLOW_ADMIN_PASSWORD) {
+  throw new Error("Configure AGENTFLOW_AUTH_CREDENTIALS or AGENTFLOW_ADMIN_PASSWORD before starting the API");
+}
 const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
+await ensureAdminUser(database, config.AGENTFLOW_ADMIN_PASSWORD, config.AGENTFLOW_ADMIN_USERNAME);
 
 const queue = new Queue(queueName, { connection: redisConnection(config.REDIS_URL) });
 // Redis outages surface here; PostgreSQL outbox rows remain the durable dispatch intent.
@@ -29,6 +32,14 @@ const scheduler = createRecoveryScheduler(
 const app = createApp(database, queue, credentials);
 const server = app.listen(config.API_PORT, () => {
   console.log(`AgentFlow API listening on port ${config.API_PORT}`);
+});
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${config.API_PORT} is already in use. Check if Docker container agentflow-api-1 or another process is occupying it.`);
+  } else {
+    console.error("AgentFlow API server error:", error);
+  }
+  process.exit(1);
 });
 dispatcher.start();
 scheduler.start();

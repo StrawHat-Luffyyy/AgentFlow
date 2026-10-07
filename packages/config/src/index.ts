@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+if (typeof process !== "undefined" && typeof (process as unknown as { loadEnvFile?: (path?: string) => void }).loadEnvFile === "function") {
+  for (const envPath of [".env", "../../.env", "../.env"]) {
+    try {
+      (process as unknown as { loadEnvFile: (path: string) => void }).loadEnvFile(envPath);
+      break;
+    } catch {
+      // .env file is optional
+    }
+  }
+}
+
 const runtimeProcess = (globalThis as {
   process?: {
     env?: Record<string, string | undefined>;
@@ -34,6 +45,11 @@ const environmentSchema = z.object({
   ),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  AGENTFLOW_ADMIN_USERNAME: z.string().min(1).max(100).default("admin"),
+  AGENTFLOW_ADMIN_PASSWORD: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional(),
+  ),
 }).superRefine((environment, context) => {
   if (environment.LEASE_HEARTBEAT_MS >= environment.OPERATION_LEASE_MS) {
     context.addIssue({

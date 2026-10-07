@@ -4,20 +4,20 @@ import {
   Eye,
   EyeOff,
   Inbox,
-  KeyRound,
+  Lock,
   LogOut,
   Pause,
   Play,
   RefreshCw,
   ShieldCheck,
   Square,
+  User,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   api,
-  setBearerToken,
   type Approval,
   type Attempt,
   type HistoryEvent,
@@ -42,7 +42,7 @@ import {
   statusTone,
 } from "./ui.js";
 
-type Principal = { id: string; roles: string[] };
+type Principal = { id: string; roles: string[]; username?: string };
 
 function shortId(value: string): string {
   return value.slice(0, 8);
@@ -127,7 +127,7 @@ function DetailSkeleton() {
   );
 }
 
-function Operations({ principal, signOut }: { principal: Principal; signOut: () => void }) {
+function Operations({ principal, signOut, onSessionExpired }: { principal: Principal; signOut: () => void; onSessionExpired?: () => void }) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [run, setRun] = useState<RunDetail | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -181,6 +181,11 @@ function Operations({ principal, signOut }: { principal: Principal; signOut: () 
       await Promise.all([loadRuns(), ...(selectedRunId ? [loadDetail(selectedRunId)] : [])]);
       setLastUpdated(Date.now());
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        if (onSessionExpired) onSessionExpired();
+        else signOut();
+        return;
+      }
       setError(cause instanceof Error ? cause.message : "Unable to load AgentFlow data");
     } finally {
       setLoading(false);
@@ -231,6 +236,11 @@ function Operations({ principal, signOut }: { principal: Principal; signOut: () 
       await action();
       await refresh(true);
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        if (onSessionExpired) onSessionExpired();
+        else signOut();
+        return;
+      }
       setError(cause instanceof Error ? cause.message : "Action failed");
     } finally {
       setMutating(false);
@@ -268,8 +278,8 @@ function Operations({ principal, signOut }: { principal: Principal; signOut: () 
           </IconButton>
           <span className="topbar-separator" aria-hidden="true" />
           <span className="principal" title={principal.roles.length ? `Roles: ${principal.roles.join(", ")}` : "No roles"}>
-            <span className="principal-avatar" aria-hidden="true">{principal.id.charAt(0).toUpperCase()}</span>
-            <span className="principal-id">{principal.id}</span>
+            <span className="principal-avatar" aria-hidden="true">{(principal.username ?? principal.id).charAt(0).toUpperCase()}</span>
+            <span className="principal-id">{principal.username ?? principal.id}</span>
           </span>
           <Button variant="ghost" size="sm" onClick={signOut} icon={<LogOut size={14} />}>Sign out</Button>
         </div>
@@ -496,20 +506,66 @@ function AttemptRow({ attempt }: { attempt: Attempt }) {
 
 function signInError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 401) return "This access token was not accepted. Check that it is current and complete.";
+    if (cause.status === 401) return "Invalid username or password. Check your credentials.";
     if (cause.status === 0 || cause.status >= 500) return "The AgentFlow API could not be reached. Check that it is running.";
     if (cause.status === 404) return "The server at the API address is not an AgentFlow API. Check that the AgentFlow API is running on the configured port.";
   }
-  return "Sign-in failed. Check your access token and API connection.";
+  return "Sign-in failed. Check your credentials and API connection.";
 }
 
 export function App() {
-  const [token, setToken] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [principal, setPrincipal] = useState<Principal | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  if (principal) return <Operations principal={principal} signOut={() => { setBearerToken(""); setPrincipal(null); }} />;
+
+  useEffect(() => {
+    let active = true;
+    api.me()
+      .then((identity) => {
+        if (active) setPrincipal(identity);
+      })
+      .catch(() => {
+        if (active) setPrincipal(null);
+      })
+      .finally(() => {
+        if (active) setCheckingAuth(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const handleSignOut = useCallback(() => {
+    void api.logout().finally(() => {
+      setPrincipal(null);
+      setError(null);
+    });
+  }, []);
+
+  const handleSessionExpired = useCallback(() => {
+    setPrincipal(null);
+    setError("Your session has expired. Please sign in again.");
+  }, []);
+
+  if (checkingAuth) {
+    return (
+      <main className="auth-shell">
+        <div className="auth-container" style={{ textAlign: "center" }}>
+          <BrandMark size={32} />
+          <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", marginTop: "var(--space-3)" }}>
+            Checking session…
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (principal) {
+    return <Operations principal={principal} signOut={handleSignOut} onSessionExpired={handleSessionExpired} />;
+  }
+
   return (
     <main className="auth-shell">
       <div className="auth-container">
@@ -520,33 +576,80 @@ export function App() {
             <p>Inspect, control, and approve durable agent workflow runs.</p>
           </header>
           <form className="auth-form" noValidate={false} onSubmit={(event) => {
-            event.preventDefault(); setBusy(true); setError(null); setBearerToken(token);
-            void api.me().then((identity) => { setPrincipal(identity); setToken(""); })
-              .catch((cause: unknown) => { setBearerToken(""); setError(signInError(cause)); })
+            event.preventDefault();
+            setBusy(true);
+            setError(null);
+            api.login(username, password)
+              .then((result) => {
+                setPrincipal(result.user);
+                setPassword("");
+              })
+              .catch((cause: unknown) => {
+                setError(signInError(cause));
+              })
               .finally(() => setBusy(false));
           }}>
             <div className="field">
-              <label htmlFor="access-token">Access token</label>
+              <label htmlFor="username">Username</label>
               <div className={`input-group ${error ? "input-group--invalid" : ""}`}>
-                <KeyRound size={15} className="input-icon" aria-hidden="true" />
-                <input id="access-token" type={revealed ? "text" : "password"} autoComplete="current-password" required
-                  spellCheck={false} autoCapitalize="off" value={token} disabled={busy}
-                  aria-invalid={error ? true : undefined} aria-describedby={error ? "sign-in-error sign-in-help" : "sign-in-help"}
-                  onChange={(event) => setToken(event.target.value)} />
-                <IconButton type="button" label={revealed ? "Hide token" : "Show token"} className="input-action"
-                  onClick={() => setRevealed((value) => !value)}>
+                <User size={15} className="input-icon" aria-hidden="true" />
+                <input
+                  id="username"
+                  type="text"
+                  autoComplete="username"
+                  required
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  value={username}
+                  disabled={busy}
+                  placeholder="Username"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "sign-in-error" : undefined}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <div className={`input-group ${error ? "input-group--invalid" : ""}`}>
+                <Lock size={15} className="input-icon" aria-hidden="true" />
+                <input
+                  id="password"
+                  type={revealed ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  value={password}
+                  disabled={busy}
+                  placeholder="Password"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "sign-in-error" : undefined}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <IconButton
+                  type="button"
+                  label={revealed ? "Hide password" : "Show password"}
+                  className="input-action"
+                  onClick={() => setRevealed((value) => !value)}
+                >
                   {revealed ? <EyeOff size={15} /> : <Eye size={15} />}
                 </IconButton>
               </div>
-              <p id="sign-in-help" className="field-help">Use the bearer token provisioned for your identity.</p>
             </div>
             {error && <div id="sign-in-error"><InlineAlert>{error}</InlineAlert></div>}
-            <Button type="submit" variant="primary" size="lg" loading={busy} disabled={token.length === 0}>
-              {busy ? "Verifying token…" : "Sign in"}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={busy}
+              disabled={username.trim().length === 0 || password.length === 0}
+            >
+              {busy ? "Signing in…" : "Sign in"}
             </Button>
           </form>
         </section>
-        <p className="auth-footnote">The token is kept in memory only and is cleared when you sign out or reload.</p>
+        <p className="auth-footnote">Credentials are authenticated via secure HTTP-only session cookies.</p>
       </div>
     </main>
   );

@@ -124,10 +124,16 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
+    ...(init?.headers as Record<string, string> | undefined),
+  };
   try {
     response = await fetch(`${apiBase}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", authorization: `Bearer ${bearerToken}`, ...init?.headers },
+      credentials: "include",
+      headers,
     });
   } catch {
     throw new ApiError("AgentFlow API is unreachable", 0);
@@ -141,7 +147,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  me: () => request<{ id: string; roles: string[] }>("/me"),
+  login: (username: string, password: string) =>
+    request<{ user: { id: string; username: string; roles: string[] } }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  logout: () => request<{ status: string }>("/auth/logout", { method: "POST" }),
+  me: () => request<{ id: string; roles: string[]; username?: string }>("/me"),
   listRuns: () => request<{ runs: RunSummary[]; total: number }>("/runs?limit=100"),
   getRun: (id: string) => request<RunDetail>(`/runs/${id}`),
   getAttempts: (id: string) => request<{ attempts: Attempt[] }>(`/runs/${id}/attempts`),

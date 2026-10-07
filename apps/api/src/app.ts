@@ -1,5 +1,14 @@
-import { createHash } from "node:crypto";
-import { bearerAuthentication, readCredentials, type Credential } from "./auth.js";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  authenticationMiddleware,
+  bearerAuthentication,
+  parseCookies,
+  readCredentials,
+  sessionCookieOptions,
+  verifyPassword,
+  type AuthenticatedPrincipal,
+  type Credential,
+} from "./auth.js";
 import type { Database } from "@agentflow/db";
 import {
   ConflictError,
@@ -48,14 +57,74 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     response.json({ status: "ready", database: "ok", queue: "ok" });
   });
 
-  app.use(bearerAuthentication(credentials));
+  app.post("/auth/login", async (request: express.Request, response: express.Response) => {
+    const loginSchema = z.object({
+      username: z.string().min(1).max(100),
+      password: z.string().min(1).max(1000),
+    });
+    const parsed = loginSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "INVALID_REQUEST_BODY", details: parsed.error.issues });
+      return;
+    }
+    const { username, password } = parsed.data;
+    const userResult = await database.query<{
+      id: string;
+      username: string;
+      password_hash: string;
+      roles: string[];
+    }>(
+      "SELECT id, username, password_hash, roles FROM web_users WHERE LOWER(username) = LOWER($1)",
+      [username],
+    );
+    if (userResult.rowCount === 0 || !userResult.rows[0]) {
+      response.status(401).json({ error: "INVALID_CREDENTIALS" });
+      return;
+    }
+    const user = userResult.rows[0];
+    if (!verifyPassword(password, user.password_hash)) {
+      response.status(401).json({ error: "INVALID_CREDENTIALS" });
+      return;
+    }
+
+    const sessionId = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await database.query(
+      "INSERT INTO web_sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+      [sessionId, user.id, expiresAt],
+    );
+    response.cookie("agentflow_session", sessionId, sessionCookieOptions);
+    response.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        roles: user.roles,
+      },
+    });
+  });
+
+  app.post("/auth/logout", async (request: express.Request, response: express.Response) => {
+    const cookies = parseCookies(request.header("cookie"));
+    const sessionId = cookies["agentflow_session"];
+    if (sessionId) {
+      await database.query("DELETE FROM web_sessions WHERE id = $1", [sessionId]);
+    }
+    response.clearCookie("agentflow_session", { path: "/" });
+    response.json({ status: "ok" });
+  });
+
+  app.use(authenticationMiddleware(database, credentials));
   app.get("/me", (_request, response) => {
-    const principal = response.locals.principal as Credential;
-    response.json({ id: principal.id, roles: principal.roles });
+    const principal = response.locals.principal as AuthenticatedPrincipal;
+    response.json({
+      id: principal.id,
+      roles: principal.roles,
+      ...(principal.username ? { username: principal.username } : {}),
+    });
   });
   // Run ownership is inherited through its immutable workflow-version relationship.
   app.use(async (request, response, next) => {
-    const principal = response.locals.principal as Credential;
+    const principal = response.locals.principal as AuthenticatedPrincipal;
     const resource = /^\/(runs|workflows|approvals|tool-executions)\/([^/]+)/.exec(request.path);
     let sql: string | undefined;
     let id: string | undefined;
@@ -174,7 +243,7 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
 
   app.post("/tool-executions/:id/reconcile", async (request: express.Request, response: express.Response) => {
     const toolExecutionId = z.string().uuid().parse(request.params.id);
-    if (!(response.locals.principal as Credential).roles.includes("operator")) {
+    if (!(response.locals.principal as AuthenticatedPrincipal).roles.includes("operator")) {
       response.status(403).json({ error: "FORBIDDEN" });
       return;
     }
@@ -185,7 +254,7 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
   app.post("/approvals/:id/decisions", async (request: express.Request, response: express.Response) => {
     const approvalId = z.string().uuid().parse(request.params.id);
     const body = approvalDecisionSchema.parse(request.body);
-    const principal = response.locals.principal as Credential;
+    const principal = response.locals.principal as AuthenticatedPrincipal;
     const approval = await database.query<{ reviewer_role: string }>(
       "SELECT reviewer_role FROM approvals WHERE id = $1", [approvalId],
     );
