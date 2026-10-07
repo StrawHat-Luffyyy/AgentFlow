@@ -39,12 +39,11 @@ const environmentSchema = z.object({
   DISPATCH_RECOVERY_MS: z.coerce.number().int().min(1_000).default(10_000),
   OTEL_SERVICE_NAME: z.string().min(1).default("agentflow"),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
-  OPENAI_API_KEY: z.preprocess(
+  GEMINI_API_KEY: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().min(1).optional(),
   ),
-  OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
-  OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash"),
   AGENTFLOW_ADMIN_USERNAME: z.string().min(1).max(100).default("admin"),
   AGENTFLOW_ADMIN_PASSWORD: z.preprocess(
     (value) => (value === "" ? undefined : value),

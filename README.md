@@ -65,7 +65,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 - **Durable Approvals:** First-class human-in-the-loop gates persist suspended workflow runs in `WAITING` state without consuming worker processes. Pending approvals survive full API and worker restarts and enforce role-gated reviewer permissions (`research-reviewer`).
 - **Idempotent Side Effects:** Dedicated `RECEIVER_IDEMPOTENT_WRITE` contracts derive deterministic idempotency keys from the workflow envelope, enabling cooperating external receivers to deduplicate retried side effects upon crash recovery.
 - **UNKNOWN & Reconciliation:** For unsupported receivers (`UNSAFE_WRITE`), ambiguous post-crash outcomes are safely transitioned to `UNKNOWN` with a `RECONCILIATION` wait reason, preventing dangerous automated duplicate dispatches.
-- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas, providing normalized adapters for OpenAI and Ollama with tool calling and usage tracking.
+- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas, providing a normalized adapter for Google Gemini (`gemini-3.5-flash`) alongside the deterministic scripted evaluation provider.
 - **Observability:** Native OpenTelemetry instrumentation exports standardized spans; execution history logs provide an immutable audit trail (`GET /runs/:id/history`).
 - **Authentication & Ownership:** SHA-256 bearer tokens with constant-time verification; immutable workflow ownership inherited by runs; owner-scoped endpoints.
 
@@ -105,7 +105,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
                                    ▼                                     ▼
                         ┌─────────────────────┐               ┌─────────────────────┐
                         │    LLM Providers    │               │    External Tools   │
-                        │   OpenAI • Ollama   │               │   Receiver Ledger   │
+                        │    Google Gemini    │               │   Receiver Ledger   │
                         └─────────────────────┘               └─────────────────────┘
 ```
 
@@ -143,7 +143,7 @@ AgentFlow/
 │   ├── config/              # Environment configuration & validation
 │   ├── db/                  # PostgreSQL pool, migrations, schema migrations
 │   ├── evaluation/          # Real multi-process runner, fault hooks, DBOS runner, seeded simulator
-│   ├── harness/             # LLM provider registry, adapters (OpenAI, Ollama), tools
+│   ├── harness/             # LLM provider registry, adapter (Google Gemini), tools
 │   ├── research/            # Fixed evaluation corpus, cloud-comparison workflow, scripted provider
 │   ├── runtime/             # Core durable domain transactions, state machine, leases
 │   ├── shared/              # Canonical JSON, queue contracts, shared schemas
@@ -284,7 +284,7 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 ## 11. Limitations
 
 - **Python Prototype Unimplemented:** An early conceptual Execute → Remember → Control research prototype was described in design documents, but was **not implemented in code** (zero `.py` files exist). The functional implementation is entirely in TypeScript.
-- **Live Provider End-to-End Campaigns Deferred:** Provider adapters (`OpenAIResponsesProvider`, `OllamaProvider`) are implemented and pass strict wire-protocol, schema normalization, and usage tests in Vitest. However, live-network end-to-end campaigns against paid external APIs were deferred due to unconfigured API keys and local daemon availability.
+- **Live Provider End-to-End Campaigns Deferred:** Provider adapter (`GeminiProvider`) is implemented and passes strict wire-protocol, schema normalization, and usage tests in Vitest. However, live-network end-to-end campaigns against paid external APIs were deferred due to unconfigured API keys.
 - **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions). The invariants held in every observed trial, but five trials cannot bound rare failure rates, and latency percentiles are descriptive.
 - **Large-Sample Results Are Simulated:** The 4,000-trial E5 sweep and the 900-trial granularity study come from the deterministic seeded simulator, not the runtime. No large-sample real campaign was run, and checkpoint grouping is not implemented in the runtime.
 - **DBOS Sample Count:** The DBOS reference system was evaluated over 25 trials on the common subset.

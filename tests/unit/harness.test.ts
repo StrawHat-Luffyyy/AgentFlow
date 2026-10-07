@@ -2,8 +2,6 @@ import {
   AgentHarness,
   DeterministicFakeProvider,
   HarnessValidationError,
-  OllamaProvider,
-  OpenAIResponsesProvider,
   ProviderRegistry,
   ToolRegistry,
   TurnLimitError,
@@ -140,74 +138,4 @@ describe("AgentHarness", () => {
   });
 });
 
-describe("provider adapters", () => {
-  it("normalizes an OpenAI Responses tool call, usage, and continuation state", async () => {
-    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      expect(body).toMatchObject({ model: "gpt-test", store: true });
-      expect(body.tools).toEqual([expect.objectContaining({ name: "fetch-page", strict: true })]);
-      return new Response(JSON.stringify({
-        id: "resp_123",
-        model: "gpt-test-2026-09-01",
-        status: "completed",
-        output: [{
-          type: "function_call",
-          call_id: "call_123",
-          name: "fetch-page",
-          arguments: "{\"url\":\"https://docs.example.com/a\"}",
-        }],
-        usage: {
-          input_tokens: 10,
-          output_tokens: 4,
-          input_tokens_details: { cached_tokens: 3 },
-          output_tokens_details: { reasoning_tokens: 2 },
-        },
-      }), { status: 200, headers: { "x-request-id": "request_123" } });
-    });
-    const provider = new OpenAIResponsesProvider({ apiKey: "test", fetch });
-    const response = await provider.execute({
-      model: "gpt-test",
-      messages: [{ role: "user", content: "read" }],
-      tools: toolRegistry().providerTools(["fetch-page"]),
-    }, context);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(response).toMatchObject({
-      finishReason: "tool_calls",
-      providerRequestId: "request_123",
-      resolvedModel: "gpt-test-2026-09-01",
-      usage: { inputTokens: 10, outputTokens: 4, cachedInputTokens: 3, reasoningTokens: 2 },
-      opaqueState: { namespace: "openai.responses", previousResponseId: "resp_123" },
-    });
-    expect(response.toolCalls[0]).toEqual({
-      id: "call_123",
-      name: "fetch-page",
-      arguments: { url: "https://docs.example.com/a" },
-    });
-  });
 
-  it("normalizes Ollama chat calls and reported token counts", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({
-      model: "qwen3:8b",
-      done: true,
-      message: {
-        role: "assistant",
-        content: "",
-        tool_calls: [{ function: { name: "fetch-page", arguments: { url: "https://docs.example.com/a" } } }],
-      },
-      prompt_eval_count: 12,
-      eval_count: 5,
-      context: [1, 2, 3],
-    }), { status: 200 }));
-    const provider = new OllamaProvider({ baseUrl: "http://ollama.test", fetch });
-    const response = await provider.execute({
-      model: "qwen3:8b",
-      messages: [{ role: "user", content: "read" }],
-      tools: toolRegistry().providerTools(["fetch-page"]),
-    }, context);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(response.finishReason).toBe("tool_calls");
-    expect(response.usage).toMatchObject({ inputTokens: 12, outputTokens: 5, provenance: "reported" });
-    expect(response.opaqueState).toEqual({ namespace: "ollama.chat", version: 1, context: [1, 2, 3] });
-    expect(response.toolCalls[0]?.id).toContain(context.logicalOperationId);
-  });
-});

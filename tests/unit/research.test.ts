@@ -23,8 +23,8 @@ describe("cloud-comparison reference assets", () => {
     const scripted = cloudComparisonWorkflowDefinition();
     const live = cloudComparisonWorkflowDefinition({
       mode: "live",
-      provider: "openai",
-      model: "test-model",
+      provider: "gemini",
+      model: "gemini-3.5-flash",
     });
     const expectedKeys = [
       "search-aws",
@@ -40,7 +40,7 @@ describe("cloud-comparison reference assets", () => {
     expect(scripted.steps.map((step) => step.key)).toEqual(expectedKeys);
     expect(live.steps.map((step) => step.key)).toEqual(expectedKeys);
     expect(scripted.steps[4]).toMatchObject({ kind: "AGENT", provider: "scripted-research" });
-    expect(live.steps[4]).toMatchObject({ kind: "AGENT", provider: "openai", model: "test-model" });
+    expect(live.steps[4]).toMatchObject({ kind: "AGENT", provider: "gemini", model: "gemini-3.5-flash" });
     expect(scripted.steps[8]).toMatchObject({
       kind: "TOOL",
       handler: "publish-approved-report",

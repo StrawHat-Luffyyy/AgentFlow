@@ -66,7 +66,7 @@ Packages:
 
 - `shared` — canonical JSON, queue contracts, zod schemas, `defaultWorkflowDefinition`.
 - `db` — pg pool + migration runner (tracks applied files in `agentflow_migrations` under an advisory lock; migrations are never edited after being applied — add a new numbered file).
-- `harness` — `AgentHarness`, `ProviderRegistry`/`ToolRegistry`, provider adapters (OpenAI Responses, Ollama, `DeterministicFakeProvider`) normalized to a common `LLMResponse`.
+- `harness` — `AgentHarness`, `ProviderRegistry`/`ToolRegistry`, provider adapters (Google Gemini `gemini-3.5-flash`, `DeterministicFakeProvider`) normalized to a common `LLMResponse`.
 - `research` — the nine-step cloud-comparison reference workflow, fixed corpus, and `ScriptedResearchProvider` used by tests and evaluation.
 - `evaluation` — real runner (`real-runner.ts` spawns separate API/worker/baseline OS processes, injects `SIGKILL` at named `ExecutionFaultBoundary` hooks, records an independent receiver ledger), DBOS reference runner, and the separate seeded simulator (`cli.ts`). Systems: B0/B1 (volatile baselines), A0 (AgentFlow without receiver cooperation), A1 (full), DBOS. Scenarios E0–E7 are defined in README §8.
 - `telemetry` — OpenTelemetry setup (imported via each app's `instrumentation.ts`).

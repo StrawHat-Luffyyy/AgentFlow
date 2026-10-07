@@ -16,7 +16,9 @@
     "dev:worker": "pnpm --filter @agentflow/worker dev",
     "dev:web": "pnpm --filter @agentflow/web dev",
     "eval:simulate": "pnpm --filter @agentflow/evaluation run simulate",
-    "eval:demo": "node --import tsx packages/evaluation/src/real-runner.ts --systems A1 --scenarios DEMO --lease-ms 15000"
+    "eval:demo": "node --import tsx packages/evaluation/src/real-runner.ts --systems A1 --scenarios DEMO --lease-ms 15000",
+    "test:gemini-live": "vitest run tests/integration/gemini-live.test.ts",
+    "validate:gemini": "node --import tsx packages/harness/src/live-validate.ts"
   },
   "devDependencies": {
     "@agentflow/db": "workspace:*",
@@ -24,6 +26,7 @@
     "@agentflow/harness": "workspace:*",
     "@agentflow/research": "workspace:*",
     "@agentflow/shared": "workspace:*",
+    "@google/genai": "^2.27.0",
     "@types/express": "^5.0.3",
     "@types/node": "^24.7.2",
     "@types/pg": "^8.15.5",

@@ -4,8 +4,7 @@ import { createDatabase, migrate } from "@agentflow/db";
 import { createProcessFaultHooks, parseFaultPlan } from "@agentflow/evaluation/process-hooks";
 import {
   AgentHarness,
-  OllamaProvider,
-  OpenAIResponsesProvider,
+  GeminiProvider,
   ProviderRegistry,
   ToolRegistry,
 } from "@agentflow/harness";
@@ -28,12 +27,11 @@ const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
 const providers = new ProviderRegistry()
-  .register(new ScriptedResearchProvider())
-  .register(new OllamaProvider({ baseUrl: config.OLLAMA_BASE_URL }));
-if (config.OPENAI_API_KEY) {
-  providers.register(new OpenAIResponsesProvider({
-    apiKey: config.OPENAI_API_KEY,
-    baseUrl: config.OPENAI_BASE_URL,
+  .register(new ScriptedResearchProvider());
+if (config.GEMINI_API_KEY) {
+  providers.register(new GeminiProvider({
+    apiKey: config.GEMINI_API_KEY,
+    model: config.GEMINI_MODEL,
   }));
 }
 const harness = new AgentHarness(providers, new ToolRegistry());
