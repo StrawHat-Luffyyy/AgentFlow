@@ -1,6 +1,7 @@
 import { Command, CommanderError } from "commander";
 import { registerAuthCommands } from "./commands/auth.js";
 import { registerConfigCommands } from "./commands/config.js";
+import { registerRunCommands } from "./commands/runs.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerWorkflowCommands } from "./commands/workflows.js";
 import { createContext, type CliContext, type GlobalFlags } from "./context.js";
@@ -31,6 +32,7 @@ export function buildProgram(io: CliIO): Command {
   registerConfigCommands(program, getContext);
   registerStatusCommand(program, getContext);
   registerWorkflowCommands(program, getContext);
+  registerRunCommands(program, getContext);
   return program;
 }
 
