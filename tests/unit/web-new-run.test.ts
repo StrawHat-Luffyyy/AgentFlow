@@ -7,6 +7,7 @@ import {
   referenceTemplate,
   runMode,
   summarizeUsage,
+  usageDetail,
   type Availability,
 } from "../../apps/web/src/new-run.ts";
 
@@ -154,5 +155,26 @@ describe("summarizeUsage", () => {
         { label: "scripted-research · s", input: 0, output: 0, provenances: ["estimated"] },
       ],
     });
+  });
+});
+
+describe("usageDetail", () => {
+  it("says nothing is recorded when there are no records", () => {
+    expect(usageDetail(null)).toBe("No usage recorded yet");
+  });
+
+  it("shows persisted provenance exactly as returned, never relabelled", () => {
+    const summary = summarizeUsage([
+      { provider: "gemini", model: "gemini-3.5-flash", provenance: "unknown", inputTokens: null, outputTokens: null },
+    ]);
+    expect(usageDetail(summary)).toBe("0 in · 0 out · unknown");
+  });
+
+  it("lists mixed provenances", () => {
+    const summary = summarizeUsage([
+      { provider: "gemini", model: "m", provenance: "reported", inputTokens: 1200, outputTokens: 300 },
+      { provider: "scripted-research", model: "s", provenance: "estimated", inputTokens: 10, outputTokens: 5 },
+    ]);
+    expect(usageDetail(summary)).toBe("1,210 in · 305 out · estimated, reported");
   });
 });

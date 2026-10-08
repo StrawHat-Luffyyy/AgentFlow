@@ -28,6 +28,7 @@ import {
   type UsageRecord,
 } from "./api.js";
 import { NewRunDrawer } from "./NewRunDrawer.js";
+import { summarizeUsage, usageDetail } from "./new-run.js";
 import { ModeBadge, ResultPanel } from "./ResultPanel.js";
 import {
   BrandMark,
@@ -227,11 +228,8 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
   }, [usage]);
   const selectedAttempts = attempts.filter((attempt) => attempt.stepId === selectedStepId);
   const pendingApprovals = approvals.filter((approval) => approval.status === "PENDING");
-  const tokenTotals = usage.reduce((totals, record) => ({
-    input: totals.input + (record.inputTokens ?? 0),
-    output: totals.output + (record.outputTokens ?? 0),
-  }), { input: 0, output: 0 });
-  const usageEstimated = usage.length > 0 && usage.every((record) => record.provenance !== "reported");
+  // Token figures come only from persisted usage records; provenance is shown as returned.
+  const usageSummary = useMemo(() => summarizeUsage(usage), [usage]);
   const runSummary = run ? runs.find((item) => item.id === run.id) : undefined;
   const committedSteps = run?.steps.filter((step) => step.status === "SUCCEEDED").length ?? 0;
   const materializedSteps = run?.steps.length ?? 0;
@@ -397,8 +395,8 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
             <dl className="stats" aria-label="Run summary">
               <Stat label="Committed steps" value={`${committedSteps}/${materializedSteps}`} detail="of materialized steps" />
               <Stat label="Attempts" value={attempts.length} detail={`${failedAttempts} failed · ${abandonedAttempts} abandoned`} />
-              <Stat label="Tokens" value={(tokenTotals.input + tokenTotals.output).toLocaleString()}
-                detail={`${tokenTotals.input.toLocaleString()} in · ${tokenTotals.output.toLocaleString()} out${usageEstimated ? " · estimated" : ""}`} />
+              <Stat label="Tokens" value={usageSummary ? (usageSummary.input + usageSummary.output).toLocaleString() : "—"}
+                detail={usageDetail(usageSummary)} />
               <Stat label="Elapsed" value={formatDuration(run.createdAt, run.finishedAt)} detail={run.finishedAt ? "completed" : "in progress"} />
             </dl>
 

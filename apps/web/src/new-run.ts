@@ -157,3 +157,10 @@ export function summarizeUsage(records: UsageLike[]): UsageSummary | null {
     groups: list,
   };
 }
+
+/** Tile/footer text for usage: persisted totals plus provenance exactly as the API returned it. */
+export function usageDetail(summary: UsageSummary | null): string {
+  if (summary === null) return "No usage recorded yet";
+  const provenances = [...new Set(summary.groups.flatMap((group) => group.provenances))].sort();
+  return `${summary.input.toLocaleString()} in · ${summary.output.toLocaleString()} out · ${provenances.join(", ")}`;
+}
