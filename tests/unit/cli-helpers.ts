@@ -123,3 +123,16 @@ export async function startFakeApi(
     close: () => new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve()))),
   };
 }
+
+/** A fake IO pre-authenticated against `apiUrl` via env, with an isolated config file. */
+export async function authedIO(apiUrl: string, options: FakeIOOptions = {}): Promise<FakeIO & { dir: string }> {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "agentflow-cli-"));
+  const fake = fakeIO({
+    ...options,
+    env: { AGENTFLOW_CONFIG: join(dir, "config.json"), AGENTFLOW_URL: apiUrl, AGENTFLOW_TOKEN: "test-token", ...options.env },
+  });
+  return { ...fake, dir };
+}
