@@ -59,6 +59,7 @@ export interface NormalizedToolCall {
   id: string;
   name: string;
   arguments: JsonObject;
+  thoughtSignature?: string;
 }
 
 export type FinishReason = "stop" | "tool_calls" | "length" | "content_filter" | "error" | "unknown";

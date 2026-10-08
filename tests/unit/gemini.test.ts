@@ -350,4 +350,71 @@ describe("GeminiProvider adapter unit tests (deterministic / mocked)", () => {
       code: "MALFORMED_PROVIDER_RESPONSE",
     });
   });
+
+  it("extracts thoughtSignature from candidate parts and passes it back in multi-turn tool requests", async () => {
+    let capturedParams: any = null;
+    const mockClient = {
+      models: {
+        generateContent: vi.fn(async (params: any) => {
+          capturedParams = params;
+          return {
+            text: "",
+            candidates: [
+              {
+                finishReason: "STOP",
+                content: {
+                  parts: [
+                    {
+                      functionCall: { name: "calculate", args: { x: 10 }, id: "call-calc-1" },
+                      thoughtSignature: "sig_abc_123_xyz",
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }),
+      },
+    } as unknown as GoogleGenAI;
+
+    const provider = new GeminiProvider({ apiKey: "test-fake-key", client: mockClient });
+    const response = await provider.execute(
+      {
+        model: "gemini-3.5-flash",
+        messages: [{ role: "user", content: "Calculate 10" }],
+      },
+      testContext,
+    );
+
+    expect(response.toolCalls).toHaveLength(1);
+    expect(response.toolCalls[0]).toEqual({
+      id: "call-calc-1",
+      name: "calculate",
+      arguments: { x: 10 },
+      thoughtSignature: "sig_abc_123_xyz",
+    });
+
+    // Now send the toolCall back in turn 2
+    await provider.execute(
+      {
+        model: "gemini-3.5-flash",
+        messages: [
+          { role: "user", content: "Calculate 10" },
+          { role: "assistant", content: "", toolCalls: [response.toolCalls[0]!] },
+          { role: "tool", name: "calculate", content: JSON.stringify({ result: 20 }) },
+        ],
+      },
+      testContext,
+    );
+
+    expect(capturedParams.contents[1]).toEqual({
+      role: "model",
+      parts: [
+        {
+          functionCall: { name: "calculate", args: { x: 10 } },
+          thoughtSignature: "sig_abc_123_xyz",
+        },
+      ],
+    });
+  });
 });

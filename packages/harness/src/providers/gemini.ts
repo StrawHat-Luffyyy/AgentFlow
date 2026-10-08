@@ -23,10 +23,10 @@ const capabilities: ProviderCapabilities = {
 };
 
 export interface GeminiProviderOptions {
-  apiKey?: string;
-  model?: string;
-  client?: GoogleGenAI;
-  baseUrl?: string;
+  apiKey?: string | undefined;
+  model?: string | undefined;
+  client?: GoogleGenAI | undefined;
+  baseUrl?: string | undefined;
 }
 
 function classifyGeminiError(error: unknown, signal: AbortSignal | undefined): ProviderError {
@@ -119,12 +119,16 @@ function mapMessagesToContents(messages: readonly LLMMessage[]): Content[] {
     }
 
     for (const call of message.toolCalls ?? []) {
-      parts.push({
+      const part: Part = {
         functionCall: {
           name: call.name,
           args: call.arguments,
         },
-      });
+      };
+      if (call.thoughtSignature) {
+        part.thoughtSignature = call.thoughtSignature;
+      }
+      parts.push(part);
     }
 
     const role = message.role === "assistant" ? "model" : "user";
@@ -210,21 +214,55 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const toolCalls: NormalizedToolCall[] = [];
-    const rawFunctionCalls = response.functionCalls ?? [];
-    for (let index = 0; index < rawFunctionCalls.length; index++) {
-      const call = rawFunctionCalls[index];
-      if (!call || typeof call.name !== "string" || !call.name) {
-        throw new ProviderError(
-          "Gemini returned a function call without a valid name",
-          "PERMANENT",
-          "MALFORMED_PROVIDER_RESPONSE",
-        );
+    const candidateParts = response.candidates?.[0]?.content?.parts ?? [];
+    const functionCallParts = candidateParts.filter((p) => p.functionCall != null);
+
+    if (functionCallParts.length > 0) {
+      for (let index = 0; index < functionCallParts.length; index++) {
+        const part = functionCallParts[index]!;
+        const call = part.functionCall!;
+        if (!call || typeof call.name !== "string" || !call.name) {
+          throw new ProviderError(
+            "Gemini returned a function call without a valid name",
+            "PERMANENT",
+            "MALFORMED_PROVIDER_RESPONSE",
+          );
+        }
+        const rawPart = part as Record<string, unknown>;
+        const rawCall = call as Record<string, unknown>;
+        const thoughtSig = part.thoughtSignature
+          ?? rawPart.thought_signature
+          ?? rawCall.thoughtSignature
+          ?? rawCall.thought_signature;
+
+        toolCalls.push({
+          id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
+          name: call.name,
+          arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
+          ...(typeof thoughtSig === "string" && thoughtSig.length > 0 ? { thoughtSignature: thoughtSig } : {}),
+        });
       }
-      toolCalls.push({
-        id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
-        name: call.name,
-        arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
-      });
+    } else {
+      const rawFunctionCalls = response.functionCalls ?? [];
+      for (let index = 0; index < rawFunctionCalls.length; index++) {
+        const call = rawFunctionCalls[index];
+        if (!call || typeof call.name !== "string" || !call.name) {
+          throw new ProviderError(
+            "Gemini returned a function call without a valid name",
+            "PERMANENT",
+            "MALFORMED_PROVIDER_RESPONSE",
+          );
+        }
+        const rawCall = call as Record<string, unknown>;
+        const thoughtSig = rawCall.thoughtSignature ?? rawCall.thought_signature;
+
+        toolCalls.push({
+          id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
+          name: call.name,
+          arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
+          ...(typeof thoughtSig === "string" && thoughtSig.length > 0 ? { thoughtSignature: thoughtSig } : {}),
+        });
+      }
     }
 
     let text = "";

@@ -1,6 +1,14 @@
 import { GeminiProvider, type ProviderExecutionContext } from "@agentflow/harness";
 import { describe, expect, it } from "vitest";
 
+if (!process.env.GEMINI_API_KEY) {
+  try {
+    process.loadEnvFile?.();
+  } catch {
+    // ignore if .env is missing
+  }
+}
+
 const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
 const geminiModel = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
