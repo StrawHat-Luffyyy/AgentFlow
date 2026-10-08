@@ -398,13 +398,13 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 223 passing (179 unit + 44 integration; 3 live-Gemini skipped if no key)
+# Complete test suite: 267 passing (214 unit + 53 integration; 3 live-Gemini skipped if no key)
 pnpm test
 
-# Fast in-memory unit tests only (179 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (214 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
-# Real PostgreSQL + Redis integration tests only (44 tests)
+# Real PostgreSQL + Redis integration tests only (53 tests)
 pnpm test:integration
 
 # Live Google Gemini integration test (runs when GEMINI_API_KEY is configured)
@@ -415,7 +415,21 @@ pnpm typecheck
 pnpm build
 ```
 
-### 6. Use the CLI
+### 6. Start a Run from the Dashboard
+
+Sign in at `http://localhost:4173` and choose **New run** in the Runs rail.
+
+- **Cloud comparison (reference)** offers two execution modes. Each creates its own immutable workflow version, so scripted evaluation evidence and live runs never mix:
+  - **Scripted** uses the deterministic `scripted-research` evaluation provider (no API key, no cost).
+  - **Live** calls real Google Gemini (`provider: "gemini"`) with a model advertised by an online worker; it uses tokens on your key.
+- **Your own workflows** run a chosen version; provider and model are fixed by that version's definition and shown read-only.
+- Input is a JSON object (the reference workflow is pre-filled with a valid template). Advanced options set a creation key (idempotent restarts) and a deadline.
+
+The readiness line comes from `GET /runtime/providers`, which aggregates the providers that workers advertised in the last 30 seconds. Live mode is blocked only when workers are online but none has Gemini configured: set `GEMINI_API_KEY` on the **worker** and restart it. With no workers online the run is still accepted and queues until one starts. Readiness is advisory only — it never authorizes or schedules execution.
+
+After starting, the run is selected automatically and polled live: runs show a **Scripted** or **Live · gemini** badge, AGENT steps show the model taken from persisted usage records, approvals are decided in place, and a **Result** panel shows the report and final output once the run succeeds. Token counts always come from persisted usage records with their provenance as recorded (`reported`, `estimated`, `unknown`); the dashboard never estimates them. Gemini rate-limit or quota errors (HTTP 429) are classified `TRANSIENT`, retried with backoff, and surface on the step's attempts if retries are exhausted.
+
+### 7. Use the CLI
 
 `agentflow` is a terminal client for a running AgentFlow API: everything the dashboard does, plus `--json` output, meaningful exit codes, and live `watch`. It talks to the API over HTTP only, so ownership and role checks stay server-side.
 
@@ -522,7 +536,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 223 passing unit/integration tests (226 total in registry), a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 267 passing unit/integration tests (270 total in registry), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  

@@ -17,7 +17,7 @@ pnpm db:migrate                        # applies packages/db/migrations/*.sql in
 pnpm dev:api                           # Express API :3000 — refuses to start without AGENTFLOW_AUTH_CREDENTIALS
 pnpm dev:worker                        # BullMQ worker
 pnpm dev:web                           # Vite dashboard :4173, proxies /api -> :3000
-pnpm agentflow <command>               # terminal CLI (apps/cli) against a running API; see README §13.6
+pnpm agentflow <command>               # terminal CLI (apps/cli) against a running API; see README §13.7
 pnpm typecheck                         # per-package tsc --noEmit
 pnpm build                             # same as typecheck for most packages; web also runs vite build
 ```
@@ -61,6 +61,7 @@ Key invariants to preserve when editing:
 - **Error classes** drive retries: `TRANSIENT` (backoff + jitter), `PERMANENT`, `TIMEOUT`, and `UNKNOWN` for ambiguous external writes (`classifyOperationError`).
 - **Side-effect contracts**: `RECEIVER_IDEMPOTENT_WRITE` derives a deterministic idempotency key from the workflow envelope; `UNSAFE_WRITE` outcomes after a crash go to `UNKNOWN` with a `RECONCILIATION` wait reason (resolved via `POST /tool-executions/:id/reconcile`, operator role) — never auto-resend.
 - **Approvals** park runs in `WAITING` without holding a worker; role-gated (`research-reviewer`). Several tables (approvals, side effects) are made immutable by DB triggers in migrations 0004/0006.
+- **Worker heartbeats are advisory**: `worker_heartbeats` (written by `apps/worker/src/heartbeat.ts`, read only by `GET /runtime/providers`) feeds dashboard readiness. It must never authorize, reject, claim, schedule, or otherwise alter execution; `tests/integration/runtime-providers.test.ts` enforces this.
 - **Ownership**: workflows have an immutable owner inherited by runs; API endpoints are owner-scoped. Auth is SHA-256 bearer token with constant-time compare (`apps/api/src/auth.ts`).
 
 Packages:
