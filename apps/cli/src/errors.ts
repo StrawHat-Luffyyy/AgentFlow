@@ -107,3 +107,10 @@ export function apiError(status: number, body: unknown, context: ApiErrorContext
   }
   return make(`Server error (${status})${typeof payload.error === "string" ? `: ${payload.error}` : ""}`, ExitCode.ERROR);
 }
+
+/** Ends a command with a non-zero exit code without printing an error (e.g. `runs watch` outcomes). */
+export class ExitWith extends Error {
+  constructor(readonly exitCode: number) {
+    super(`exit ${exitCode}`);
+  }
+}

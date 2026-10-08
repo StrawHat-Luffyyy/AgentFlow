@@ -5,7 +5,7 @@ import { registerRunCommands } from "./commands/runs.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerWorkflowCommands } from "./commands/workflows.js";
 import { createContext, type CliContext, type GlobalFlags } from "./context.js";
-import { CliError, ExitCode } from "./errors.js";
+import { CliError, ExitCode, ExitWith } from "./errors.js";
 import type { CliIO } from "./io.js";
 import { VERSION } from "./version.js";
 
@@ -83,6 +83,7 @@ export async function run(argv: string[], io: CliIO): Promise<number> {
     await program.parseAsync(argv, { from: "user" });
     return ExitCode.OK;
   } catch (error) {
+    if (error instanceof ExitWith) return error.exitCode;
     if (error instanceof CommanderError) {
       if (error.code === "commander.helpDisplayed" || error.code === "commander.version") return ExitCode.OK;
       return ExitCode.USAGE;

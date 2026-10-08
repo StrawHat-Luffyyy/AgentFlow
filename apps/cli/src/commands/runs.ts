@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { createRunSchema } from "@agentflow/shared";
 import type { CliContext, ContextFactory } from "../context.js";
-import { UsageError } from "../errors.js";
+import { ExitWith, UsageError } from "../errors.js";
 import { applySets, parseNonNegativeInt, parsePositiveInt, readJsonSource, shortId, validateRequest } from "../input.js";
 import { formatRelative, parseDuration } from "../output/duration.js";
 import { paintStatus } from "../output/style.js";
@@ -10,11 +10,40 @@ import { aborted, confirm } from "../prompt.js";
 import { renderRunDetail } from "../render/run.js";
 import { resolveRunId } from "../resolve-id.js";
 import type { RunDetail } from "../schemas.js";
+import { watchRun, type WatchOptions } from "../watch.js";
 
 const collect = (value: string, previous: string[]) => [...previous, value];
 
 export function renderOptions(ctx: CliContext) {
   return { color: ctx.out.opts.color, now: ctx.io.now(), width: ctx.out.width, verbose: ctx.out.opts.verbose };
+}
+
+interface WatchFlags {
+  interval: string;
+  timeout?: string;
+  untilTerminal: boolean;
+}
+
+function watchOptions(flags: WatchFlags): WatchOptions {
+  const intervalMs = parseDuration(flags.interval);
+  if (intervalMs < 1) throw new UsageError("--interval must be greater than zero");
+  return {
+    intervalMs,
+    untilTerminal: flags.untilTerminal,
+    ...(flags.timeout === undefined ? {} : { timeoutMs: parseDuration(flags.timeout) }),
+  };
+}
+
+function addWatchFlags(command: Command): Command {
+  return command
+    .option("--interval <duration>", "poll interval", "2s")
+    .option("--timeout <duration>", "give up after this long (exit 13)")
+    .option("--until-terminal", "keep watching through WAITING_APPROVAL / NEEDS_ATTENTION", false);
+}
+
+async function finishWatch(ctx: CliContext, runId: string, flags: WatchFlags): Promise<void> {
+  const code = await watchRun(ctx, runId, watchOptions(flags));
+  if (code !== 0) throw new ExitWith(code);
 }
 
 export interface StartOptions {
@@ -174,20 +203,34 @@ export function registerRunCommands(program: Command, getContext: ContextFactory
       });
     });
 
-  runs
+  const start = runs
     .command("start <workflowVersionId>")
     .description("start a run of a workflow version")
     .option("--input <file|->", "run input JSON object")
     .option("--set <key=value>", "set a top-level input field (repeatable; value parsed as JSON when valid)", collect, [])
     .option("--creation-key <key>", "idempotency key: repeating it returns the same run")
     .option("--deadline <duration>", "run deadline, e.g. 5m (default 5m)")
-    .action(async (workflowVersionId: string, opts: StartOptions) => {
+    .option("--watch", "watch the run after starting it (exit code reflects its outcome)", false);
+  addWatchFlags(start).action(async (workflowVersionId: string, opts: StartOptions & WatchFlags & { watch: boolean }) => {
+    const ctx = await getContext();
+    if (opts.watch) watchOptions(opts);
+    const run = await startRun(ctx, workflowVersionId, opts);
+    if (opts.watch) {
+      ctx.out.info(`Started run ${run.id}`);
+      await finishWatch(ctx, run.id, opts);
+      return;
+    }
+    ctx.out.data(run, {
+      render: () => `Started run ${run.id} (${paintStatus(run.publicStatus, ctx.out.opts.color)})`,
+      ids: () => [run.id],
+    });
+  });
+
+  addWatchFlags(runs.command("watch <id>").description("follow a run until it finishes or needs attention"))
+    .action(async (raw: string, opts: WatchFlags) => {
       const ctx = await getContext();
-      const run = await startRun(ctx, workflowVersionId, opts);
-      ctx.out.data(run, {
-        render: () => `Started run ${run.id} (${paintStatus(run.publicStatus, ctx.out.opts.color)})`,
-        ids: () => [run.id],
-      });
+      watchOptions(opts);
+      await finishWatch(ctx, await resolveRunId(ctx.client, raw), opts);
     });
 
   runs
