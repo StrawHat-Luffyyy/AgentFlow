@@ -26,7 +26,10 @@ import {
   getRunSources,
   getRunToolExecutions,
   getRunUsage,
+  getWorkflow,
+  listPendingApprovals,
   listRuns,
+  listWorkflows,
   reconcileToolExecution,
 } from "@agentflow/runtime";
 import {
@@ -169,6 +172,15 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     response.status(201).json(workflow);
   });
 
+  app.get("/workflows", async (_request: express.Request, response: express.Response) => {
+    response.json(await listWorkflows(database, { ownerId: response.locals.principal.id }));
+  });
+
+  app.get("/workflows/:id", async (request: express.Request, response: express.Response) => {
+    const workflowId = z.string().uuid().parse(request.params.id);
+    response.json(await getWorkflow(database, workflowId));
+  });
+
   app.post("/workflows/:id/versions", async (request: express.Request, response: express.Response) => {
     const workflowId = z.string().uuid().parse(request.params.id);
     const body = createWorkflowVersionSchema.parse(request.body);
@@ -249,6 +261,17 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     }
     const body = reconciliationDecisionSchema.parse(request.body);
     response.json(await reconcileToolExecution(database, toolExecutionId, body));
+  });
+
+  app.get("/approvals", async (request: express.Request, response: express.Response) => {
+    const query = z.object({ runId: z.string().uuid().optional() }).parse(request.query);
+    const principal = response.locals.principal as AuthenticatedPrincipal;
+    const approvals = await listPendingApprovals(database, {
+      ownerId: principal.id,
+      roles: principal.roles,
+      ...(query.runId === undefined ? {} : { runId: query.runId }),
+    });
+    response.json({ approvals });
   });
 
   app.post("/approvals/:id/decisions", async (request: express.Request, response: express.Response) => {

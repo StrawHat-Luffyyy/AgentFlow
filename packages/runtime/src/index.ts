@@ -500,6 +500,59 @@ export async function getRunApprovals(database: Queryable, runId: string) {
   return approvals.rows;
 }
 
+export async function listPendingApprovals(
+  database: Queryable,
+  options: { ownerId: string; roles: readonly string[]; runId?: string },
+) {
+  const approvals = await database.query(
+    `SELECT a.id, a.run_id AS "runId", a.step_id AS "stepId", a.generation, a.status,
+       a.proposal_json AS proposal, a.proposal_hash AS "proposalHash",
+       a.payload_json AS payload, a.payload_hash AS "payloadHash",
+       a.reviewer_role AS "reviewerRole", a.expires_at AS "expiresAt",
+       a.decision, a.decision_at AS "decisionAt", a.decided_by AS "decidedBy",
+       a.decided_role AS "decidedRole", a.decision_request_id AS "decisionRequestId",
+       a.created_at AS "createdAt"
+     FROM approvals a
+     JOIN workflow_runs wr ON wr.id = a.run_id
+     JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     JOIN workflows w ON w.id = wv.workflow_id
+     WHERE a.status = 'PENDING' AND a.expires_at > now()
+       AND a.reviewer_role = ANY($2::text[]) AND w.owner_id = $1
+       AND ($3::uuid IS NULL OR a.run_id = $3)
+     ORDER BY a.created_at, a.id`,
+    [options.ownerId, [...options.roles], options.runId ?? null],
+  );
+  return approvals.rows;
+}
+
+export async function listWorkflows(database: Queryable, options: { ownerId: string }) {
+  const workflows = await database.query(
+    `SELECT w.id, w.name, w.description, w.created_at AS "createdAt",
+       max(wv.version) AS "latestVersion", count(wv.id)::integer AS "versionCount"
+     FROM workflows w LEFT JOIN workflow_versions wv ON wv.workflow_id = w.id
+     WHERE w.owner_id = $1
+     GROUP BY w.id
+     ORDER BY w.created_at DESC, w.id DESC`,
+    [options.ownerId],
+  );
+  return { workflows: workflows.rows };
+}
+
+export async function getWorkflow(database: Queryable, workflowId: string) {
+  const workflow = await database.query(
+    `SELECT id, name, description, created_at AS "createdAt" FROM workflows WHERE id = $1`,
+    [workflowId],
+  );
+  if (workflow.rowCount === 0) throw new NotFoundError("Workflow not found");
+  const versions = await database.query(
+    `SELECT id, version, created_at AS "createdAt",
+       jsonb_array_length(definition_json->'steps')::integer AS "stepCount"
+     FROM workflow_versions WHERE workflow_id = $1 ORDER BY version`,
+    [workflowId],
+  );
+  return { ...workflow.rows[0], versions: versions.rows };
+}
+
 export async function getRunToolExecutions(database: Queryable, runId: string) {
   const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
   if (exists.rowCount === 0) throw new NotFoundError("Run not found");
