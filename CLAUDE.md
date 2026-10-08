@@ -17,6 +17,7 @@ pnpm db:migrate                        # applies packages/db/migrations/*.sql in
 pnpm dev:api                           # Express API :3000 — refuses to start without AGENTFLOW_AUTH_CREDENTIALS
 pnpm dev:worker                        # BullMQ worker
 pnpm dev:web                           # Vite dashboard :4173, proxies /api -> :3000
+pnpm agentflow <command>               # terminal CLI (apps/cli) against a running API; see README §13.6
 pnpm typecheck                         # per-package tsc --noEmit
 pnpm build                             # same as typecheck for most packages; web also runs vite build
 ```
@@ -71,7 +72,7 @@ Packages:
 - `evaluation` — real runner (`real-runner.ts` spawns separate API/worker/baseline OS processes, injects `SIGKILL` at named `ExecutionFaultBoundary` hooks, records an independent receiver ledger), DBOS reference runner, and the separate seeded simulator (`cli.ts`). Systems: B0/B1 (volatile baselines), A0 (AgentFlow without receiver cooperation), A1 (full), DBOS. Scenarios E0–E7 are defined in README §8.
 - `telemetry` — OpenTelemetry setup (imported via each app's `instrumentation.ts`).
 
-`apps/web` is a React 19 + Vite operations dashboard talking to the API through the `/api` proxy (`src/api.ts`).
+`apps/cli` is the `agentflow` terminal client: Commander commands over a typed `ApiClient` (the only HTTP code), testable via `run(argv, io)`. It must only import `@agentflow/shared` from the workspace (it is kept bundle-ready) and never touches Postgres. `apps/web` is a React 19 + Vite operations dashboard talking to the API through the `/api` proxy (`src/api.ts`).
 
 ## Repo notes
 

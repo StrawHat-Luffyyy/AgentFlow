@@ -141,6 +141,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 AgentFlow/
 ├── apps/
 │   ├── api/                 # Express 5 control API, dual auth, scheduler, outbox
+│   ├── cli/                 # `agentflow` terminal CLI (thin HTTP client of the API)
 │   ├── worker/              # BullMQ worker process, fenced claim, execution
 │   └── web/                 # React 19 / Vite operations dashboard (session auth)
 ├── packages/
@@ -394,16 +395,16 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 - **Password:** The password configured in `AGENTFLOW_ADMIN_PASSWORD`
 
 ### 5. Run Test Suites
-PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only.
+PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 70 passing (36 unit + 34 integration; 3 live-Gemini skipped if no key)
+# Complete test suite: 218 passing (174 unit + 44 integration; 3 live-Gemini skipped if no key)
 pnpm test
 
-# Fast in-memory unit tests only (36 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (174 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
-# Real PostgreSQL + Redis integration tests only (34 tests)
+# Real PostgreSQL + Redis integration tests only (44 tests)
 pnpm test:integration
 
 # Live Google Gemini integration test (runs when GEMINI_API_KEY is configured)
@@ -413,6 +414,60 @@ pnpm test:gemini-live
 pnpm typecheck
 pnpm build
 ```
+
+### 6. Use the CLI
+
+`agentflow` is a terminal client for a running AgentFlow API: everything the dashboard does, plus `--json` output, meaningful exit codes, and live `watch`. It talks to the API over HTTP only, so ownership and role checks stay server-side.
+
+```powershell
+pnpm agentflow --help                          # run from the repo
+pnpm --filter @agentflow/cli link --global     # optional: put `agentflow` on your PATH
+```
+
+**Log in.** Use a bearer token (from step 2B) or the web username/password; credentials are stored per profile in `%APPDATA%\agentflow\config.json` (`~/.config/agentflow/config.json` elsewhere, mode 0600):
+
+```powershell
+"<token>" | pnpm agentflow login --token --url http://localhost:3000
+pnpm agentflow login --username admin          # prompts for the password
+pnpm agentflow whoami
+pnpm agentflow config use prod                 # switch profiles; --profile <name> per command
+```
+
+For CI, skip the config file entirely: `AGENTFLOW_URL`, `AGENTFLOW_TOKEN`, `AGENTFLOW_PROFILE`, and `AGENTFLOW_CONFIG` override stored settings (flags beat env, env beats the profile).
+
+**Run the reference workflow end to end:**
+
+```powershell
+pnpm agentflow status                                    # api / database / queue health
+$version = pnpm --silent agentflow workflows reference -q
+pnpm agentflow runs start $version --input input.json --watch   # exits 12 at the approval gate
+pnpm agentflow approvals list
+pnpm agentflow approvals approve <approval-id>           # shows the proposal and its hashes, then asks
+pnpm agentflow runs watch <run-id>                       # run IDs accept unique 8+ char prefixes
+pnpm agentflow runs show <run-id>
+pnpm agentflow runs history <run-id>                     # also: attempts, usage, sources, tools, ops
+```
+
+`approvals approve` recomputes `sha256(canonicalJson(...))` of the proposal and payload it displays and refuses to sign if they don't match the server's hashes. UNKNOWN side effects are resolved with `agentflow tools reconcile <id> --succeeded --receiver <id> --receipt <file>` or `--fail` (operator role). Irreversible commands (`runs cancel`, `approvals approve|reject`, `tools reconcile`) prompt unless `--yes`, and refuse without `--yes` when stdin is not a terminal.
+
+**Scripting.** stdout carries only data: `--json` prints the API response body, `-q` prints only IDs, and messages go to stderr.
+
+```powershell
+pnpm --silent agentflow runs list --json | jq -r '.runs[] | select(.publicStatus=="WAITING_APPROVAL") | .id'
+```
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Success (`watch`: run `SUCCEEDED`) |
+| 1 | Generic, network, or unexpected-response error |
+| 2 | Usage or validation error (bad flags, HTTP 400) |
+| 3 | Not authenticated / forbidden (HTTP 401, 403) |
+| 4 | Not found (HTTP 404, unknown run-ID prefix) |
+| 5 | Conflict (HTTP 409) |
+| 10 / 11 / 14 | `watch`: run `FAILED` / `CANCELLED` / `TIMED_OUT` |
+| 12 | `watch`: run reached `WAITING_APPROVAL` or `NEEDS_ATTENTION` (pass `--until-terminal` to keep watching) |
+| 13 | `watch`: `--timeout` elapsed |
+| 130 | Interrupted (Ctrl-C); the run itself is unaffected |
 
 ---
 
@@ -467,7 +522,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, and receiver contracts are implemented and covered by 70 passing unit/integration tests (73 total in registry), a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 218 passing unit/integration tests (221 total in registry), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  
