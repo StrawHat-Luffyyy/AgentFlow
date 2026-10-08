@@ -40,8 +40,8 @@ Ordinary agent loops execute in volatile process memory. When a worker process c
 AgentFlow decouples workflow control, queue transport, and worker execution through transactional PostgreSQL boundaries:
 
 ```text
-Client / SDK
-    ↓ HTTP (Bearer Auth)
+Client / SDK / Dashboard
+    ↓ HTTP (Bearer Auth & Session Cookies)
 Express API
     ↓ short database transaction
 PostgreSQL (runs, operations, checkpoints, outbox)
@@ -65,9 +65,9 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 - **Durable Approvals:** First-class human-in-the-loop gates persist suspended workflow runs in `WAITING` state without consuming worker processes. Pending approvals survive full API and worker restarts and enforce role-gated reviewer permissions (`research-reviewer`).
 - **Idempotent Side Effects:** Dedicated `RECEIVER_IDEMPOTENT_WRITE` contracts derive deterministic idempotency keys from the workflow envelope, enabling cooperating external receivers to deduplicate retried side effects upon crash recovery.
 - **UNKNOWN & Reconciliation:** For unsupported receivers (`UNSAFE_WRITE`), ambiguous post-crash outcomes are safely transitioned to `UNKNOWN` with a `RECONCILIATION` wait reason, preventing dangerous automated duplicate dispatches.
-- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas, providing a normalized adapter for Google Gemini (`gemini-3.5-flash`) alongside the deterministic scripted evaluation provider.
+- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas. AgentFlow standardizes on Google Gemini (`gemini-3.5-flash` via `@google/genai`) as its production LLM provider with tool calling and structured schemas, while preserving a deterministic scripted provider for reproducible benchmark evaluation.
 - **Observability:** Native OpenTelemetry instrumentation exports standardized spans; execution history logs provide an immutable audit trail (`GET /runs/:id/history`).
-- **Authentication & Ownership:** SHA-256 bearer tokens with constant-time verification; immutable workflow ownership inherited by runs; owner-scoped endpoints.
+- **Dual Authentication & Ownership:** Session-cookie authentication (`HttpOnly`, `SameSite=Lax`) with `scrypt` password hashing for the operations dashboard; constant-time SHA-256 bearer tokens for CLI, runners, and automated integrations; immutable workflow ownership inherited by runs.
 
 ---
 
@@ -109,10 +109,10 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
                         └─────────────────────┘               └─────────────────────┘
 ```
 
-1. **Express API:** Validates incoming requests, authenticates bearer tokens, manages immutable workflow ownership, and writes run creation keys atomically.
+1. **Express API:** Validates incoming requests, authenticates callers via session cookies (web dashboard) or bearer tokens (CLI/SDK), manages immutable workflow ownership, and writes run creation keys atomically.
 2. **Outbox Dispatcher:** Reads pending dispatches from PostgreSQL and pushes operation job references to BullMQ. If Redis is restarted or flushed, deliveries are rebuilt from PostgreSQL.
 3. **Worker:** Receives a job reference, verifies eligibility against PostgreSQL, claims a time-bounded lease, and invokes the operation through the harness.
-4. **Harness & Tool Boundary:** Maps model inputs/outputs, enforces tool allowlists, checks capability contracts, and executes deterministic or side-effecting operations.
+4. **Harness & Tool Boundary:** Maps model inputs/outputs, invokes Google Gemini (`gemini-3.5-flash`) or the scripted provider, enforces tool allowlists, checks capability contracts, and executes deterministic or side-effecting operations.
 5. **Atomic Result Commit:** Worker commits operation outputs, creates successor steps, advances run status, and commits the checkpoint in a single PostgreSQL transaction.
 
 ---
@@ -121,8 +121,12 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 
 - **Runtime & Language:** Node.js v24+, TypeScript 5.9 (strict ESM)
 - **API Framework:** Express 5.1
+- **LLM Integration:** Google Gemini SDK (`@google/genai` 2.27+) targeting `gemini-3.5-flash`
 - **Database & Storage:** PostgreSQL 17 (Docker Compose image; via `pg` pool, schema migrations in `packages/db`)
 - **Queue & Transport:** Redis 7, BullMQ 5
+- **Authentication:** Dual-mode authentication:
+  - Session-cookie web auth (`POST /auth/login`, `POST /auth/logout`, `GET /me`, HTTP-only `agentflow_session`, `scrypt` password hashing)
+  - Bearer token auth (`Authorization: Bearer <token>`, constant-time SHA-256 verification)
 - **Reference Durable System:** DBOS TypeScript SDK 5.2.11 (`@dbos-inc/dbos-sdk`)
 - **Operations Console:** React 19, Vite 7, Lucide Icons
 - **Validation & Schemas:** Zod 3.23
@@ -136,22 +140,22 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 ```text
 AgentFlow/
 ├── apps/
-│   ├── api/                 # Express 5 control API, auth, scheduler, outbox
+│   ├── api/                 # Express 5 control API, dual auth, scheduler, outbox
 │   ├── worker/              # BullMQ worker process, fenced claim, execution
-│   └── web/                 # React 19 / Vite operations dashboard
+│   └── web/                 # React 19 / Vite operations dashboard (session auth)
 ├── packages/
-│   ├── config/              # Environment configuration & validation
-│   ├── db/                  # PostgreSQL pool, migrations, schema migrations
+│   ├── config/              # Environment configuration & validation (native .env loading)
+│   ├── db/                  # PostgreSQL pool, migrations (runs, approvals, sessions, users)
 │   ├── evaluation/          # Real multi-process runner, fault hooks, DBOS runner, seeded simulator
-│   ├── harness/             # LLM provider registry, adapter (Google Gemini), tools
+│   ├── harness/             # LLM provider registry, Google Gemini adapter, tools, live-validate CLI
 │   ├── research/            # Fixed evaluation corpus, cloud-comparison workflow, scripted provider
 │   ├── runtime/             # Core durable domain transactions, state machine, leases
 │   ├── shared/              # Canonical JSON, queue contracts, shared schemas
 │   └── telemetry/           # OpenTelemetry span exporters and attribute schemas
 ├── evaluation-results/      # Evaluation evidence (real campaigns and labelled simulator output)
 ├── tests/
-│   ├── unit/                # Unit tests for harness, research workflow, evaluation
-│   └── integration/         # Real PostgreSQL + Redis end-to-end integration suite
+│   ├── unit/                # Unit tests: Gemini adapter (mocked), auth, research, harness, evaluation
+│   └── integration/         # Real PostgreSQL + Redis suite (durable path, session auth, opt-in live Gemini)
 └── docker-compose.yml       # Local PostgreSQL 17 and Redis 7 services
 ```
 
@@ -284,7 +288,7 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 ## 11. Limitations
 
 - **Python Prototype Unimplemented:** An early conceptual Execute → Remember → Control research prototype was described in design documents, but was **not implemented in code** (zero `.py` files exist). The functional implementation is entirely in TypeScript.
-- **Live Provider End-to-End Campaigns Deferred:** Provider adapter (`GeminiProvider`) is implemented and passes strict wire-protocol, schema normalization, and usage tests in Vitest. However, live-network end-to-end campaigns against paid external APIs were deferred due to unconfigured API keys.
+- **Live Provider End-to-End Campaigns Deferred:** The production Google Gemini provider adapter (`GeminiProvider` using `@google/genai` and `gemini-3.5-flash`) is implemented and validated by unit tests mocking wire protocol, tool execution, and token usage, plus an opt-in live integration test (`pnpm test:gemini-live`) and CLI validator (`pnpm validate:gemini`). However, multi-trial reliability evaluation campaigns were executed using the deterministic `ScriptedResearchProvider` to eliminate non-deterministic external network flakiness, rate limits, and token costs from the benchmark findings.
 - **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions). The invariants held in every observed trial, but five trials cannot bound rare failure rates, and latency percentiles are descriptive.
 - **Large-Sample Results Are Simulated:** The 4,000-trial E5 sweep and the 900-trial granularity study come from the deterministic seeded simulator, not the runtime. No large-sample real campaign was run, and checkpoint grouping is not implemented in the runtime.
 - **DBOS Sample Count:** The DBOS reference system was evaluated over 25 trials on the common subset.
@@ -329,17 +333,45 @@ On an existing PostgreSQL volume, create any missing databases once:
 docker compose exec postgres psql -U agentflow -d agentflow -c "CREATE DATABASE agentflow_test" -c "CREATE DATABASE agentflow_acceptance_eval" -c "CREATE DATABASE agentflow_reference_eval"
 ```
 
-The processes read configuration from environment variables (defaults match `.env.example`); `.env` is not loaded automatically.
+Copy the example environment configuration to `.env` (Node.js 24+ automatically loads `.env` if present):
 
-### 2. Configure an API Credential
-The API refuses to start without at least one credential. Generate a random token and provision only its SHA-256 hash:
+```powershell
+copy .env.example .env
+```
+
+### 2. Configure Authentication & Optional Gemini Key
+
+The API supports dual authentication: **Session Cookies** for the React web operations console and **Bearer Tokens** for CLI, runners, and automated API clients.
+
+#### A. Web Operations Console (Username & Password)
+Set an administrator password in `.env` (or environment variable). When the API starts, it automatically provisions the `acceptance-owner` user (username defaults to `admin`) with `research-reviewer` and `operator` roles:
+
+```env
+AGENTFLOW_ADMIN_PASSWORD="ChooseYourSecurePassword"
+AGENTFLOW_ADMIN_USERNAME="admin"
+```
+
+#### B. Bearer Tokens (CLI, Tests & SDK)
+For programmatic access, generate a token and provision its SHA-256 hash in `AGENTFLOW_AUTH_CREDENTIALS`:
 
 ```powershell
 node -e "const c=require('crypto');const t=c.randomBytes(32).toString('hex');console.log('token:',t);console.log(JSON.stringify([{id:'local-owner',tokenHash:c.createHash('sha256').update(t).digest('hex'),roles:['research-reviewer','operator']}]))"
 $env:AGENTFLOW_AUTH_CREDENTIALS = '<JSON array printed above>'
 ```
 
-See [`docs/acceptance-map.md`](docs/acceptance-map.md#authentication) for the credential format.
+#### C. Optional: Google Gemini Live API
+To enable live LLM inference with Google Gemini (`gemini-3.5-flash`), add your Gemini API key to `.env`:
+
+```env
+GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_MODEL="gemini-3.5-flash"
+```
+
+Verify your Gemini configuration at any time:
+
+```powershell
+pnpm validate:gemini
+```
 
 ### 3. Database Migrations
 ```powershell
@@ -348,26 +380,34 @@ pnpm db:migrate
 
 ### 4. Start Development Services
 ```powershell
-# Terminal 1: Express API on port 3000 (needs AGENTFLOW_AUTH_CREDENTIALS)
+# Terminal 1: Express API on port 3000
 pnpm dev:api
 
 # Terminal 2: BullMQ worker
 pnpm dev:worker
 
-# Terminal 3: Operations console
+# Terminal 3: Operations console (React 19 / Vite)
 pnpm dev:web
 ```
-The operations dashboard is served at `http://localhost:4173` and proxies `/api` to `http://127.0.0.1:3000`. Sign in with the raw token.
+The operations dashboard is served at `http://localhost:4173` and proxies `/api` to `http://127.0.0.1:3000`. Sign in with:
+- **Username:** `admin` (or `acceptance-owner`)
+- **Password:** The password configured in `AGENTFLOW_ADMIN_PASSWORD`
 
 ### 5. Run Test Suites
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only.
 
 ```powershell
-# All tests: 24 unit + 25 integration (49 total)
+# Complete test suite: 70 passing (36 unit + 34 integration; 3 live-Gemini skipped if no key)
 pnpm test
 
-# Real PostgreSQL + Redis integration tests only (25 tests)
+# Fast in-memory unit tests only (36 tests, no Postgres/Redis required)
+pnpm exec vitest run tests/unit
+
+# Real PostgreSQL + Redis integration tests only (34 tests)
 pnpm test:integration
+
+# Live Google Gemini integration test (runs when GEMINI_API_KEY is configured)
+pnpm test:gemini-live
 
 # Workspace typecheck and build
 pnpm typecheck
@@ -398,6 +438,9 @@ node --import tsx packages/evaluation/src/cli.ts --systems B0,B1,A0,A1 --scenari
 
 # 6. SIMULATOR: checkpoint granularity model (900 simulated trials)
 node --import tsx packages/evaluation/src/cli.ts --systems A1 --scenarios E0,E1,E5 --granularity 1,2,4 --trials 100 --output evaluation-results/granularity-ablation
+
+# 7. Live Google Gemini provider validation (requires GEMINI_API_KEY)
+pnpm validate:gemini
 ```
 
 ---
@@ -424,7 +467,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, role-gated approvals, and receiver contracts are implemented and covered by 49 unit/integration tests, a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, and receiver contracts are implemented and covered by 70 passing unit/integration tests (73 total in registry), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  
