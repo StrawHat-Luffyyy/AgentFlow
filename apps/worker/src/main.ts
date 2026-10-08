@@ -9,7 +9,9 @@ import {
   ToolRegistry,
 } from "@agentflow/harness";
 import { ScriptedResearchProvider } from "@agentflow/research";
+import { recordWorkerHeartbeat } from "@agentflow/runtime";
 import type { ConnectionOptions } from "bullmq";
+import { advertisedProviders, startHeartbeat } from "./heartbeat.js";
 import { createOperationWorker } from "./worker.js";
 
 function redisConnection(redisUrl: string): ConnectionOptions {
@@ -62,11 +64,21 @@ worker.on("error", (error) => {
 });
 console.log(`AgentFlow worker ${config.WORKER_ID} started`);
 
+// Advisory readiness for the operations UI only; execution never reads it.
+const heartbeat = startHeartbeat({
+  providers: advertisedProviders(providers, {
+    gemini: [config.GEMINI_MODEL],
+    "scripted-research": ["cloud-comparison-scripted-v1"],
+  }),
+  write: (advertised) => recordWorkerHeartbeat(database, { workerId: config.WORKER_ID, providers: advertised }),
+});
+
 let shuttingDown = false;
 async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}; shutting down AgentFlow worker`);
+  heartbeat.stop();
   await worker.close();
   await database.end();
   await telemetry.shutdown();
