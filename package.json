@@ -18,7 +18,8 @@
     "eval:simulate": "pnpm --filter @agentflow/evaluation run simulate",
     "eval:demo": "node --import tsx packages/evaluation/src/real-runner.ts --systems A1 --scenarios DEMO --lease-ms 15000",
     "test:gemini-live": "vitest run tests/integration/gemini-live.test.ts",
-    "validate:gemini": "node --import tsx packages/harness/src/live-validate.ts"
+    "validate:gemini": "node --import tsx packages/harness/src/live-validate.ts",
+    "agentflow": "node apps/cli/bin/agentflow.js"
   },
   "devDependencies": {
     "@agentflow/db": "workspace:*",
