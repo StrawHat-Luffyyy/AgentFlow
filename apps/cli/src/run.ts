@@ -1,4 +1,8 @@
 import { Command, CommanderError } from "commander";
+import { registerAuthCommands } from "./commands/auth.js";
+import { registerConfigCommands } from "./commands/config.js";
+import { registerStatusCommand } from "./commands/status.js";
+import { createContext, type CliContext, type GlobalFlags } from "./context.js";
 import { CliError, ExitCode } from "./errors.js";
 import type { CliIO } from "./io.js";
 import { VERSION } from "./version.js";
@@ -19,7 +23,26 @@ export function buildProgram(io: CliIO): Command {
       writeErr: (text) => io.stderr.write(text),
     });
   program.showHelpAfterError("(run agentflow --help for usage)");
+  let context: Promise<CliContext> | undefined;
+  const getContext = () => (context ??= createContext(io, globalFlags(program)));
+  registerAuthCommands(program, getContext);
+  registerConfigCommands(program, getContext);
+  registerStatusCommand(program, getContext);
   return program;
+}
+
+function globalFlags(program: Command): GlobalFlags {
+  const opts = program.opts<{
+    profile?: string; url?: string; json: boolean; color: boolean; quiet: boolean; verbose: boolean;
+  }>();
+  return {
+    ...(opts.profile === undefined ? {} : { profile: opts.profile }),
+    ...(opts.url === undefined ? {} : { url: opts.url }),
+    json: opts.json,
+    color: opts.color,
+    quiet: opts.quiet,
+    verbose: opts.verbose,
+  };
 }
 
 function reportError(error: unknown, io: CliIO, json: boolean, verbose: boolean): number {

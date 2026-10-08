@@ -9,6 +9,7 @@ export interface FakeIO {
   stdout(): string;
   stderr(): string;
   feed(text: string): void;
+  endInput(): void;
   sleeps: number[];
   abort(): void;
 }
@@ -61,6 +62,7 @@ export function fakeIO(options: FakeIOOptions = {}): FakeIO {
     stdout: () => out,
     stderr: () => err,
     feed: (text: string) => { stdin.write(text); },
+    endInput: () => { stdin.end(); },
     sleeps,
     abort: () => controller.abort(),
   };

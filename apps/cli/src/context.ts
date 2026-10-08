@@ -32,6 +32,8 @@ export interface CliContext {
   client: ApiClient;
 }
 
+export type ContextFactory = () => Promise<CliContext>;
+
 export function resolveSettings(config: Config, flags: GlobalFlags, env: CliIO["env"]): Settings {
   const profileName = flags.profile ?? env.AGENTFLOW_PROFILE ?? config.currentProfile ?? "default";
   const profile = config.profiles[profileName] ?? {};
