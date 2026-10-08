@@ -28,7 +28,7 @@ import {
   type UsageRecord,
 } from "./api.js";
 import { NewRunDrawer } from "./NewRunDrawer.js";
-import { summarizeUsage, usageDetail } from "./new-run.js";
+import { summarizeUsage, usageDetail, usageTotal } from "./new-run.js";
 import { ModeBadge, ResultPanel } from "./ResultPanel.js";
 import {
   BrandMark,
@@ -395,7 +395,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
             <dl className="stats" aria-label="Run summary">
               <Stat label="Committed steps" value={`${committedSteps}/${materializedSteps}`} detail="of materialized steps" />
               <Stat label="Attempts" value={attempts.length} detail={`${failedAttempts} failed · ${abandonedAttempts} abandoned`} />
-              <Stat label="Tokens" value={usageSummary ? (usageSummary.input + usageSummary.output).toLocaleString() : "—"}
+              <Stat label="Tokens" value={usageTotal(usageSummary)}
                 detail={usageDetail(usageSummary)} />
               <Stat label="Elapsed" value={formatDuration(run.createdAt, run.finishedAt)} detail={run.finishedAt ? "completed" : "in progress"} />
             </dl>

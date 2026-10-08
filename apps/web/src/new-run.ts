@@ -128,39 +128,74 @@ export interface UsageLike {
 }
 
 export interface UsageSummary {
+  /** Sums of persisted counts only; records with no counts are excluded, never treated as zero. */
   input: number;
   output: number;
-  groups: Array<{ label: string; input: number; output: number; provenances: string[] }>;
+  countedRecords: number;
+  unreportedRecords: number;
+  groups: Array<{ label: string; input: number; output: number; unreported: number; provenances: string[] }>;
+}
+
+function isUnreported(record: UsageLike): boolean {
+  return record.inputTokens === null && record.outputTokens === null;
 }
 
 /**
- * Totals persisted usage records exactly as returned by the API. Null counts add nothing;
- * nothing is estimated here.
+ * Totals persisted usage records exactly as returned by the API. A record whose counts are
+ * null is tallied as "unreported" rather than added as zero; nothing is estimated here.
  */
 export function summarizeUsage(records: UsageLike[]): UsageSummary | null {
   if (records.length === 0) return null;
-  const groups = new Map<string, { input: number; output: number; provenances: Set<string> }>();
+  const groups = new Map<string, { input: number; output: number; unreported: number; provenances: Set<string> }>();
   for (const record of records) {
     const label = `${record.provider} · ${record.model}`;
-    const group = groups.get(label) ?? { input: 0, output: 0, provenances: new Set<string>() };
-    group.input += record.inputTokens ?? 0;
-    group.output += record.outputTokens ?? 0;
+    const group = groups.get(label) ?? { input: 0, output: 0, unreported: 0, provenances: new Set<string>() };
+    if (isUnreported(record)) group.unreported += 1;
+    else {
+      group.input += record.inputTokens ?? 0;
+      group.output += record.outputTokens ?? 0;
+    }
     group.provenances.add(record.provenance);
     groups.set(label, group);
   }
   const list = [...groups.entries()].map(([label, group]) => ({
-    label, input: group.input, output: group.output, provenances: [...group.provenances].sort(),
+    label, input: group.input, output: group.output, unreported: group.unreported, provenances: [...group.provenances].sort(),
   }));
+  const unreportedRecords = list.reduce((sum, group) => sum + group.unreported, 0);
   return {
     input: list.reduce((sum, group) => sum + group.input, 0),
     output: list.reduce((sum, group) => sum + group.output, 0),
+    countedRecords: records.length - unreportedRecords,
+    unreportedRecords,
     groups: list,
   };
+}
+
+/** Headline token figure: "—" when nothing was reported, "N+" when some records were unreported. */
+export function usageTotal(summary: UsageSummary | null): string {
+  if (summary === null || summary.countedRecords === 0) return "—";
+  const total = (summary.input + summary.output).toLocaleString();
+  return summary.unreportedRecords > 0 ? `${total}+` : total;
 }
 
 /** Tile/footer text for usage: persisted totals plus provenance exactly as the API returned it. */
 export function usageDetail(summary: UsageSummary | null): string {
   if (summary === null) return "No usage recorded yet";
-  const provenances = [...new Set(summary.groups.flatMap((group) => group.provenances))].sort();
-  return `${summary.input.toLocaleString()} in · ${summary.output.toLocaleString()} out · ${provenances.join(", ")}`;
+  const provenances = [...new Set(summary.groups.flatMap((group) => group.provenances))].sort().join(", ");
+  if (summary.countedRecords === 0) return `Not reported by provider · ${provenances}`;
+  const unreported = summary.unreportedRecords > 0 ? ` + ${summary.unreportedRecords} unreported` : "";
+  return `${summary.input.toLocaleString()} in · ${summary.output.toLocaleString()} out${unreported} · ${provenances}`;
+}
+
+/**
+ * The version Start would use. Versions are tagged with the workflow they were loaded for, so a
+ * stale list from a previously selected workflow can never be submitted for the current one.
+ */
+export function selectedVersionFor<V extends { id: string }>(
+  workflowId: string,
+  loaded: { workflowId: string; versions: V[] } | null,
+  versionId: string,
+): V | undefined {
+  if (!loaded || loaded.workflowId !== workflowId) return undefined;
+  return loaded.versions.find((version) => version.id === versionId);
 }

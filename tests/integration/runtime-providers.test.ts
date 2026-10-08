@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { Queue, type Worker } from "bullmq";
@@ -11,7 +11,7 @@ import { createOutboxDispatcher } from "../../apps/api/src/outbox.ts";
 import { redisConnection } from "../../apps/api/src/redis.ts";
 import { createOperationWorker } from "../../apps/worker/src/worker.ts";
 import { createDatabase, migrate, type Database } from "@agentflow/db";
-import { AgentHarness, ProviderRegistry, ToolRegistry } from "@agentflow/harness";
+import { AgentHarness, DeterministicFakeProvider, ProviderRegistry, ToolRegistry } from "@agentflow/harness";
 import { listAvailableProviders, recordWorkerHeartbeat } from "../../packages/runtime/src/index.ts";
 
 const databaseUrl =
@@ -122,14 +122,33 @@ describe("worker heartbeats", () => {
 });
 
 describe("heartbeats are advisory only", () => {
-  it("queues a run with no fresh heartbeats and executes it when a worker appears later", async () => {
-    const { versionId } = await deterministicVersion(`advisory-${suffix}`);
-    const run = await json<{ id: string; publicStatus: string }>("/runs", {
+  it("accepts and executes a run after the advertising worker vanishes", async () => {
+    // A worker advertises the provider, so the UI would report it available...
+    const vanishing = `hb-${suffix}-vanishing`;
+    await recordWorkerHeartbeat(database, { workerId: vanishing, providers: [{ name: "fake", models: ["fake-1"] }] });
+    expect((await listAvailableProviders(database)).providers.some((p) => p.name === "fake")).toBe(true);
+    // ...then it disappears (its heartbeat goes stale) before the run is started.
+    await database.query(
+      "UPDATE worker_heartbeats SET last_seen_at = now() - interval '31 seconds' WHERE worker_id = $1", [vanishing],
+    );
+    expect((await listAvailableProviders(database)).providers.some((p) => p.name === "fake")).toBe(false);
+
+    const workflow = await json<{ id: string }>("/workflows", { method: "POST", body: JSON.stringify({ name: `advisory-${suffix}` }) });
+    const version = await json<{ id: string }>(`/workflows/${workflow.id}/versions`, {
       method: "POST",
-      body: JSON.stringify({ workflowVersionId: versionId, input: { note: "queued before any worker" } }),
+      body: JSON.stringify({
+        version: 1,
+        definition: { steps: [{ key: "think", kind: "AGENT", handler: "agent", provider: "fake", model: "fake-1", instructions: "Say anything." }] },
+      }),
     });
+    const run = await json<{ id: string; publicStatus: string; providers: string[] }>("/runs", {
+      method: "POST",
+      body: JSON.stringify({ workflowVersionId: version.id, input: { note: "provider currently unavailable" } }),
+    });
+    expect(run.providers).toEqual(["fake"]);
     expect(run.publicStatus).toBe("QUEUED");
 
+    // An eligible worker returns and executes the queued run.
     const connection = redisConnection(redisUrl);
     let worker: Worker | undefined;
     const dispatcher = createOutboxDispatcher(database, queue, 25);
@@ -137,17 +156,17 @@ describe("heartbeats are advisory only", () => {
       worker = createOperationWorker({
         database,
         connection,
-        workerId: `late-worker-${suffix}`,
+        workerId: `returning-worker-${suffix}`,
         leaseMs: 15_000,
         concurrency: 1,
         queueName,
-        harness: new AgentHarness(new ProviderRegistry(), new ToolRegistry()),
+        harness: new AgentHarness(new ProviderRegistry().register(new DeterministicFakeProvider()), new ToolRegistry()),
       });
       await worker.waitUntilReady();
       dispatcher.start();
       const deadline = Date.now() + 15_000;
       let status = run.publicStatus;
-      while (Date.now() < deadline && status !== "SUCCEEDED") {
+      while (Date.now() < deadline && status !== "SUCCEEDED" && status !== "FAILED") {
         await new Promise((resolve) => setTimeout(resolve, 100));
         status = (await json<{ publicStatus: string }>(`/runs/${run.id}`)).publicStatus;
       }
@@ -164,10 +183,15 @@ describe("heartbeats are advisory only", () => {
       .filter((chunk) => chunk.includes("worker_heartbeats"))
       .map((chunk) => /^async function (\w+)/.exec(chunk)?.[1] ?? chunk.slice(0, 40));
     expect(readers.sort()).toEqual(["listAvailableProviders", "recordWorkerHeartbeat"]);
-    const worker = await readFile(new URL("../../apps/worker/src/worker.ts", import.meta.url), "utf8");
-    expect(worker).not.toContain("worker_heartbeats");
-    const app = await readFile(new URL("../../apps/api/src/app.ts", import.meta.url), "utf8");
-    expect(app).not.toContain("worker_heartbeats");
+    // Only the heartbeat writer may name the table; every API and worker source file is checked.
+    for (const directory of ["../../apps/api/src/", "../../apps/worker/src/"]) {
+      const base = new URL(directory, import.meta.url);
+      for (const file of await readdir(base)) {
+        if (!file.endsWith(".ts") || file === "heartbeat.ts") continue;
+        const source = await readFile(new URL(file, base), "utf8");
+        expect(source.includes("worker_heartbeats"), `${directory}${file}`).toBe(false);
+      }
+    }
   });
 });
 

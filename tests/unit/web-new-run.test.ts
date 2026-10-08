@@ -5,9 +5,11 @@ import {
   parseRunInput,
   readiness,
   referenceTemplate,
+  selectedVersionFor,
   runMode,
   summarizeUsage,
   usageDetail,
+  usageTotal,
   type Availability,
 } from "../../apps/web/src/new-run.ts";
 
@@ -150,9 +152,11 @@ describe("summarizeUsage", () => {
     expect(summary).toEqual({
       input: 150,
       output: 50,
+      countedRecords: 2,
+      unreportedRecords: 1,
       groups: [
-        { label: "gemini · gemini-3.5-flash", input: 150, output: 50, provenances: ["reported"] },
-        { label: "scripted-research · s", input: 0, output: 0, provenances: ["estimated"] },
+        { label: "gemini · gemini-3.5-flash", input: 150, output: 50, unreported: 0, provenances: ["reported"] },
+        { label: "scripted-research · s", input: 0, output: 0, unreported: 1, provenances: ["estimated"] },
       ],
     });
   });
@@ -163,11 +167,21 @@ describe("usageDetail", () => {
     expect(usageDetail(null)).toBe("No usage recorded yet");
   });
 
-  it("shows persisted provenance exactly as returned, never relabelled", () => {
+  it("never turns null counts into a zero", () => {
     const summary = summarizeUsage([
       { provider: "gemini", model: "gemini-3.5-flash", provenance: "unknown", inputTokens: null, outputTokens: null },
     ]);
-    expect(usageDetail(summary)).toBe("0 in · 0 out · unknown");
+    expect(usageDetail(summary)).toBe("Not reported by provider · unknown");
+    expect(usageTotal(summary)).toBe("—");
+  });
+
+  it("marks totals that exclude unreported records", () => {
+    const summary = summarizeUsage([
+      { provider: "gemini", model: "m", provenance: "reported", inputTokens: 1200, outputTokens: 300 },
+      { provider: "gemini", model: "m", provenance: "unknown", inputTokens: null, outputTokens: null },
+    ]);
+    expect(usageDetail(summary)).toBe("1,200 in · 300 out + 1 unreported · reported, unknown");
+    expect(usageTotal(summary)).toBe("1,500+");
   });
 
   it("lists mixed provenances", () => {
@@ -176,5 +190,26 @@ describe("usageDetail", () => {
       { provider: "scripted-research", model: "s", provenance: "estimated", inputTokens: 10, outputTokens: 5 },
     ]);
     expect(usageDetail(summary)).toBe("1,210 in · 305 out · estimated, reported");
+    expect(usageTotal(summary)).toBe("1,515");
+  });
+
+  it("shows a dash total when nothing is recorded", () => {
+    expect(usageTotal(null)).toBe("—");
+  });
+});
+
+describe("selectedVersionFor", () => {
+  const versions = [{ id: "va1", version: 1 }, { id: "va2", version: 2 }];
+
+  it("returns the chosen version when versions were loaded for the current workflow", () => {
+    expect(selectedVersionFor("A", { workflowId: "A", versions }, "va2")).toEqual({ id: "va2", version: 2 });
+  });
+
+  it("returns nothing while the current workflow's versions are not loaded yet", () => {
+    expect(selectedVersionFor("B", { workflowId: "A", versions }, "va2")).toBeUndefined();
+  });
+
+  it("returns nothing when no versions have loaded", () => {
+    expect(selectedVersionFor("A", null, "va1")).toBeUndefined();
   });
 });

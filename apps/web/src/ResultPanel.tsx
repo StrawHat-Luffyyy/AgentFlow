@@ -1,6 +1,6 @@
 import { FileText } from "lucide-react";
 import type { JsonValue, RunDetail, UsageRecord } from "./api.js";
-import { extractReport, runMode, summarizeUsage } from "./new-run.js";
+import { extractReport, runMode, summarizeUsage, usageDetail } from "./new-run.js";
 import { Panel } from "./ui.js";
 
 /** "Scripted" vs "Live · <provider>" so evaluation and real-provider runs can't be confused. */
@@ -39,16 +39,13 @@ export function ResultPanel({ run, usage }: { run: RunDetail; usage: UsageRecord
         </div>
       )}
       <footer className="result-usage">
-        {totals === null ? "No usage recorded" : (
-          <>
-            <strong>{totals.input.toLocaleString()} in · {totals.output.toLocaleString()} out</strong>
-            {totals.groups.map((group) => (
-              <span key={group.label}>
-                {group.label}: {group.input.toLocaleString()} in · {group.output.toLocaleString()} out ({group.provenances.join(", ")})
-              </span>
-            ))}
-          </>
-        )}
+        <strong>{usageDetail(totals)}</strong>
+        {totals?.groups.map((group) => (
+          <span key={group.label}>
+            {group.label}: {group.input.toLocaleString()} in · {group.output.toLocaleString()} out
+            {group.unreported > 0 ? ` + ${group.unreported} unreported` : ""} ({group.provenances.join(", ")})
+          </span>
+        ))}
       </footer>
     </Panel>
   );

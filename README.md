@@ -398,10 +398,10 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 267 passing (214 unit + 53 integration; 3 live-Gemini skipped if no key)
+# Complete test suite: 272 passing (219 unit + 53 integration; 3 live-Gemini skipped if no key)
 pnpm test
 
-# Fast in-memory unit tests only (214 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (219 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
 # Real PostgreSQL + Redis integration tests only (53 tests)
@@ -536,7 +536,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 267 passing unit/integration tests (270 total in registry), a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 272 passing unit/integration tests (275 total in registry), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  

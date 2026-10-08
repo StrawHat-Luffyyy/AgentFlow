@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Play, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, type ProviderAvailability, type WorkflowSummary, type WorkflowVersionSummary } from "./api.js";
-import { deadlineMsFromMinutes, parseRunInput, readiness, referenceTemplate, SCRIPTED_PROVIDER } from "./new-run.js";
+import { deadlineMsFromMinutes, parseRunInput, readiness, referenceTemplate, SCRIPTED_PROVIDER, selectedVersionFor } from "./new-run.js";
 import { Button, IconButton, InlineAlert } from "./ui.js";
 
 const REFERENCE = "reference";
@@ -36,7 +36,7 @@ export function NewRunDrawer({
 
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowId, setWorkflowId] = useState<string>(REFERENCE);
-  const [versions, setVersions] = useState<WorkflowVersionSummary[]>([]);
+  const [loadedVersions, setLoadedVersions] = useState<{ workflowId: string; versions: WorkflowVersionSummary[] } | null>(null);
   const [versionId, setVersionId] = useState<string>("");
   const [mode, setMode] = useState<Mode>("scripted");
   const [model, setModel] = useState<string>(FALLBACK_MODEL);
@@ -96,12 +96,14 @@ export function NewRunDrawer({
   }, [open]);
 
   useEffect(() => {
-    if (!open || isReference) { setVersions([]); setVersionId(""); return; }
+    setLoadedVersions(null);
+    setVersionId("");
+    if (!open || isReference) return;
     let cancelled = false;
     api.getWorkflow(workflowId).then((detail) => {
       if (cancelled) return;
       const sorted = [...detail.versions].sort((a, b) => b.version - a.version);
-      setVersions(sorted);
+      setLoadedVersions({ workflowId, versions: sorted });
       setVersionId(sorted[0]?.id ?? "");
     }).catch((cause: unknown) => { if (!cancelled) handleFailure(cause); });
     return () => { cancelled = true; };
@@ -119,7 +121,8 @@ export function NewRunDrawer({
     if (!geminiModels.includes(model)) setModel(geminiModels[0]!);
   }, [geminiModels, model]);
 
-  const selectedVersion = versions.find((version) => version.id === versionId);
+  const versions = loadedVersions?.workflowId === workflowId ? loadedVersions.versions : [];
+  const selectedVersion = selectedVersionFor(workflowId, loadedVersions, versionId);
   const required = isReference ? [mode === "live" ? LIVE_PROVIDER : SCRIPTED_PROVIDER] : selectedVersion?.providers ?? [];
   const ready = readiness(required, availability);
   const parsedInput = parseRunInput(inputText);
