@@ -72,7 +72,12 @@ editing workflow definitions in the browser; SSE/streaming; token streaming.
 - **`apps/worker`:** a heartbeat loop (`startHeartbeat({ database, workerId, providers, intervalMs = 10_000, log })`
   in its own module) writes once at startup and every `intervalMs`; the timer is `unref()`ed;
   failures are logged and never thrown; `stop()` is called during graceful shutdown.
-- **Invariant:** nothing in claim, lease, execution, or scheduling reads `worker_heartbeats`.
+- **Invariant (strictly advisory):** `worker_heartbeats` is readiness information for the UI only.
+  It must never authorize, reject, claim, schedule, or otherwise alter durable execution:
+  nothing in run creation, claim, lease, execution, retry, scheduling, or repair reads it, and
+  `POST /runs` / the reference endpoint never consult it. If a worker disappears after the UI
+  reported it available, the run still queues safely in Postgres and executes when an eligible
+  worker returns (covered by an integration test, §6).
 
 ### 2.2 API (`apps/api/src/app.ts`, thin routes)
 
@@ -150,6 +155,11 @@ viewports the drawer becomes full-width.
    → no badge. Shown on rail items and in the run header.
 2. **Observing** — unchanged polling and views. Addition: AGENT step rows show the model name
    from that step's usage records when available.
+   **Token counts are never estimated or synthesized in the frontend.** Every token figure shown
+   (usage tab, Result footer, step hints) is a sum of `inputTokens`/`outputTokens` from persisted
+   usage records returned by `GET /runs/:id/usage`; a record with a null count contributes
+   nothing and is labelled with its `provenance` as returned by the API. Before any usage
+   record exists, the UI shows "No usage recorded yet" rather than a number.
 3. **Approval** — unchanged approval card; verified during acceptance to show the payload
    (the generated report) being approved.
 4. **Result panel** — rendered only when `publicStatus === "SUCCEEDED"`, above the steps:
@@ -162,7 +172,7 @@ viewports the drawer becomes full-width.
 ## 5. Code organization
 
 - `apps/web/src/new-run.ts` — pure, framework-free logic: `parseRunInput`, `referenceTemplate`,
-  `readiness`, `runMode`, `extractReport`, `deadlineMsFromMinutes`.
+  `readiness`, `runMode`, `extractReport`, `deadlineMsFromMinutes`, `summarizeUsage`.
 - `apps/web/src/NewRunDrawer.tsx` — drawer component (uses `ui.tsx` primitives).
 - `apps/web/src/ResultPanel.tsx` — result panel component.
 - `apps/web/src/api.ts` — add `listWorkflows`, `getWorkflow`, `runtimeProviders`,
@@ -184,6 +194,19 @@ viewports the drawer becomes full-width.
   worker excluded; aggregation across two workers; `GET /runtime/providers` requires auth;
   `providers` present on workflow versions, run summaries and run detail. Isolation: unique
   worker/owner IDs, no TRUNCATE.
+- **Integration — live reference version contents** — `POST /reference-workflows/cloud-comparison`
+  with `{ mode: "live", provider: "gemini", model: <GEMINI_MODEL> }`, then read the persisted
+  `workflow_versions.definition_json` directly from Postgres and assert that **every** `AGENT`
+  step — specifically `analyze-pricing` and `analyze-features`, and no others — has
+  `provider: "gemini"` and `model` equal to the requested model; the scripted version's AGENT
+  steps have `provider: "scripted-research"`. Not inferred from UI labels or `providers` summaries.
+- **Integration — heartbeats never gate execution** — with no heartbeat rows (or only stale
+  ones) for a provider, `POST /runs` still succeeds and the run is `QUEUED`; a worker started
+  afterwards executes it to completion. Also asserts no runtime execution module references
+  `worker_heartbeats` (grep-style test over `packages/runtime/src` and `apps/worker/src/worker.ts`).
+- **Unit — usage display** — `summarizeUsage(records)` (in `new-run.ts`) sums only persisted
+  counts, treats null as absent (not zero-estimated), groups by `provider · model`, and returns
+  `null` for no records.
 - **Browser acceptance (in-app browser, real api + worker + web against `agentflow_test`):**
   1. Scripted: New run → Reference → Scripted → Start → `WAITING_APPROVAL` → Approve →
      `SUCCEEDED`; Result panel shows report; "Scripted" badge.
