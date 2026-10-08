@@ -35,6 +35,13 @@ function hash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/** Distinct LLM providers used by AGENT steps of a workflow version (sorted; empty when none). */
+function agentProvidersSql(versionAlias: string): string {
+  return `COALESCE((SELECT array_agg(DISTINCT step->>'provider' ORDER BY step->>'provider')
+    FROM jsonb_array_elements(${versionAlias}.definition_json->'steps') step
+    WHERE step->>'kind' = 'AGENT'), '{}'::text[])`;
+}
+
 interface StepPolicy {
   maxAttempts: number;
   initialBackoffMs: number;
@@ -339,7 +346,8 @@ export async function listRuns(
          COALESCE(step_stats.attempt_count, 0)::integer AS "attemptCount",
          COALESCE(step_stats.has_running, false) AS "hasRunning",
          COALESCE(usage_stats.input_tokens, 0)::integer AS "inputTokens",
-         COALESCE(usage_stats.output_tokens, 0)::integer AS "outputTokens"
+         COALESCE(usage_stats.output_tokens, 0)::integer AS "outputTokens",
+         ${agentProvidersSql("wv")} AS providers
        FROM workflow_runs wr
        JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
        JOIN workflows w ON w.id = wv.workflow_id
@@ -419,7 +427,8 @@ export async function getRun(database: Queryable, runId: string) {
        wait_reason AS "waitReason",
        input_json AS input, state_revision AS "stateRevision",
        current_checkpoint_id AS "currentCheckpointId", created_at AS "createdAt",
-       finished_at AS "finishedAt", deadline_at AS "deadlineAt", failure_json AS failure
+       finished_at AS "finishedAt", deadline_at AS "deadlineAt", failure_json AS failure,
+       (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers
      FROM workflow_runs WHERE id = $1`,
     [runId],
   );
@@ -593,8 +602,9 @@ export async function getWorkflow(database: Queryable, workflowId: string) {
   if (workflow.rowCount === 0) throw new NotFoundError("Workflow not found");
   const versions = await database.query(
     `SELECT id, version, created_at AS "createdAt",
-       jsonb_array_length(definition_json->'steps')::integer AS "stepCount"
-     FROM workflow_versions WHERE workflow_id = $1 ORDER BY version`,
+       jsonb_array_length(definition_json->'steps')::integer AS "stepCount",
+       ${agentProvidersSql("wv")} AS providers
+     FROM workflow_versions wv WHERE workflow_id = $1 ORDER BY version`,
     [workflowId],
   );
   return { ...workflow.rows[0], versions: versions.rows };

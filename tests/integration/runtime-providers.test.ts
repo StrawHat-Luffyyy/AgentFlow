@@ -170,3 +170,65 @@ describe("heartbeats are advisory only", () => {
     expect(app).not.toContain("worker_heartbeats");
   });
 });
+
+describe("reference workflow versions persist the requested provider", () => {
+  async function agentSteps(workflowVersionId: string) {
+    const row = await database.query<{ definition_json: { steps: Array<Record<string, unknown>> } }>(
+      "SELECT definition_json FROM workflow_versions WHERE id = $1", [workflowVersionId],
+    );
+    return row.rows[0]!.definition_json.steps.filter((step) => step.kind === "AGENT");
+  }
+
+  it("binds every AGENT step of the live version to gemini and the configured model", async () => {
+    const setup = await json<{ workflowVersionId: string }>("/reference-workflows/cloud-comparison", {
+      method: "POST",
+      body: JSON.stringify({ mode: "live", provider: "gemini", model: "gemini-3.5-flash" }),
+    });
+    const steps = await agentSteps(setup.workflowVersionId);
+    expect(steps.map((step) => step.key)).toEqual(["analyze-pricing", "analyze-features"]);
+    for (const step of steps) {
+      expect(step.provider).toBe("gemini");
+      expect(step.model).toBe("gemini-3.5-flash");
+    }
+  });
+
+  it("binds every AGENT step of the scripted version to the scripted provider", async () => {
+    const setup = await json<{ workflowVersionId: string }>("/reference-workflows/cloud-comparison", {
+      method: "POST",
+      body: JSON.stringify({ mode: "scripted" }),
+    });
+    const steps = await agentSteps(setup.workflowVersionId);
+    expect(steps.map((step) => step.key)).toEqual(["analyze-pricing", "analyze-features"]);
+    for (const step of steps) expect(step.provider).toBe("scripted-research");
+  });
+});
+
+describe("providers summaries", () => {
+  it("lists AGENT providers on workflow versions", async () => {
+    const live = await json<{ workflowId: string }>("/reference-workflows/cloud-comparison", {
+      method: "POST",
+      body: JSON.stringify({ mode: "live", provider: "gemini", model: "gemini-3.5-flash" }),
+    });
+    const liveDetail = await json<{ versions: Array<{ providers: string[] }> }>(`/workflows/${live.workflowId}`);
+    expect(liveDetail.versions[0]?.providers).toEqual(["gemini"]);
+    const { workflowId } = await deterministicVersion(`no-llm-${suffix}`);
+    const plain = await json<{ versions: Array<{ providers: string[] }> }>(`/workflows/${workflowId}`);
+    expect(plain.versions[0]?.providers).toEqual([]);
+  });
+
+  it("lists AGENT providers on run summaries and run detail", async () => {
+    const live = await json<{ workflowVersionId: string }>("/reference-workflows/cloud-comparison", {
+      method: "POST",
+      body: JSON.stringify({ mode: "live", provider: "gemini", model: "gemini-3.5-flash" }),
+    });
+    // No worker consumes this test's queue with gemini registered, so no Gemini call is made.
+    const run = await json<{ id: string; providers: string[] }>("/runs", {
+      method: "POST",
+      body: JSON.stringify({ workflowVersionId: live.workflowVersionId, input: {} }),
+    });
+    expect(run.providers).toEqual(["gemini"]);
+    expect((await json<{ providers: string[] }>(`/runs/${run.id}`)).providers).toEqual(["gemini"]);
+    const list = await json<{ runs: Array<{ id: string; providers: string[] }> }>("/runs?limit=100");
+    expect(list.runs.find((item) => item.id === run.id)?.providers).toEqual(["gemini"]);
+  });
+});
