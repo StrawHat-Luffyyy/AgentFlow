@@ -510,3 +510,19 @@ code { font-size: .92em; }
   .drawer { width: 100vw; border-left: 0; }
   .field-row, .segmented { grid-template-columns: 1fr; }
 }
+
+/* ---- Run mode badge, step model hint, result panel ---- */
+.badge--live { color: var(--accent); background: var(--accent-subtle); border-color: var(--focus); }
+.mode-badge { flex: none; }
+.step-model { margin-left: var(--space-2); color: var(--text-tertiary); font-family: var(--font-mono); font-size: var(--text-xs); }
+.result-panel .result-report { display: grid; gap: var(--space-2); padding: var(--space-4); border-bottom: 1px solid var(--border); }
+.result-report h4 { font-size: var(--text-md); font-weight: 600; }
+.result-report-body {
+  max-height: 420px; margin: 0; padding: var(--space-3); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-subtle); font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.result-citations { display: grid; gap: 4px; color: var(--text-secondary); font-size: var(--text-sm); }
+.result-citations ul { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.result-final { display: grid; gap: var(--space-2); padding: var(--space-4); }
+.result-label { color: var(--text-secondary); font-size: var(--text-sm); }
+.result-usage { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); background: var(--surface-subtle); color: var(--text-secondary); font-size: var(--text-sm); }

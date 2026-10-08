@@ -28,6 +28,7 @@ import {
   type UsageRecord,
 } from "./api.js";
 import { NewRunDrawer } from "./NewRunDrawer.js";
+import { ModeBadge, ResultPanel } from "./ResultPanel.js";
 import {
   BrandMark,
   Button,
@@ -218,6 +219,12 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
     () => new Map((run?.steps ?? []).map((step) => [step.id, step.nodeKey])),
     [run],
   );
+  // Model names shown on AGENT steps come from persisted usage records only.
+  const stepModels = useMemo(() => {
+    const byStep = new Map<string, Set<string>>();
+    for (const record of usage) byStep.set(record.stepId, (byStep.get(record.stepId) ?? new Set()).add(record.model));
+    return new Map([...byStep].map(([stepId, models]) => [stepId, [...models].join(", ")]));
+  }, [usage]);
   const selectedAttempts = attempts.filter((attempt) => attempt.stepId === selectedStepId);
   const pendingApprovals = approvals.filter((approval) => approval.status === "PENDING");
   const tokenTotals = usage.reduce((totals, record) => ({
@@ -325,6 +332,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
               >
                 <span className="run-item-row">
                   <span className="run-item-name" title={item.workflowName}>{item.workflowName}</span>
+                  <ModeBadge providers={item.providers} size="sm" />
                   <StatusBadge value={item.publicStatus} size="sm" />
                 </span>
                 <span className="run-item-row run-item-meta">
@@ -358,6 +366,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
                 <nav className="breadcrumb" aria-label="Breadcrumb"><span>Runs</span><ChevronRight size={12} aria-hidden="true" /><code>{shortId(run.id)}</code></nav>
                 <div className="run-title-row">
                   <h2 id="run-title" title={runSummary?.workflowName}>{runSummary?.workflowName ?? "Workflow run"}</h2>
+                  <ModeBadge providers={run.providers ?? runSummary?.providers} />
                   <StatusBadge value={run.publicStatus} />
                 </div>
                 <dl className="run-meta">
@@ -424,6 +433,8 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
               </Panel>
             )}
 
+            <ResultPanel run={run} usage={usage} />
+
             <Panel title="Steps" meta="Materialized as the run advances" labelledBy="steps-title">
               <div className="table-wrap">
                 <table className="table">
@@ -435,6 +446,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
                         <button className="step-link" onClick={(event) => { event.stopPropagation(); setSelectedStepId(step.id); }}
                           aria-pressed={step.id === selectedStepId}>
                           <span>{step.nodeKey}</span><code>{step.handler}</code>
+                          {stepModels.get(step.id) && <span className="step-model" title="Model from persisted usage records">{stepModels.get(step.id)}</span>}
                         </button>
                       </td>
                       <td className="col-kind"><span className="tag">{humanize(step.kind)}</span></td>
