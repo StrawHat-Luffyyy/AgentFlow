@@ -500,6 +500,53 @@ export async function getRunApprovals(database: Queryable, runId: string) {
   return approvals.rows;
 }
 
+export interface AdvertisedProvider {
+  name: string;
+  models: string[];
+}
+
+/** Advisory readiness only: never consulted when creating, claiming, or executing work. */
+export async function recordWorkerHeartbeat(
+  database: Queryable,
+  input: { workerId: string; providers: AdvertisedProvider[] },
+): Promise<void> {
+  await database.query(
+    `INSERT INTO worker_heartbeats (worker_id, providers) VALUES ($1, $2::jsonb)
+     ON CONFLICT (worker_id) DO UPDATE SET providers = EXCLUDED.providers, last_seen_at = now()`,
+    [input.workerId, JSON.stringify(input.providers)],
+  );
+}
+
+export async function listAvailableProviders(database: Queryable, options: { freshWithinMs?: number } = {}) {
+  const freshWithinMs = options.freshWithinMs ?? 30_000;
+  const workers = await database.query<{ providers: AdvertisedProvider[]; last_seen_at: Date }>(
+    `SELECT providers, last_seen_at FROM worker_heartbeats
+     WHERE last_seen_at > now() - ($1 * interval '1 millisecond')`,
+    [freshWithinMs],
+  );
+  const byName = new Map<string, { models: Set<string>; workerCount: number; lastSeenAt: Date }>();
+  for (const worker of workers.rows) {
+    for (const provider of worker.providers) {
+      const entry = byName.get(provider.name) ?? { models: new Set<string>(), workerCount: 0, lastSeenAt: worker.last_seen_at };
+      for (const model of provider.models) entry.models.add(model);
+      entry.workerCount += 1;
+      if (worker.last_seen_at > entry.lastSeenAt) entry.lastSeenAt = worker.last_seen_at;
+      byName.set(provider.name, entry);
+    }
+  }
+  return {
+    workers: workers.rowCount ?? 0,
+    providers: [...byName.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, entry]) => ({
+        name,
+        models: [...entry.models].sort(),
+        workerCount: entry.workerCount,
+        lastSeenAt: entry.lastSeenAt.toISOString(),
+      })),
+  };
+}
+
 export async function listPendingApprovals(
   database: Queryable,
   options: { ownerId: string; roles: readonly string[]; runId?: string },

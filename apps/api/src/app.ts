@@ -27,6 +27,7 @@ import {
   getRunToolExecutions,
   getRunUsage,
   getWorkflow,
+  listAvailableProviders,
   listPendingApprovals,
   listRuns,
   listWorkflows,
@@ -154,6 +155,11 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
       return;
     }
     next();
+  });
+
+  // Advisory worker/provider readiness for the operations UI; never used to gate execution.
+  app.get("/runtime/providers", async (_request: express.Request, response: express.Response) => {
+    response.json(await listAvailableProviders(database));
   });
 
   app.get("/reference-corpora/cloud-comparison-v1", (_request, response) => {
