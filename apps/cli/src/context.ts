@@ -1,3 +1,4 @@
+import { ApiClient } from "./api-client.js";
 import { ConfigStore, configPath, type Config, type StoredAuth } from "./config-store.js";
 import type { CliIO } from "./io.js";
 import { Output } from "./output/emit.js";
@@ -28,6 +29,7 @@ export interface CliContext {
   store: ConfigStore;
   config: Config;
   settings: Settings;
+  client: ApiClient;
 }
 
 export function resolveSettings(config: Config, flags: GlobalFlags, env: CliIO["env"]): Settings {
@@ -51,5 +53,12 @@ export async function createContext(io: CliIO, flags: GlobalFlags): Promise<CliC
   });
   const store = new ConfigStore(configPath(io));
   const config = await store.load();
-  return { io, out, flags, store, config, settings: resolveSettings(config, flags, io.env) };
+  const settings = resolveSettings(config, flags, io.env);
+  const client = new ApiClient({
+    baseUrl: settings.baseUrl,
+    io,
+    out,
+    ...(settings.auth ? { auth: settings.auth } : {}),
+  });
+  return { io, out, flags, store, config, settings, client };
 }
