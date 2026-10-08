@@ -35,7 +35,14 @@ function authLabel(ctx: CliContext): string {
 }
 
 async function loginWithToken(ctx: CliContext): Promise<void> {
-  const token = ctx.io.stdin.isTTY ? await askSecret(ctx.io, "API token: ") : (await readLine(ctx.io)).trim();
+  let token: string;
+  if (ctx.io.stdin.isTTY) {
+    token = await askSecret(ctx.io, "API token: ");
+  } else {
+    // Some terminals (e.g. Git Bash/mintty on Windows) are not detected as TTYs; say what we are waiting for.
+    ctx.io.stderr.write("Reading API token from stdin (input is not hidden; prefer piping it)...\n");
+    token = (await readLine(ctx.io)).trim();
+  }
   if (token === "") throw new UsageError("No token provided");
   const auth: StoredAuth = { type: "token", token };
   const client = new ApiClient({ baseUrl: ctx.settings.baseUrl, io: ctx.io, out: ctx.out, auth });

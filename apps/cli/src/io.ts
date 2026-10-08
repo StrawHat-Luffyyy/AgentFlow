@@ -11,5 +11,11 @@ export interface CliIO {
   fetch: typeof fetch;
   sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
   now: () => number;
+  /** Aborted on Ctrl-C, but only while a command has trapped interrupts. */
   signal: AbortSignal;
+  /**
+   * Opts the running command into graceful Ctrl-C handling (abort `signal` instead of
+   * exiting 130 immediately). Returns a release function.
+   */
+  trapInterrupts: () => () => void;
 }

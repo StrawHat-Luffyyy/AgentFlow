@@ -93,6 +93,17 @@ describe("runs watch resilience", () => {
     expect(Math.max(...fake.sleeps)).toBe(30_000);
   });
 
+  it("honours --timeout while the API keeps failing", async () => {
+    await serveSequence([503]);
+    let now = Date.parse("2026-10-08T12:00:00.000Z");
+    const { code, fake } = await watch(["--timeout", "5s", "--interval", "2s"], {
+      now: () => now,
+      onSleep: (ms) => { now += ms; },
+    });
+    expect(code).toBe(13);
+    expect(fake.sleeps.reduce((sum, ms) => sum + ms, 0)).toBe(5_000);
+  });
+
   it("aborts immediately on 404", async () => {
     await serveSequence(["RUNNING", 404]);
     expect((await watch([])).code).toBe(4);
@@ -106,6 +117,15 @@ describe("runs watch resilience", () => {
       onSleep: (ms) => { now += ms; },
     });
     expect(code).toBe(13);
+  });
+
+  it("traps Ctrl-C only while watching", async () => {
+    await serveSequence(["RUNNING", "SUCCEEDED"]);
+    const during: number[] = [];
+    const fake = await authedIO(api!.url, { onSleep: () => { during.push(fake.trapped()); } });
+    expect(await run(["runs", "watch", RUN], fake.io)).toBe(0);
+    expect(during).toEqual([1]);
+    expect(fake.trapped()).toBe(0);
   });
 
   it("stops on Ctrl-C without touching the run", async () => {

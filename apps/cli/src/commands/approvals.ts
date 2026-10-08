@@ -3,13 +3,13 @@ import type { Command } from "commander";
 import { approvalDecisionSchema, canonicalJson } from "@agentflow/shared";
 import type { ApiClient } from "../api-client.js";
 import type { CliContext, ContextFactory } from "../context.js";
-import { CliError, ExitCode } from "../errors.js";
+import { CliError, ExitCode, UsageError } from "../errors.js";
 import { shortId, validateRequest } from "../input.js";
 import { formatRelative } from "../output/duration.js";
 import { renderFields } from "../output/fields.js";
 import { renderTable } from "../output/table.js";
 import { aborted, confirm } from "../prompt.js";
-import { resolveRunId } from "../resolve-id.js";
+import { MIN_PREFIX, resolveRunId } from "../resolve-id.js";
 import type { Approval } from "../schemas.js";
 
 function sha256(value: unknown): string {
@@ -22,16 +22,25 @@ function stepKey(approval: Approval): string {
 }
 
 export async function findPendingApproval(client: ApiClient, id: string): Promise<Approval> {
+  const wanted = id.toLowerCase();
+  if (wanted.length < MIN_PREFIX) {
+    throw new UsageError(`Approval ID must be a full UUID or a prefix of at least ${MIN_PREFIX} characters`);
+  }
   const { approvals } = await client.listApprovals();
-  const approval = approvals.find((candidate) => candidate.id === id.toLowerCase());
-  if (!approval) {
+  const exact = approvals.find((candidate) => candidate.id === wanted);
+  const matches = exact ? [exact] : approvals.filter((candidate) => candidate.id.startsWith(wanted));
+  if (matches.length > 1) {
+    const listed = matches.slice(0, 5).map((candidate) => `  ${candidate.id}`).join("\n");
+    throw new UsageError(`Approval ID prefix ${id} is ambiguous; it matches:\n${listed}`);
+  }
+  if (!matches[0]) {
     throw new CliError(
       `Approval ${id} not found, not pending, or not assigned to your roles`,
       ExitCode.NOT_FOUND,
       "NOT_FOUND",
     );
   }
-  return approval;
+  return matches[0];
 }
 
 /** The API signs `sha256(canonicalJson(value))`; refuse to decide on content that does not match. */

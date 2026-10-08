@@ -52,6 +52,14 @@ describe("login --token", () => {
     expect(fake.stdout() + fake.stderr()).not.toContain("t0k3n");
   });
 
+  it("says it is reading the token from stdin when not on a TTY", async () => {
+    await serve(() => ({ status: 200, body: { id: "u1", roles: [] } }));
+    const fake = cli();
+    fake.feed("t0k3n\n");
+    expect(await run(["login", "--token", "--url", api!.url], fake.io)).toBe(0);
+    expect(fake.stderr()).toContain("Reading API token from stdin");
+  });
+
   it("does not save a token the API rejects", async () => {
     await serve(() => ({ status: 401, body: { error: "UNAUTHENTICATED" } }));
     const fake = cli();

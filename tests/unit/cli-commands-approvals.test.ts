@@ -66,6 +66,22 @@ describe("approvals approve/reject", () => {
     expect(first.stdout()).toContain(`Approved approval ${APPROVAL}`);
   });
 
+  it("accepts the short id printed by approvals list", async () => {
+    await serve(approvalsApi([approval()]));
+    const fake = await authedIO(api!.url);
+    expect(await run(["approvals", "approve", APPROVAL.slice(0, 8), "--yes"], fake.io)).toBe(0);
+    expect(posts()[0]?.path).toBe(`/approvals/${APPROVAL}/decisions`);
+  });
+
+  it("refuses an ambiguous approval prefix", async () => {
+    const twin = "aaaaaaaa-9999-4000-8000-000000000009";
+    await serve(approvalsApi([approval(), approval({ id: twin })]));
+    const fake = await authedIO(api!.url);
+    expect(await run(["approvals", "approve", "aaaaaaaa", "--yes"], fake.io)).toBe(2);
+    expect(fake.stderr()).toContain(twin);
+    expect(posts()).toEqual([]);
+  });
+
   it("rejects with decision REJECT", async () => {
     await serve(approvalsApi([approval()]));
     const fake = await authedIO(api!.url);

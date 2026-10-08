@@ -38,6 +38,15 @@ function eventLine(event: HistoryEvent, run: RunDetail): string {
 
 /** Polls a run until it reaches a stopping state; returns the CLI exit code. */
 export async function watchRun(ctx: CliContext, runId: string, opts: WatchOptions): Promise<number> {
+  const release = ctx.io.trapInterrupts();
+  try {
+    return await poll(ctx, runId, opts);
+  } finally {
+    release();
+  }
+}
+
+async function poll(ctx: CliContext, runId: string, opts: WatchOptions): Promise<number> {
   const { io, out, client } = ctx;
   const live = !out.opts.json && out.tty;
   const appendMode = !out.opts.json && !out.tty;
@@ -45,6 +54,9 @@ export async function watchRun(ctx: CliContext, runId: string, opts: WatchOption
   const seen = new Set<string>();
   let drawnLines = 0;
   let failures = 0;
+  const timedOut = () => deadline !== undefined && io.now() >= deadline;
+  // Never sleep past the --timeout deadline.
+  const pause = (ms: number) => io.sleep(deadline === undefined ? ms : Math.max(0, Math.min(ms, deadline - io.now())), io.signal);
 
   for (;;) {
     if (io.signal.aborted) {
@@ -59,10 +71,14 @@ export async function watchRun(ctx: CliContext, runId: string, opts: WatchOption
       failures = 0;
     } catch (error) {
       if (!isTransient(error)) throw error;
+      if (timedOut()) {
+        out.warn(`Timed out waiting for run ${runId} (API unavailable: ${(error as Error).message})`);
+        return ExitCode.WATCH_TIMEOUT;
+      }
       failures += 1;
       const delay = Math.min(opts.intervalMs * 2 ** failures, MAX_BACKOFF_MS);
       out.warn(`Retrying in ${Math.round(delay / 1000)}s: ${(error as Error).message}`);
-      await io.sleep(delay, io.signal);
+      await pause(delay);
       continue;
     }
 
@@ -87,11 +103,11 @@ export async function watchRun(ctx: CliContext, runId: string, opts: WatchOption
       else if (appendMode) io.stdout.write(`Run ${run.id} ${run.publicStatus}\n`);
       return code;
     }
-    if (deadline !== undefined && io.now() >= deadline) {
+    if (timedOut()) {
       out.warn(`Timed out waiting for run ${runId} (still ${run.publicStatus})`);
       if (out.opts.json) out.data(run, { render: () => "" });
       return ExitCode.WATCH_TIMEOUT;
     }
-    await io.sleep(opts.intervalMs, io.signal);
+    await pause(opts.intervalMs);
   }
 }

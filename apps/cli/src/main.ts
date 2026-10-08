@@ -4,9 +4,11 @@ import type { CliIO } from "./io.js";
 import { run } from "./run.js";
 
 const controller = new AbortController();
+let trapped = 0;
 process.on("SIGINT", () => {
-  // A second Ctrl-C exits immediately even if a command ignores the abort.
-  if (controller.signal.aborted) process.exit(130);
+  // Only commands that trap interrupts (runs watch) get a graceful abort; a second
+  // Ctrl-C, or any Ctrl-C elsewhere (prompts, stdin reads, hung requests), exits now.
+  if (trapped === 0 || controller.signal.aborted) process.exit(130);
   controller.abort();
 });
 
@@ -23,6 +25,10 @@ const io: CliIO = {
   },
   now: () => Date.now(),
   signal: controller.signal,
+  trapInterrupts: () => {
+    trapped += 1;
+    return () => { trapped -= 1; };
+  },
 };
 
 process.exitCode = await run(process.argv.slice(2), io);

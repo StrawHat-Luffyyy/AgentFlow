@@ -12,6 +12,7 @@ export interface FakeIO {
   endInput(): void;
   sleeps: number[];
   abort(): void;
+  trapped(): number;
 }
 
 export interface FakeIOOptions {
@@ -42,6 +43,7 @@ export function fakeIO(options: FakeIOOptions = {}): FakeIO {
   stderr.on("data", (chunk: Buffer) => { err += chunk.toString("utf8"); });
   const sleeps: number[] = [];
   const controller = new AbortController();
+  let trapped = 0;
   const io: CliIO = {
     stdout,
     stderr,
@@ -56,6 +58,10 @@ export function fakeIO(options: FakeIOOptions = {}): FakeIO {
     },
     now: options.now ?? (() => Date.parse("2026-10-08T12:00:00.000Z")),
     signal: controller.signal,
+    trapInterrupts: () => {
+      trapped += 1;
+      return () => { trapped -= 1; };
+    },
   };
   return {
     io,
@@ -65,6 +71,7 @@ export function fakeIO(options: FakeIOOptions = {}): FakeIO {
     endInput: () => { stdin.end(); },
     sleeps,
     abort: () => controller.abort(),
+    trapped: () => trapped,
   };
 }
 
