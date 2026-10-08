@@ -21,6 +21,8 @@ export interface RunSummary {
   attemptCount: number;
   inputTokens: number;
   outputTokens: number;
+  /** Distinct LLM providers of the run's AGENT steps. */
+  providers?: string[];
 }
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -57,6 +59,7 @@ export interface RunDetail {
   failure: JsonValue | null;
   steps: Step[];
   checkpoint: { id: string; revision: number; reason: string; createdAt: string };
+  providers?: string[];
 }
 
 export interface Attempt {
@@ -115,6 +118,50 @@ export interface UsageRecord {
   createdAt: string;
 }
 
+export interface WorkflowSummary {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  latestVersion: number | null;
+  versionCount: number;
+}
+
+export interface WorkflowVersionSummary {
+  id: string;
+  version: number;
+  createdAt: string;
+  stepCount: number;
+  providers: string[];
+}
+
+export interface WorkflowDetail extends Omit<WorkflowSummary, "latestVersion" | "versionCount"> {
+  versions: WorkflowVersionSummary[];
+}
+
+export interface ProviderAvailability {
+  workers: number;
+  providers: Array<{ name: string; models: string[]; workerCount: number; lastSeenAt: string }>;
+}
+
+export interface ReferenceSetup {
+  workflowId: string;
+  workflowVersionId: string;
+  workflowName: string;
+  version: number;
+  created: boolean;
+  mode: string;
+  provider: string;
+  model: string;
+}
+
+export interface CreateRunBody {
+  workflowVersionId: string;
+  input: Record<string, unknown>;
+  creationKey?: string;
+  deadlineMs?: number;
+}
+
 /** HTTP status 0 means the API could not be reached at all. */
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -138,9 +185,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new ApiError("AgentFlow API is unreachable", 0);
   }
-  const body = await response.json().catch(() => ({})) as { message?: string; error?: string };
+  const body = await response.json().catch(() => ({})) as {
+    message?: string;
+    error?: string;
+    details?: Array<{ path?: Array<string | number>; message?: string }>;
+  };
   if (!response.ok) {
-    const reason = body.message || body.error;
+    const issues = Array.isArray(body.details)
+      ? body.details.map((issue) => `${issue.path?.length ? issue.path.join(".") : "input"}: ${issue.message ?? "invalid"}`).join("; ")
+      : "";
+    const reason = issues || body.message || body.error;
     throw new ApiError(reason ? `${reason} (${response.status})` : `Request failed (${response.status})`, response.status);
   }
   return body as T;
@@ -160,6 +214,13 @@ export const api = {
   getApprovals: (id: string) => request<{ approvals: Approval[] }>(`/runs/${id}/approvals`),
   getHistory: (id: string) => request<{ events: HistoryEvent[] }>(`/runs/${id}/history`),
   getUsage: (id: string) => request<{ usage: UsageRecord[] }>(`/runs/${id}/usage`),
+  listWorkflows: () => request<{ workflows: WorkflowSummary[] }>("/workflows"),
+  getWorkflow: (id: string) => request<WorkflowDetail>(`/workflows/${encodeURIComponent(id)}`),
+  runtimeProviders: () => request<ProviderAvailability>("/runtime/providers"),
+  setupReference: (body: { mode: "scripted" } | { mode: "live"; provider: string; model: string }) =>
+    request<ReferenceSetup>("/reference-workflows/cloud-comparison", { method: "POST", body: JSON.stringify(body) }),
+  createRun: (body: CreateRunBody) =>
+    request<RunDetail>("/runs", { method: "POST", body: JSON.stringify(body) }),
   controlRun: (id: string, command: "pause" | "resume" | "cancel") =>
     request<RunDetail>(`/runs/${id}/${command}`, { method: "POST" }),
   decideApproval: (

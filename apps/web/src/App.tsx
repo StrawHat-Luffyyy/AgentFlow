@@ -8,6 +8,7 @@ import {
   LogOut,
   Pause,
   Play,
+  Plus,
   RefreshCw,
   ShieldCheck,
   Square,
@@ -26,6 +27,7 @@ import {
   type RunSummary,
   type UsageRecord,
 } from "./api.js";
+import { NewRunDrawer } from "./NewRunDrawer.js";
 import {
   BrandMark,
   Button,
@@ -148,6 +150,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [newRunOpen, setNewRunOpen] = useState(false);
   const loadRuns = useCallback(async () => {
     const response = await api.listRuns();
     setRuns(response.runs);
@@ -285,10 +288,20 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
         </div>
       </header>
 
+      <NewRunDrawer
+        open={newRunOpen}
+        onClose={() => setNewRunOpen(false)}
+        onStarted={(id) => { selectRun(id); void refresh(true); }}
+        onSessionExpired={() => (onSessionExpired ? onSessionExpired() : signOut())}
+      />
+
       <aside className="run-rail" aria-label="Workflow runs">
         <div className="rail-header">
           <h1>Runs</h1>
-          <span className="count" aria-label={`${runs.length} runs`}>{runs.length}</span>
+          <div className="rail-header-actions">
+            <span className="count" aria-label={`${runs.length} runs`}>{runs.length}</span>
+            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setNewRunOpen(true)}>New run</Button>
+          </div>
         </div>
         {!runsLoaded && error ? (
           <div className="rail-message">
@@ -297,7 +310,10 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
         ) : !runsLoaded ? (
           <RunListSkeleton />
         ) : runs.length === 0 ? (
-          <EmptyState icon={<Inbox size={20} />} title="No runs yet">Runs you create through the API appear here.</EmptyState>
+          <EmptyState icon={<Inbox size={20} />} title="No runs yet">
+            <p>Start a scripted or live Gemini run from here, or create one through the API or CLI.</p>
+            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setNewRunOpen(true)}>Start your first run</Button>
+          </EmptyState>
         ) : (
           <nav className="run-list">
             {runs.map((item) => (
