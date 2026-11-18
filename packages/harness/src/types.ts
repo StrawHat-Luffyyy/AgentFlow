@@ -65,12 +65,24 @@ export interface NormalizedToolCall {
 export type FinishReason = "stop" | "tool_calls" | "length" | "content_filter" | "error" | "unknown";
 export type UsageProvenance = "reported" | "estimated" | "unknown";
 
+/**
+ * Provider usage normalized to one convention so totals mean the same thing for
+ * every adapter (providers report reasoning and tool-use tokens differently):
+ * - `inputTokens`: all billed input tokens, including cached and tool-use prompt
+ *   tokens. `cachedInputTokens` is a subset of it.
+ * - `outputTokens`: all billed output tokens, including reasoning/thinking tokens.
+ *   `reasoningTokens` is a subset of it.
+ * - `totalTokens`: the provider-reported total, copied verbatim, never computed.
+ * A field the provider did not report is `null`; it is never estimated unless
+ * `provenance` says so.
+ */
 export interface LLMUsage {
   provenance: UsageProvenance;
   inputTokens: number | null;
   outputTokens: number | null;
   cachedInputTokens: number | null;
   reasoningTokens: number | null;
+  totalTokens?: number | null;
   raw: JsonObject;
 }
 

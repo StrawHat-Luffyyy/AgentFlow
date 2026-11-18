@@ -188,6 +188,27 @@ describe("run sub-resources", () => {
     expect(fake.stdout()).toContain("RUN_CREATED");
   });
 
+  it("renders usage with unreported rows and replay savings", async () => {
+    await serve(() => ({
+      status: 200,
+      body: {
+        usage: [
+          { provider: "gemini", model: "gemini-3.5-flash", inputTokens: 120, outputTokens: 30, provenance: "reported", createdAt: "2026-10-08T11:59:00.000Z" },
+          { provider: "gemini", model: "gemini-3.5-flash", inputTokens: null, outputTokens: null, provenance: "unknown", createdAt: "2026-10-08T11:59:30.000Z" },
+        ],
+        replays: [],
+        summary: { replayedCalls: 1, savedByReplayInputTokens: 120, savedByReplayOutputTokens: 30 },
+      },
+    }));
+    const fake = await authedIO(api!.url);
+    expect(await run(["runs", "usage", TARGET], fake.io)).toBe(0);
+    const out = fake.stdout();
+    expect(out).toContain("unknown");
+    expect(out).toContain("—");
+    expect(out).toContain("total: 120 in / 30 out (1 unreported)");
+    expect(out).toContain("saved by replay: 120 in / 30 out (1 replayed calls)");
+  });
+
   it.each([
     ["attempts", "attempts", { attempts: [] }],
     ["usage", "usage", { usage: [] }],

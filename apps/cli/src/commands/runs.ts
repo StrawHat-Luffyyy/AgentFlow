@@ -107,16 +107,27 @@ function registerSubResources(runs: Command, getContext: ContextFactory): void {
     const now = ctx.io.now();
     ctx.out.data(body, {
       render: () => {
-        const totalIn = body.usage.reduce((sum, u) => sum + u.inputTokens, 0);
-        const totalOut = body.usage.reduce((sum, u) => sum + u.outputTokens, 0);
+        // Null counts mean the provider reported nothing for that call; show a dash, never 0.
+        const count = (value: number | null) => (value === null ? "—" : String(value));
+        const totalIn = body.usage.reduce((sum, u) => sum + (u.inputTokens ?? 0), 0);
+        const totalOut = body.usage.reduce((sum, u) => sum + (u.outputTokens ?? 0), 0);
+        const unreported = body.usage.filter((u) => u.inputTokens === null && u.outputTokens === null).length;
         const table = renderTable([
           { header: "PROVIDER", get: (u) => u.provider },
           { header: "MODEL", get: (u) => u.model },
-          { header: "IN", get: (u) => String(u.inputTokens) },
-          { header: "OUT", get: (u) => String(u.outputTokens) },
+          { header: "IN", get: (u) => count(u.inputTokens) },
+          { header: "OUT", get: (u) => count(u.outputTokens) },
+          { header: "PROVENANCE", get: (u) => u.provenance ?? "—" },
           { header: "WHEN", get: (u) => formatRelative(u.createdAt, now) },
         ], body.usage, ctx.out.width);
-        return `${table}\n\ntotal: ${totalIn} in / ${totalOut} out`;
+        const lines = [`total: ${totalIn} in / ${totalOut} out${unreported > 0 ? ` (${unreported} unreported)` : ""}`];
+        if (body.summary && body.summary.replayedCalls > 0) {
+          lines.push(
+            `saved by replay: ${body.summary.savedByReplayInputTokens} in / ` +
+            `${body.summary.savedByReplayOutputTokens} out (${body.summary.replayedCalls} replayed calls)`,
+          );
+        }
+        return `${table}\n\n${lines.join("\n")}`;
       },
     });
   });

@@ -132,10 +132,17 @@ export const usageSchema = z.object({
   usage: z.array(z.object({
     provider: z.string(),
     model: z.string(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
+    // null when the provider reported no counts (e.g. a lost or failed call); never estimated.
+    inputTokens: z.number().nullable(),
+    outputTokens: z.number().nullable(),
+    provenance: z.string().optional(),
     createdAt: timestamp,
   }).passthrough()),
+  summary: z.object({
+    savedByReplayInputTokens: z.number(),
+    savedByReplayOutputTokens: z.number(),
+    replayedCalls: z.number(),
+  }).passthrough().optional(),
 }).passthrough();
 
 export const sourcesSchema = z.object({

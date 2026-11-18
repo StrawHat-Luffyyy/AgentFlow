@@ -2747,6 +2747,7 @@ export interface HarnessReplaySavedUsage {
   outputTokens: number | null;
   cachedInputTokens: number | null;
   reasoningTokens: number | null;
+  totalTokens: number | null;
 }
 
 export type BegunHarnessLlmOperation =
@@ -3022,11 +3023,12 @@ async function recordHarnessReplay(
     output_tokens: number | null;
     cached_input_tokens: number | null;
     reasoning_tokens: number | null;
+    total_tokens: number | null;
   }>(
     `SELECT pc.id AS provider_call_id, pc.provider,
        COALESCE(ur.model, pc.resolved_model, pc.requested_model) AS model,
        ur.provenance, ur.input_tokens, ur.output_tokens, ur.cached_input_tokens,
-       ur.reasoning_tokens
+       ur.reasoning_tokens, ur.total_tokens
      FROM provider_calls pc
      LEFT JOIN usage_records ur ON ur.provider_call_id = pc.id
      WHERE pc.harness_operation_id = $1 AND pc.status = 'SUCCEEDED' AND pc.accepted
@@ -3042,19 +3044,20 @@ async function recordHarnessReplay(
     outputTokens: row.output_tokens,
     cachedInputTokens: row.cached_input_tokens,
     reasoningTokens: row.reasoning_tokens,
+    totalTokens: row.total_tokens,
   };
   const inserted = await transaction.query(
     `INSERT INTO harness_replays
        (id, run_id, step_id, attempt_id, harness_operation_id, source_provider_call_id,
         provider, model, provenance, saved_input_tokens, saved_output_tokens,
-        saved_cached_input_tokens, saved_reasoning_tokens)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        saved_cached_input_tokens, saved_reasoning_tokens, saved_total_tokens)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      ON CONFLICT (harness_operation_id, attempt_id) DO NOTHING`,
     [
       randomUUID(), operation.runId, operation.operationId, operation.attemptId,
       harnessOperationId, row.provider_call_id, row.provider, row.model,
       savedUsage.provenance, savedUsage.inputTokens, savedUsage.outputTokens,
-      savedUsage.cachedInputTokens, savedUsage.reasoningTokens,
+      savedUsage.cachedInputTokens, savedUsage.reasoningTokens, savedUsage.totalTokens,
     ],
   );
   if (inserted.rowCount === 1) {
@@ -3084,6 +3087,8 @@ export interface CompleteHarnessLlmInput {
     outputTokens: number | null;
     cachedInputTokens: number | null;
     reasoningTokens: number | null;
+    /** Provider-reported total, verbatim; absent or null when not reported. */
+    totalTokens?: number | null;
     raw: Record<string, unknown>;
   };
 }
@@ -3155,8 +3160,8 @@ export async function completeHarnessLlmOperation(
       `INSERT INTO usage_records
          (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
           provenance, input_tokens, output_tokens, cached_input_tokens,
-          reasoning_tokens, raw_usage_json)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)`,
+          reasoning_tokens, total_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)`,
       [
         randomUUID(),
         operation.runId,
@@ -3170,6 +3175,7 @@ export async function completeHarnessLlmOperation(
         input.usage.outputTokens,
         input.usage.cachedInputTokens,
         input.usage.reasoningTokens,
+        input.usage.totalTokens ?? null,
         JSON.stringify(input.usage.raw),
       ],
     );
@@ -3206,15 +3212,15 @@ export async function recordUnacceptedHarnessLlmResponse(
       `INSERT INTO usage_records
          (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
           provenance, input_tokens, output_tokens, cached_input_tokens,
-          reasoning_tokens, raw_usage_json)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+          reasoning_tokens, total_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
        ON CONFLICT (provider_call_id) DO NOTHING`,
       [
         randomUUID(), operation.runId, operation.operationId, operation.attemptId,
         providerCallId, row.provider, input.resolvedModel || row.requested_model,
         input.usage.provenance, input.usage.inputTokens, input.usage.outputTokens,
         input.usage.cachedInputTokens, input.usage.reasoningTokens,
-        JSON.stringify(input.usage.raw),
+        input.usage.totalTokens ?? null, JSON.stringify(input.usage.raw),
       ],
     );
     return { recorded: true };
@@ -3429,7 +3435,7 @@ export async function getRunUsage(database: Queryable, runId: string) {
        provider_call_id AS "providerCallId", provider, model, provenance,
        input_tokens AS "inputTokens", output_tokens AS "outputTokens",
        cached_input_tokens AS "cachedInputTokens", reasoning_tokens AS "reasoningTokens",
-       raw_usage_json AS raw, created_at AS "createdAt"
+       total_tokens AS "totalTokens", raw_usage_json AS raw, created_at AS "createdAt"
      FROM usage_records WHERE run_id = $1 ORDER BY created_at, id`,
     [runId],
   );
@@ -3446,28 +3452,73 @@ export async function getRunReplays(database: Queryable, runId: string) {
        source_provider_call_id AS "sourceProviderCallId", provider, model, provenance,
        saved_input_tokens AS "savedInputTokens", saved_output_tokens AS "savedOutputTokens",
        saved_cached_input_tokens AS "savedCachedInputTokens",
-       saved_reasoning_tokens AS "savedReasoningTokens", created_at AS "createdAt"
+       saved_reasoning_tokens AS "savedReasoningTokens",
+       saved_total_tokens AS "savedTotalTokens", created_at AS "createdAt"
      FROM harness_replays WHERE run_id = $1 ORDER BY created_at, id`,
     [runId],
   );
   return result.rows;
 }
 
-export interface RunUsageSummary {
+/** Token totals for one slice of a run (whole run, one step, or one provider/model). */
+export interface UsageTotals {
   billedCalls: number;
+  /** Billed calls whose provider reported no token counts; they are excluded from sums, never estimated. */
+  unreportedCalls: number;
   billedInputTokens: number;
   billedOutputTokens: number;
   billedCachedInputTokens: number;
+  billedReasoningTokens: number;
   replayedCalls: number;
   savedByReplayInputTokens: number;
   savedByReplayOutputTokens: number;
-  /** Count of usage records per provenance; null token fields are excluded from sums, never estimated. */
+}
+
+export interface RunUsageSummary extends UsageTotals {
+  /** Count of usage records per provenance. */
   provenance: Record<"reported" | "estimated" | "unknown", number>;
+  byStep: Array<UsageTotals & { stepId: string }>;
+  byModel: Array<UsageTotals & { provider: string; model: string }>;
+}
+
+interface SummarizableUsage {
+  stepId: string;
+  provider: string;
+  model: string;
+  provenance: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  reasoningTokens: number | null;
+}
+
+interface SummarizableReplay {
+  stepId: string;
+  provider: string;
+  model: string;
+  savedInputTokens: number | null;
+  savedOutputTokens: number | null;
+}
+
+function totalsOf(usage: ReadonlyArray<SummarizableUsage>, replays: ReadonlyArray<SummarizableReplay>): UsageTotals {
+  const sum = <T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null) =>
+    rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  return {
+    billedCalls: usage.length,
+    unreportedCalls: usage.filter((r) => r.inputTokens === null && r.outputTokens === null).length,
+    billedInputTokens: sum(usage, (r) => r.inputTokens),
+    billedOutputTokens: sum(usage, (r) => r.outputTokens),
+    billedCachedInputTokens: sum(usage, (r) => r.cachedInputTokens),
+    billedReasoningTokens: sum(usage, (r) => r.reasoningTokens),
+    replayedCalls: replays.length,
+    savedByReplayInputTokens: sum(replays, (r) => r.savedInputTokens),
+    savedByReplayOutputTokens: sum(replays, (r) => r.savedOutputTokens),
+  };
 }
 
 export function summarizeRunUsage(
-  usage: ReadonlyArray<{ provenance: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null }>,
-  replays: ReadonlyArray<{ savedInputTokens: number | null; savedOutputTokens: number | null }>,
+  usage: ReadonlyArray<SummarizableUsage>,
+  replays: ReadonlyArray<SummarizableReplay>,
 ): RunUsageSummary {
   const provenance = { reported: 0, estimated: 0, unknown: 0 };
   for (const record of usage) {
@@ -3475,16 +3526,23 @@ export function summarizeRunUsage(
       provenance[record.provenance] += 1;
     }
   }
-  const sum = <T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null) =>
-    rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  const groupKeys = <K extends string>(key: (row: SummarizableUsage | SummarizableReplay) => K) =>
+    [...new Set([...usage.map(key), ...replays.map(key)])];
+  const modelKey = (row: SummarizableUsage | SummarizableReplay) => `${row.provider}\u0000${row.model}`;
   return {
-    billedCalls: usage.length,
-    billedInputTokens: sum(usage, (r) => r.inputTokens),
-    billedOutputTokens: sum(usage, (r) => r.outputTokens),
-    billedCachedInputTokens: sum(usage, (r) => r.cachedInputTokens),
-    replayedCalls: replays.length,
-    savedByReplayInputTokens: sum(replays, (r) => r.savedInputTokens),
-    savedByReplayOutputTokens: sum(replays, (r) => r.savedOutputTokens),
+    ...totalsOf(usage, replays),
     provenance,
+    byStep: groupKeys((row) => row.stepId).map((stepId) => ({
+      stepId,
+      ...totalsOf(usage.filter((r) => r.stepId === stepId), replays.filter((r) => r.stepId === stepId)),
+    })),
+    byModel: groupKeys(modelKey).map((key) => {
+      const [provider, model] = key.split("\u0000") as [string, string];
+      return {
+        provider,
+        model,
+        ...totalsOf(usage.filter((r) => modelKey(r) === key), replays.filter((r) => modelKey(r) === key)),
+      };
+    }),
   };
 }

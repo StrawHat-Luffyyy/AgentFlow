@@ -288,12 +288,25 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const usageMeta = response.usageMetadata;
+    // Gemini UsageMetadata semantics (checked 2026-11-18 against the Gemini API
+    // reference for GenerateContentResponse.UsageMetadata and the thinking guide):
+    // - promptTokenCount includes cached content; cachedContentTokenCount is the
+    //   cached part of the prompt (a subset).
+    // - toolUsePromptTokenCount, thoughtsTokenCount, and candidatesTokenCount are
+    //   reported separately: totalTokenCount = prompt + tool-use prompt + thoughts
+    //   + response candidates.
+    // - Thinking tokens are billed with the response ("output tokens and thinking
+    //   tokens"), so normalized outputTokens = candidates + thoughts.
+    const prompt = nullableCount(usageMeta?.promptTokenCount);
+    const candidates = nullableCount(usageMeta?.candidatesTokenCount);
+    const thoughts = nullableCount(usageMeta?.thoughtsTokenCount);
     const usage = {
       provenance: usageMeta ? ("reported" as const) : ("unknown" as const),
-      inputTokens: nullableCount(usageMeta?.promptTokenCount),
-      outputTokens: nullableCount(usageMeta?.candidatesTokenCount),
+      inputTokens: prompt === null ? null : prompt + (nullableCount(usageMeta?.toolUsePromptTokenCount) ?? 0),
+      outputTokens: candidates === null && thoughts === null ? null : (candidates ?? 0) + (thoughts ?? 0),
       cachedInputTokens: nullableCount(usageMeta?.cachedContentTokenCount),
-      reasoningTokens: null,
+      reasoningTokens: thoughts,
+      totalTokens: nullableCount(usageMeta?.totalTokenCount),
       raw: asJsonObject(usageMeta ?? {}, "Gemini usage metadata"),
     };
 

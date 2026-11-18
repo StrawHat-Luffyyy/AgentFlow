@@ -859,6 +859,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         outputTokens: 9,
         cachedInputTokens: 0,
         reasoningTokens: null,
+        totalTokens: 49,
         raw: { input_tokens: 40, output_tokens: 9 },
       };
       const turnOne = { ordinal: 0, turn: 1, maxTurns: 3, provider: "fake", adapterVersion: "1.0.0", model: "fake-model" };
@@ -884,7 +885,10 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       expect(replay).toMatchObject({
         replayed: true,
         output,
-        savedUsage: { provenance: "reported", inputTokens: 40, outputTokens: 9, sourceProviderCallId: begun.providerCallId },
+        savedUsage: {
+          provenance: "reported", inputTokens: 40, outputTokens: 9, totalTokens: 49,
+          sourceProviderCallId: begun.providerCallId,
+        },
       });
       // A second begin in the same attempt is not double-counted.
       expect(await beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 }))
@@ -946,21 +950,40 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       expect(history.events.filter((event) => event.type === "LLM_JOURNAL_ORPHANED")).toHaveLength(1);
 
       const usageResponse = await request<{
-        usage: Array<{ provenance: string }>;
-        replays: Array<{ savedInputTokens: number; savedOutputTokens: number }>;
+        usage: Array<{ provenance: string; totalTokens: number | null }>;
+        replays: Array<{ savedInputTokens: number; savedOutputTokens: number; savedTotalTokens: number | null }>;
         summary: Record<string, unknown>;
       }>(`/runs/${created.id}/usage`);
       // Billed rows: turn one, the lost turn-two call (unknown), turn three. Replays never add billed rows.
       expect(usageResponse.usage.map((record) => record.provenance).sort()).toEqual(["reported", "reported", "unknown"]);
-      expect(usageResponse.summary).toEqual({
+      expect(usageResponse.usage.map((record) => record.totalTokens).sort()).toEqual([49, 49, null]);
+      expect(usageResponse.replays.map((replay) => replay.savedTotalTokens)).toEqual([49, 49]);
+      const totals = {
         billedCalls: 3,
+        unreportedCalls: 1,
         billedInputTokens: 80,
         billedOutputTokens: 18,
         billedCachedInputTokens: 0,
+        billedReasoningTokens: 0,
         replayedCalls: 2,
         savedByReplayInputTokens: 80,
         savedByReplayOutputTokens: 18,
+      };
+      expect(usageResponse.summary).toEqual({
+        ...totals,
         provenance: { reported: 2, estimated: 0, unknown: 1 },
+        byStep: [{ stepId: step.id, ...totals }],
+        byModel: [
+          {
+            provider: "fake", model: "fake-model-v1", ...totals,
+            billedCalls: 2, unreportedCalls: 0,
+          },
+          {
+            provider: "fake", model: "fake-model", ...totals,
+            billedCalls: 1, unreportedCalls: 1, billedInputTokens: 0, billedOutputTokens: 0,
+            replayedCalls: 0, savedByReplayInputTokens: 0, savedByReplayOutputTokens: 0,
+          },
+        ],
       });
       await controlRun(database, created.id, "cancel");
     } finally {
