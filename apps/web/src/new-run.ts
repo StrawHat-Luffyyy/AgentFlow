@@ -3,6 +3,17 @@
 
 export const SCRIPTED_PROVIDER = "scripted-research";
 
+/** Live providers the reference workflow can run against; each worker registers one only when its key is set. */
+export const LIVE_PROVIDERS = [
+  { name: "gemini", label: "Gemini", envVar: "GEMINI_API_KEY", fallbackModel: "gemini-3.5-flash" },
+  { name: "groq", label: "Groq", envVar: "GROQ_API_KEY", fallbackModel: "openai/gpt-oss-120b" },
+] as const;
+export type LiveProviderName = (typeof LIVE_PROVIDERS)[number]["name"];
+
+export function liveProviderLabel(name: string | undefined): string | undefined {
+  return LIVE_PROVIDERS.find((provider) => provider.name === name)?.label ?? name;
+}
+
 export type ParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
 
 function lineColumn(text: string, position: number): { line: number; column: number } {
@@ -68,11 +79,12 @@ export function readiness(required: string[], availability: Availability | null)
   const online = new Set(availability.providers.map((provider) => provider.name));
   const missing = required.find((name) => !online.has(name));
   if (missing) {
+    const known = LIVE_PROVIDERS.find((provider) => provider.name === missing);
     return {
       state: "block-missing-provider",
       blocking: true,
-      message: missing === "gemini"
-        ? "No online worker has gemini configured — set GEMINI_API_KEY on the worker and restart it"
+      message: known
+        ? `No online worker has ${missing} configured — set ${known.envVar} on the worker and restart it`
         : `No online worker has the ${missing} provider registered — configure it on a worker and restart it`,
     };
   }

@@ -5,6 +5,7 @@ import { createProcessFaultHooks, parseFaultPlan } from "@agentflow/evaluation/p
 import {
   AgentHarness,
   GeminiProvider,
+  GroqProvider,
   ProviderRegistry,
   ToolRegistry,
 } from "@agentflow/harness";
@@ -34,6 +35,12 @@ if (config.GEMINI_API_KEY) {
   providers.register(new GeminiProvider({
     apiKey: config.GEMINI_API_KEY,
     model: config.GEMINI_MODEL,
+  }));
+}
+if (config.GROQ_API_KEY) {
+  providers.register(new GroqProvider({
+    apiKey: config.GROQ_API_KEY,
+    model: config.GROQ_MODEL,
   }));
 }
 const harness = new AgentHarness(providers, new ToolRegistry());
@@ -68,6 +75,7 @@ console.log(`AgentFlow worker ${config.WORKER_ID} started`);
 const heartbeat = startHeartbeat({
   providers: advertisedProviders(providers, {
     gemini: [config.GEMINI_MODEL],
+    groq: [config.GROQ_MODEL],
     "scripted-research": ["cloud-comparison-scripted-v1"],
   }),
   write: (advertised) => recordWorkerHeartbeat(database, { workerId: config.WORKER_ID, providers: advertised }),

@@ -4,3 +4,4 @@ export * from "./registry.js";
 export * from "./types.js";
 export * from "./providers/fake.js";
 export * from "./providers/gemini.js";
+export * from "./providers/groq.js";

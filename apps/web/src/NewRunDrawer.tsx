@@ -1,12 +1,13 @@
 import { ChevronDown, ChevronRight, Play, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, type ProviderAvailability, type WorkflowSummary, type WorkflowVersionSummary } from "./api.js";
-import { deadlineMsFromMinutes, parseRunInput, readiness, referenceTemplate, SCRIPTED_PROVIDER, selectedVersionFor } from "./new-run.js";
+import {
+  deadlineMsFromMinutes, LIVE_PROVIDERS, liveProviderLabel, parseRunInput, readiness, referenceTemplate,
+  SCRIPTED_PROVIDER, selectedVersionFor, type LiveProviderName,
+} from "./new-run.js";
 import { Button, IconButton, InlineAlert } from "./ui.js";
 
 const REFERENCE = "reference";
-const LIVE_PROVIDER = "gemini";
-const FALLBACK_MODEL = "gemini-3.5-flash";
 const AVAILABILITY_POLL_MS = 5_000;
 
 type Mode = "scripted" | "live";
@@ -32,14 +33,15 @@ export function NewRunDrawer({
   onSessionExpired: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const ids = { title: useId(), workflow: useId(), version: useId(), model: useId(), input: useId(), inputError: useId(), key: useId(), deadline: useId() };
+  const ids = { title: useId(), workflow: useId(), version: useId(), provider: useId(), model: useId(), input: useId(), inputError: useId(), key: useId(), deadline: useId() };
 
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowId, setWorkflowId] = useState<string>(REFERENCE);
   const [loadedVersions, setLoadedVersions] = useState<{ workflowId: string; versions: WorkflowVersionSummary[] } | null>(null);
   const [versionId, setVersionId] = useState<string>("");
   const [mode, setMode] = useState<Mode>("scripted");
-  const [model, setModel] = useState<string>(FALLBACK_MODEL);
+  const [liveProviderName, setLiveProviderName] = useState<LiveProviderName>(LIVE_PROVIDERS[0].name);
+  const [model, setModel] = useState<string>(LIVE_PROVIDERS[0].fallbackModel);
   const [availability, setAvailability] = useState<ProviderAvailability | null>(null);
   const [inputText, setInputText] = useState(() => referenceTemplate(new Date()));
   const [inputDirty, setInputDirty] = useState(false);
@@ -113,17 +115,18 @@ export function NewRunDrawer({
     if (!inputDirty) setInputText(template());
   }, [template, inputDirty]);
 
-  const geminiModels = useMemo(() => {
-    const advertised = availability?.providers.find((provider) => provider.name === LIVE_PROVIDER)?.models ?? [];
-    return advertised.length > 0 ? advertised : [FALLBACK_MODEL];
-  }, [availability]);
+  const liveModels = useMemo(() => {
+    const advertised = availability?.providers.find((provider) => provider.name === liveProviderName)?.models ?? [];
+    const fallback = LIVE_PROVIDERS.find((provider) => provider.name === liveProviderName)!.fallbackModel;
+    return advertised.length > 0 ? advertised : [fallback];
+  }, [availability, liveProviderName]);
   useEffect(() => {
-    if (!geminiModels.includes(model)) setModel(geminiModels[0]!);
-  }, [geminiModels, model]);
+    if (!liveModels.includes(model)) setModel(liveModels[0]!);
+  }, [liveModels, model]);
 
   const versions = loadedVersions?.workflowId === workflowId ? loadedVersions.versions : [];
   const selectedVersion = selectedVersionFor(workflowId, loadedVersions, versionId);
-  const required = isReference ? [mode === "live" ? LIVE_PROVIDER : SCRIPTED_PROVIDER] : selectedVersion?.providers ?? [];
+  const required = isReference ? [mode === "live" ? liveProviderName : SCRIPTED_PROVIDER] : selectedVersion?.providers ?? [];
   const ready = readiness(required, availability);
   const parsedInput = parseRunInput(inputText);
   const parsedDeadline = deadlineMsFromMinutes(deadline);
@@ -131,9 +134,9 @@ export function NewRunDrawer({
   const missingVersion = !isReference && !selectedVersion;
   const canStart = parsedInput.ok && parsedDeadline.ok && !keyTooLong && !ready.blocking && !missingVersion && !submitting;
   const liveProvider = isReference
-    ? (mode === "live" ? LIVE_PROVIDER : undefined)
+    ? (mode === "live" ? liveProviderName : undefined)
     : (selectedVersion?.providers ?? []).find((name) => name !== SCRIPTED_PROVIDER);
-  const liveLabel = liveProvider === LIVE_PROVIDER ? "Gemini" : liveProvider;
+  const liveLabel = liveProviderLabel(liveProvider);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -142,7 +145,7 @@ export function NewRunDrawer({
     setError(null);
     try {
       const workflowVersionId = isReference
-        ? (await api.setupReference(mode === "live" ? { mode: "live", provider: LIVE_PROVIDER, model } : { mode: "scripted" })).workflowVersionId
+        ? (await api.setupReference(mode === "live" ? { mode: "live", provider: liveProviderName, model } : { mode: "scripted" })).workflowVersionId
         : versionId;
       const run = await api.createRun({
         workflowVersionId,
@@ -194,7 +197,7 @@ export function NewRunDrawer({
               <div className="segmented" role="radiogroup">
                 {([
                   ["scripted", "Scripted", "Deterministic evaluation provider · no API key, no cost"],
-                  ["live", "Live", "Real Google Gemini calls · uses tokens"],
+                  ["live", "Live", "Real provider calls (Gemini or Groq) · uses tokens"],
                 ] as const).map(([value, label, help]) => (
                   <label key={value} className={`segmented-option ${mode === value ? "segmented-option--selected" : ""}`}>
                     <input type="radio" name="mode" value={value} checked={mode === value} onChange={() => setMode(value)} />
@@ -222,13 +225,16 @@ export function NewRunDrawer({
           {isReference && mode === "live" && (
             <div className="field-row">
               <div className="field">
-                <span className="field-label">Provider</span>
-                <span className="readonly-value"><code>{LIVE_PROVIDER}</code></span>
+                <label htmlFor={ids.provider}>Provider</label>
+                <select id={ids.provider} className="select" value={liveProviderName}
+                  onChange={(event) => setLiveProviderName(event.target.value as LiveProviderName)}>
+                  {LIVE_PROVIDERS.map((provider) => <option key={provider.name} value={provider.name}>{provider.label}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label htmlFor={ids.model}>Model</label>
                 <select id={ids.model} className="select" value={model} onChange={(event) => setModel(event.target.value)}>
-                  {geminiModels.map((name) => <option key={name} value={name}>{name}</option>)}
+                  {liveModels.map((name) => <option key={name} value={name}>{name}</option>)}
                 </select>
               </div>
             </div>

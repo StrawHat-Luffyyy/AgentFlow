@@ -65,7 +65,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 - **Durable Approvals:** First-class human-in-the-loop gates persist suspended workflow runs in `WAITING` state without consuming worker processes. Pending approvals survive full API and worker restarts and enforce role-gated reviewer permissions (`research-reviewer`).
 - **Idempotent Side Effects:** Dedicated `RECEIVER_IDEMPOTENT_WRITE` contracts derive deterministic idempotency keys from the workflow envelope, enabling cooperating external receivers to deduplicate retried side effects upon crash recovery.
 - **UNKNOWN & Reconciliation:** For unsupported receivers (`UNSAFE_WRITE`), ambiguous post-crash outcomes are safely transitioned to `UNKNOWN` with a `RECONCILIATION` wait reason, preventing dangerous automated duplicate dispatches.
-- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas. AgentFlow standardizes on Google Gemini (`gemini-3.5-flash` via `@google/genai`) as its production LLM provider with tool calling and structured schemas, while preserving a deterministic scripted provider for reproducible benchmark evaluation.
+- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas. AgentFlow ships two production LLM adapters with different wire formats: Google Gemini (`gemini-3.5-flash` via `@google/genai`) and Groq (OpenAI-compatible Chat Completions over plain `fetch`, default `openai/gpt-oss-120b`). Both have tool calling and structured schemas, normalize into the same response and usage shape, and sit behind the same harness-enforced tool allowlist. A deterministic scripted provider is kept for reproducible benchmark evaluation.
 - **Observability:** Native OpenTelemetry instrumentation exports standardized spans; execution history logs provide an immutable audit trail (`GET /runs/:id/history`).
 - **Dual Authentication & Ownership:** Session-cookie authentication (`HttpOnly`, `SameSite=Lax`) with `scrypt` password hashing for the operations dashboard; constant-time SHA-256 bearer tokens for CLI, runners, and automated integrations; immutable workflow ownership inherited by runs.
 
@@ -148,7 +148,7 @@ AgentFlow/
 │   ├── config/              # Environment configuration & validation (native .env loading)
 │   ├── db/                  # PostgreSQL pool, migrations (runs, approvals, sessions, users)
 │   ├── evaluation/          # Real multi-process runner, fault hooks, DBOS runner, seeded simulator
-│   ├── harness/             # LLM provider registry, Google Gemini adapter, tools, live-validate CLI
+│   ├── harness/             # LLM provider registry, Gemini and Groq adapters, tools, live-validate CLIs
 │   ├── research/            # Fixed evaluation corpus, cloud-comparison workflow, scripted provider
 │   ├── runtime/             # Core durable domain transactions, state machine, leases
 │   ├── shared/              # Canonical JSON, queue contracts, shared schemas
@@ -290,13 +290,13 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 ## 11. Limitations
 
 - **Python Prototype Unimplemented:** An early conceptual Execute → Remember → Control research prototype was described in design documents, but was **not implemented in code** (zero `.py` files exist). The functional implementation is entirely in TypeScript.
-- **Live Provider End-to-End Campaigns Deferred:** The production Google Gemini provider adapter (`GeminiProvider` using `@google/genai` and `gemini-3.5-flash`) is implemented and validated by unit tests mocking wire protocol, tool execution, and token usage, plus an opt-in live integration test (`pnpm test:gemini-live`) and CLI validator (`pnpm validate:gemini`). However, multi-trial reliability evaluation campaigns were executed using the deterministic `ScriptedResearchProvider` to eliminate non-deterministic external network flakiness, rate limits, and token costs from the benchmark findings.
+- **Live Provider End-to-End Campaigns Deferred:** The production Google Gemini provider adapter (`GeminiProvider` using `@google/genai` and `gemini-3.5-flash`) is implemented and validated by unit tests mocking wire protocol, tool execution, and token usage, plus an opt-in live integration test (`pnpm test:gemini-live`) and CLI validator (`pnpm validate:gemini`). The Groq adapter has the same structure (`pnpm test:groq-live`, `pnpm validate:groq`), but it has not yet been exercised against the live Groq API. However, multi-trial reliability evaluation campaigns were executed using the deterministic `ScriptedResearchProvider` to eliminate non-deterministic external network flakiness, rate limits, and token costs from the benchmark findings.
 - **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions). The invariants held in every observed trial, but five trials cannot bound rare failure rates, and latency percentiles are descriptive.
 - **Large-Sample Results Are Simulated:** The 4,000-trial E5 sweep and the 900-trial granularity study come from the deterministic seeded simulator, not the runtime. No large-sample real campaign was run, and checkpoint grouping is not implemented in the runtime.
 - **DBOS Sample Count:** The DBOS reference system was evaluated over 25 trials on the common subset.
 - **Single-Machine Testbed:** All experiments were conducted on a single host running containerized PostgreSQL and Redis. Distributed cluster partitions and multi-region failovers were outside the MVP scope.
 - **Token Count Estimates:** Token figures from the scripted provider are estimates based on word count, not billed provider tokens.
-- **Usage Normalization:** Every adapter maps provider usage to one convention: `inputTokens` covers all billed input (cached and tool-use prompt tokens included; `cachedInputTokens` is a subset), and `outputTokens` covers all billed output (thinking tokens included; `reasoningTokens` is a subset). `totalTokens` is the provider's own total, copied verbatim. For Gemini that means output = `candidatesTokenCount + thoughtsTokenCount`. Usage rows written before this change recorded candidates only, so they under-count output tokens for thinking models. Calls with no reported usage keep `null` counts with provenance `unknown` and are listed as unreported, never estimated.
+- **Usage Normalization:** Every adapter maps provider usage to one convention: `inputTokens` covers all billed input (cached and tool-use prompt tokens included; `cachedInputTokens` is a subset), and `outputTokens` covers all billed output (thinking tokens included; `reasoningTokens` is a subset). `totalTokens` is the provider's own total, copied verbatim. For Gemini that means output = `candidatesTokenCount + thoughtsTokenCount`. In a live `gemini-3.5-flash` check on 2026-11-18, one short reasoning prompt reported 4 candidate tokens and 277 thought tokens. Output is now recorded as 281, and input + output equalled the provider's `totalTokenCount` (317). Usage rows written before this change recorded candidates only, so they under-count output tokens for thinking models. Calls with no reported usage keep `null` counts with provenance `unknown` and are listed as unreported, never estimated.
 - **Report Quality Not Evaluated:** The report-hash and citation checks prove artifact integrity, not semantic report quality.
 - **LLM Journal Window and DBOS Granularity:** AgentFlow journals each LLM response in its own short transaction (`harness_operations` + `provider_calls`), before the step checkpoint. A crash between the provider response and that commit (E2/E2a) still repeats the call and its billed tokens. The DBOS reference wraps each agent step in one DBOS step. A DBOS application that makes every LLM call its own `@step` would also avoid the E2B repeat, so the E2B difference measures *per-call journaling by default*, not a capability DBOS cannot express.
 - **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
@@ -377,6 +377,32 @@ Verify your Gemini configuration at any time:
 pnpm validate:gemini
 ```
 
+#### D. Optional: Groq Live API
+Groq is a second live provider (OpenAI-compatible Chat Completions). A worker registers it only when the key is set:
+
+```env
+GROQ_API_KEY="your-groq-api-key"
+GROQ_MODEL="openai/gpt-oss-120b"
+```
+
+`openai/gpt-oss-120b` is the default because, per Groq's docs (checked 2026-11-18), it is a production model that supports both tool calling and strict `json_schema` structured outputs. Groq does not allow structured outputs and tool use in the same request, so the adapter rejects that combination as a `PERMANENT` error. Verify with:
+
+```powershell
+pnpm validate:groq
+pnpm test:groq-live
+```
+
+Provider-specific feature support:
+
+| Feature | Gemini | Groq |
+|---|---|---|
+| Tool calling | yes | yes (one call per turn; `parallel_tool_calls: false`) |
+| Structured output | `responseSchema` | strict `json_schema`, not combinable with tools |
+| Cached input tokens reported | `cachedContentTokenCount` | `prompt_tokens_details.cached_tokens` (automatic prompt caching on gpt-oss models) |
+| Reasoning tokens reported | `thoughtsTokenCount`, billed as output | `completion_tokens_details.reasoning_tokens` only when returned; assumed inside `completion_tokens` (Groq docs do not say) |
+| Explicit context caching (brief §2.3) | planned | not applicable |
+| HTTP 429 / 5xx | `TRANSIENT` | `TRANSIENT`, honouring `retry-after`; Groq's 498 (flex capacity) is also `TRANSIENT` |
+
 ### 3. Database Migrations
 ```powershell
 pnpm db:migrate
@@ -401,17 +427,18 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 272 passing (219 unit + 53 integration; 3 live-Gemini skipped if no key)
+# Complete test suite: 250 unit + 54 integration, plus 3 live-Gemini and 3 live-Groq tests that run only when the key is configured
 pnpm test
 
-# Fast in-memory unit tests only (219 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (250 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
-# Real PostgreSQL + Redis integration tests only (53 tests)
+# Real PostgreSQL + Redis integration tests only
 pnpm test:integration
 
-# Live Google Gemini integration test (runs when GEMINI_API_KEY is configured)
+# Live provider integration tests (run when GEMINI_API_KEY / GROQ_API_KEY is configured)
 pnpm test:gemini-live
+pnpm test:groq-live
 
 # Workspace typecheck and build
 pnpm typecheck
@@ -424,11 +451,11 @@ Sign in at `http://localhost:4173` and choose **New run** in the Runs rail.
 
 - **Cloud comparison (reference)** offers two execution modes. Each creates its own immutable workflow version, so scripted evaluation evidence and live runs never mix:
   - **Scripted** uses the deterministic `scripted-research` evaluation provider (no API key, no cost).
-  - **Live** calls real Google Gemini (`provider: "gemini"`) with a model advertised by an online worker; it uses tokens on your key.
+  - **Live** calls a real provider, either Google Gemini (`provider: "gemini"`) or Groq (`provider: "groq"`), with a model advertised by an online worker; it uses tokens on your key.
 - **Your own workflows** run a chosen version; provider and model are fixed by that version's definition and shown read-only.
 - Input is a JSON object (the reference workflow is pre-filled with a valid template). Advanced options set a creation key (idempotent restarts) and a deadline.
 
-The readiness line comes from `GET /runtime/providers`, which aggregates the providers that workers advertised in the last 30 seconds. Live mode is blocked only when workers are online but none has Gemini configured: set `GEMINI_API_KEY` on the **worker** and restart it. With no workers online the run is still accepted and queues until one starts. Readiness is advisory only — it never authorizes or schedules execution.
+The readiness line comes from `GET /runtime/providers`, which aggregates the providers that workers advertised in the last 30 seconds. Live mode is blocked only when workers are online but none has the selected provider configured: set `GEMINI_API_KEY` or `GROQ_API_KEY` on the **worker** and restart it. With no workers online the run is still accepted and queues until one starts. Readiness is advisory only — it never authorizes or schedules execution.
 
 After starting, the run is selected automatically and polled live: runs show a **Scripted** or **Live · gemini** badge, AGENT steps show the model taken from persisted usage records, approvals are decided in place, and a **Result** panel shows the report and final output once the run succeeds. Token counts always come from persisted usage records with their provenance as recorded (`reported`, `estimated`, `unknown`); the dashboard never estimates them. Gemini rate-limit or quota errors (HTTP 429) are classified `TRANSIENT`, retried with backoff, and surface on the step's attempts if retries are exhausted.
 
@@ -539,7 +566,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 272 passing unit/integration tests (275 total in registry), a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) and Groq (`openai/gpt-oss-120b`) provider adapters, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 304 unit/integration tests (plus 6 opt-in live-provider tests), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  

@@ -44,6 +44,11 @@ const environmentSchema = z.object({
     z.string().min(1).optional(),
   ),
   GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash"),
+  GROQ_API_KEY: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  GROQ_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
   AGENTFLOW_ADMIN_USERNAME: z.string().min(1).max(100).default("admin"),
   AGENTFLOW_ADMIN_PASSWORD: z.preprocess(
     (value) => (value === "" ? undefined : value),
