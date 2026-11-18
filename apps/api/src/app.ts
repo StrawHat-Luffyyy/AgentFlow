@@ -25,6 +25,7 @@ import {
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getRunCacheLookups,
   getRunReplays,
   getRunUsage,
   getWorkflow,
@@ -255,7 +256,8 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     const runId = z.string().uuid().parse(request.params.id);
     const usage = await getRunUsage(database, runId);
     const replays = await getRunReplays(database, runId);
-    response.json({ usage, replays, summary: summarizeRunUsage(usage, replays) });
+    const cache = await getRunCacheLookups(database, runId);
+    response.json({ usage, replays, summary: summarizeRunUsage(usage, replays, cache) });
   });
 
   app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {

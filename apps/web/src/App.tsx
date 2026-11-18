@@ -25,6 +25,7 @@ import {
   type JsonValue,
   type RunDetail,
   type RunSummary,
+  type ServerUsageSummary,
   type UsageRecord,
 } from "./api.js";
 import { NewRunDrawer } from "./NewRunDrawer.js";
@@ -138,6 +139,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [history, setHistory] = useState<HistoryEvent[]>([]);
   const [usage, setUsage] = useState<UsageRecord[]>([]);
+  const [serverUsageSummary, setServerUsageSummary] = useState<ServerUsageSummary | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => {
     const match = window.location.pathname.match(/^\/runs\/([a-f0-9-]+)$/i);
     return match?.[1] ?? null;
@@ -174,6 +176,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
     setApprovals(nextApprovals.approvals);
     setHistory(nextHistory.events);
     setUsage(nextUsage.usage);
+    setServerUsageSummary(nextUsage.summary ?? null);
     setSelectedStepId((current) => current && nextRun.steps.some((step) => step.id === current)
       ? current
       : nextRun.steps.at(-1)?.id ?? null);
@@ -431,7 +434,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
               </Panel>
             )}
 
-            <ResultPanel run={run} usage={usage} />
+            <ResultPanel run={run} usage={usage} usageSummary={serverUsageSummary} />
 
             <Panel title="Steps" meta="Materialized as the run advances" labelledBy="steps-title">
               <div className="table-wrap">

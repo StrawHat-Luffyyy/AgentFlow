@@ -197,7 +197,11 @@ describe("run sub-resources", () => {
           { provider: "gemini", model: "gemini-3.5-flash", inputTokens: null, outputTokens: null, provenance: "unknown", createdAt: "2026-10-08T11:59:30.000Z" },
         ],
         replays: [],
-        summary: { replayedCalls: 1, savedByReplayInputTokens: 120, savedByReplayOutputTokens: 30 },
+        summary: {
+          replayedCalls: 1, savedByReplayInputTokens: 120, savedByReplayOutputTokens: 30,
+          cacheHitCalls: 1, savedByCacheInputTokens: 40, savedByCacheOutputTokens: 6,
+          cacheScope: "version", cacheLookups: { hits: 1, misses: 2, off: 0 },
+        },
       },
     }));
     const fake = await authedIO(api!.url);
@@ -207,6 +211,7 @@ describe("run sub-resources", () => {
     expect(out).toContain("—");
     expect(out).toContain("total: 120 in / 30 out (1 unreported)");
     expect(out).toContain("saved by replay: 120 in / 30 out (1 replayed calls)");
+    expect(out).toContain("cache (version): 1 hits / 2 misses · saved 40 in / 6 out");
   });
 
   it.each([

@@ -127,6 +127,14 @@ function registerSubResources(runs: Command, getContext: ContextFactory): void {
             `${body.summary.savedByReplayOutputTokens} out (${body.summary.replayedCalls} replayed calls)`,
           );
         }
+        const lookups = body.summary?.cacheLookups;
+        if (body.summary && lookups && lookups.hits + lookups.misses + lookups.off > 0) {
+          const scope = body.summary.cacheScope ?? "run";
+          lines.push(lookups.hits + lookups.misses === 0
+            ? "cache: off"
+            : `cache (${scope}): ${lookups.hits} hits / ${lookups.misses} misses` +
+              ` · saved ${body.summary.savedByCacheInputTokens ?? 0} in / ${body.summary.savedByCacheOutputTokens ?? 0} out`);
+        }
         return `${table}\n\n${lines.join("\n")}`;
       },
     });

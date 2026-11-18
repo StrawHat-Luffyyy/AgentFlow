@@ -1,6 +1,6 @@
 import { FileText } from "lucide-react";
-import type { JsonValue, RunDetail, UsageRecord } from "./api.js";
-import { extractReport, runMode, summarizeUsage, usageDetail } from "./new-run.js";
+import type { JsonValue, RunDetail, ServerUsageSummary, UsageRecord } from "./api.js";
+import { extractReport, reuseDetail, runMode, summarizeUsage, usageDetail } from "./new-run.js";
 import { Panel } from "./ui.js";
 
 /** "Scripted" vs "Live · <provider>" so evaluation and real-provider runs can't be confused. */
@@ -12,7 +12,11 @@ export function ModeBadge({ providers, size = "md" }: { providers: string[] | un
     : <span className={`badge badge--live badge--${size} mode-badge`} title={`Real provider calls via ${mode.provider}`}>Live · {mode.provider}</span>;
 }
 
-export function ResultPanel({ run, usage }: { run: RunDetail; usage: UsageRecord[] }) {
+export function ResultPanel({ run, usage, usageSummary }: {
+  run: RunDetail;
+  usage: UsageRecord[];
+  usageSummary?: ServerUsageSummary | null;
+}) {
   if (run.publicStatus !== "SUCCEEDED") return null;
   const report = extractReport(run.steps);
   const finalStep = run.steps.at(-1);
@@ -46,6 +50,7 @@ export function ResultPanel({ run, usage }: { run: RunDetail; usage: UsageRecord
             {group.unreported > 0 ? ` + ${group.unreported} unreported` : ""} ({group.provenances.join(", ")})
           </span>
         ))}
+        {reuseDetail(usageSummary).map((line) => <span key={line}>{line}</span>)}
       </footer>
     </Panel>
   );

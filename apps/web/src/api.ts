@@ -104,6 +104,18 @@ export interface HistoryEvent {
   createdAt: string;
 }
 
+/** The subset of the API's usage summary the dashboard shows: tokens avoided by journal replay and the response cache. */
+export interface ServerUsageSummary {
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+  cacheScope: "run" | "version" | "off" | null;
+  cacheLookups: { hits: number; misses: number; off: number };
+}
+
 export interface UsageRecord {
   id: string;
   stepId: string;
@@ -213,7 +225,7 @@ export const api = {
   getAttempts: (id: string) => request<{ attempts: Attempt[] }>(`/runs/${id}/attempts`),
   getApprovals: (id: string) => request<{ approvals: Approval[] }>(`/runs/${id}/approvals`),
   getHistory: (id: string) => request<{ events: HistoryEvent[] }>(`/runs/${id}/history`),
-  getUsage: (id: string) => request<{ usage: UsageRecord[] }>(`/runs/${id}/usage`),
+  getUsage: (id: string) => request<{ usage: UsageRecord[]; summary?: ServerUsageSummary }>(`/runs/${id}/usage`),
   listWorkflows: () => request<{ workflows: WorkflowSummary[] }>("/workflows"),
   getWorkflow: (id: string) => request<WorkflowDetail>(`/workflows/${encodeURIComponent(id)}`),
   runtimeProviders: () => request<ProviderAvailability>("/runtime/providers"),

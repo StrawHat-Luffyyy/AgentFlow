@@ -968,11 +968,18 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         replayedCalls: 2,
         savedByReplayInputTokens: 80,
         savedByReplayOutputTokens: 18,
+        cacheHitCalls: 0,
+        savedByCacheInputTokens: 0,
+        savedByCacheOutputTokens: 0,
       };
+      // Turns one and two looked up the cache and missed; turn three is a legacy (v1) row.
+      const cacheLookups = { hits: 0, misses: 2, off: 0 };
       expect(usageResponse.summary).toEqual({
         ...totals,
         provenance: { reported: 2, estimated: 0, unknown: 1 },
-        byStep: [{ stepId: step.id, ...totals }],
+        cacheScope: "run",
+        cacheLookups,
+        byStep: [{ stepId: step.id, ...totals, cacheLookups }],
         byModel: [
           {
             provider: "fake", model: "fake-model-v1", ...totals,
@@ -986,6 +993,161 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         ],
       });
       await controlRun(database, created.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("answers identical LLM requests from the response cache only within its configured scope", async () => {
+    await worker.pause();
+    try {
+      const agentStep = (key: string) => ({
+        key, kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+        instructions: "Cache test.", allowedTools: [], maxTurns: 2,
+      });
+      const createVersion = async (name: string, cacheScope: string | undefined, steps: number) => {
+        const workflow = await request<{ id: string }>("/workflows", {
+          method: "POST",
+          body: JSON.stringify({ name, description: "Response cache" }),
+        });
+        return request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST",
+          body: JSON.stringify({
+            version: 1,
+            definition: {
+              ...(cacheScope === undefined ? {} : { cacheScope }),
+              steps: Array.from({ length: steps }, (_, index) => agentStep(`agent-${index + 1}`)),
+            },
+          }),
+        });
+      };
+      const startRun = async (versionId: string, creationKey: string) => request<{ id: string }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: versionId, input: { topic: "cache" }, creationKey }),
+      });
+      const claimStep = async (runId: string, versionId: string, position: number, workerId: string) => {
+        const step = await database.query<{ id: string; dispatch_generation: number }>(
+          "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = $2",
+          [runId, position],
+        );
+        const claimed = await claimOperation(database, {
+          runId, operationId: step.rows[0]!.id, workflowVersionId: versionId,
+          dispatchGeneration: step.rows[0]!.dispatch_generation,
+        }, workerId, 15_000);
+        expect(claimed).not.toBeNull();
+        return claimed!;
+      };
+      const request0 = { model: "fake-model", messages: [{ role: "user", content: "identical prompt" }] };
+      const key = { hashVersion: 2, provider: "fake", adapterVersion: "1.0.0", ...request0, tools: [], params: { temperature: null } };
+      const turn = { ordinal: 0, turn: 1, maxTurns: 2, provider: "fake", adapterVersion: "1.0.0", model: "fake-model", request: request0 };
+      const usage = {
+        provenance: "reported" as const, inputTokens: 30, outputTokens: 5, cachedInputTokens: 0,
+        reasoningTokens: null, totalTokens: 35, raw: {},
+      };
+      const output = { text: "cached answer", toolCalls: [], finishReason: "stop", usage };
+      const callAndComplete = async (claimed: Awaited<ReturnType<typeof claimStep>>, journalKey = key) => {
+        const begun = await beginHarnessLlmOperation(database, claimed, { ...turn, journalKey });
+        if (begun.replayed) throw new Error("Expected a provider call");
+        await completeHarnessLlmOperation(database, claimed, begun.providerCallId, {
+          output, continuationState: null, providerRequestId: `req-${begun.providerCallId}`,
+          resolvedModel: "fake-model-v1", finishReason: "stop", usage,
+        });
+        return begun;
+      };
+      const providerCallsFor = async (runId: string) => Number((await database.query<{ count: string }>(
+        `SELECT count(*) FROM provider_calls pc JOIN harness_operations ho ON ho.id = pc.harness_operation_id
+         WHERE ho.run_id = $1`, [runId],
+      )).rows[0]!.count);
+
+      // 1. Run scope (the default): a second step with an identical request in the same run hits.
+      const runScoped = await createVersion("cache-run-scope", undefined, 2);
+      const runA = await startRun(runScoped.id, "cache-run-a");
+      const stepOne = await claimStep(runA.id, runScoped.id, 0, "cache-worker");
+      const original = await callAndComplete(stepOne);
+      expect(original.cacheLookup).toBe("MISS");
+      await completeOperation(database, stepOne, { done: true });
+      const stepTwo = await claimStep(runA.id, runScoped.id, 1, "cache-worker");
+      const hit = await beginHarnessLlmOperation(database, stepTwo, { ...turn, journalKey: key });
+      expect(hit).toMatchObject({
+        replayed: true,
+        output,
+        cacheHit: { scope: "run", sourceHarnessOperationId: original.harnessOperationId },
+        savedUsage: { inputTokens: 30, outputTokens: 5, provenance: "reported" },
+      });
+      expect(await providerCallsFor(runA.id)).toBe(1);
+      // A crash after the hit replays it from the journal without counting the saving twice.
+      expect(await beginHarnessLlmOperation(database, stepTwo, { ...turn, journalKey: key }))
+        .toMatchObject({ replayed: true, cacheHit: null, savedUsage: null });
+
+      // 2. The default scope never crosses runs.
+      const runB = await startRun(runScoped.id, "cache-run-b");
+      const crossRun = await callAndComplete(await claimStep(runB.id, runScoped.id, 0, "cache-worker"));
+      expect(crossRun.cacheLookup).toBe("MISS");
+
+      // 3. Version scope: another run of the same version hits; a different version misses.
+      const versionScoped = await createVersion("cache-version-scope", "version", 1);
+      const runC = await startRun(versionScoped.id, "cache-version-c");
+      await callAndComplete(await claimStep(runC.id, versionScoped.id, 0, "cache-worker"));
+      const runD = await startRun(versionScoped.id, "cache-version-d");
+      const claimedD = await claimStep(runD.id, versionScoped.id, 0, "cache-worker");
+      expect(await beginHarnessLlmOperation(database, claimedD, { ...turn, journalKey: key }))
+        .toMatchObject({ replayed: true, cacheHit: { scope: "version" } });
+      expect(await providerCallsFor(runD.id)).toBe(0);
+      const otherVersion = await createVersion("cache-version-other", "version", 1);
+      const runE = await startRun(otherVersion.id, "cache-version-e");
+      expect((await callAndComplete(await claimStep(runE.id, otherVersion.id, 0, "cache-worker"))).cacheLookup).toBe("MISS");
+
+      // 4. A different sampling parameter or tool set is a different request: no hit.
+      const runF = await startRun(versionScoped.id, "cache-version-f");
+      const differentTemperature = await beginHarnessLlmOperation(database, await claimStep(runF.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: { ...key, params: { temperature: 0 } },
+      });
+      expect(differentTemperature).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+      const runG = await startRun(versionScoped.id, "cache-version-g");
+      expect(await beginHarnessLlmOperation(database, await claimStep(runG.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: { ...key, tools: [{ name: "search", version: "1" }] },
+      })).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+
+      // 5. An in-flight (never accepted) response is never served: runF's call has no result.
+      const sameAsF = { ...key, params: { temperature: 0 } };
+      const runH = await startRun(versionScoped.id, "cache-version-h");
+      expect(await beginHarnessLlmOperation(database, await claimStep(runH.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: sameAsF,
+      })).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+
+      // 6. "off" always calls the provider, even for an identical in-run request.
+      const offScoped = await createVersion("cache-off-scope", "off", 2);
+      const runI = await startRun(offScoped.id, "cache-off-i");
+      const offOne = await claimStep(runI.id, offScoped.id, 0, "cache-worker");
+      expect((await callAndComplete(offOne)).cacheLookup).toBe("OFF");
+      await completeOperation(database, offOne, { done: true });
+      expect((await callAndComplete(await claimStep(runI.id, offScoped.id, 1, "cache-worker"))).cacheLookup).toBe("OFF");
+      expect(await providerCallsFor(runI.id)).toBe(2);
+
+      // 7. Audit trail and usage summary keep cache savings apart from journal replay.
+      const history = await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(`/runs/${runA.id}/history`);
+      expect(history.events.filter((event) => event.type === "LLM_CACHE_HIT")).toEqual([
+        expect.objectContaining({ payload: expect.objectContaining({ source: "CACHE_RUN", sourceHarnessOperationId: original.harnessOperationId }) }),
+      ]);
+      const summaryA = (await request<{ summary: Record<string, unknown>; replays: Array<{ source: string }> }>(`/runs/${runA.id}/usage`));
+      expect(summaryA.replays.map((replay) => replay.source)).toEqual(["CACHE_RUN"]);
+      expect(summaryA.summary).toMatchObject({
+        billedCalls: 1,
+        replayedCalls: 0,
+        cacheHitCalls: 1,
+        savedByCacheInputTokens: 30,
+        savedByCacheOutputTokens: 5,
+        cacheScope: "run",
+        cacheLookups: { hits: 1, misses: 1, off: 0 },
+      });
+      const summaryD = (await request<{ summary: Record<string, unknown> }>(`/runs/${runD.id}/usage`)).summary;
+      expect(summaryD).toMatchObject({ billedCalls: 0, cacheHitCalls: 1, cacheScope: "version", cacheLookups: { hits: 1, misses: 0, off: 0 } });
+      const summaryI = (await request<{ summary: Record<string, unknown> }>(`/runs/${runI.id}/usage`)).summary;
+      expect(summaryI).toMatchObject({ billedCalls: 2, cacheHitCalls: 0, cacheScope: "off", cacheLookups: { hits: 0, misses: 0, off: 2 } });
+
+      for (const run of [runA, runB, runC, runD, runE, runF, runG, runH, runI]) {
+        await controlRun(database, run.id, "cancel");
+      }
     } finally {
       await worker.resume();
     }

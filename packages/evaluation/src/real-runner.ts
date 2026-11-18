@@ -18,6 +18,10 @@ const seed = Number(argument("--seed", "42"));
 const trials = Number(argument("--trials", "1"));
 const systems = argument("--systems", "B0,B1,A1").split(",") as RealSystem[];
 const scenarios = argument("--scenarios", "E0,E1,E2,E2B,E3,E4,E5,E6,E7").split(",") as RealScenario[];
+// LLM response-cache scope for AgentFlow workflow versions (brief §2.2). Empty keeps the
+// definition unchanged (runtime default "run"), so earlier campaigns stay comparable.
+const cacheScope = argument("--cache-scope", "");
+if (!["", "run", "version", "off"].includes(cacheScope)) throw new Error("--cache-scope must be run, version, or off");
 if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
     systems.some((s) => !["B0","B1","A0","A1","DBOS"].includes(s)) ||
     scenarios.some((s) => !["E0","E1","E2","E2B","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
@@ -105,6 +109,7 @@ async function versionFor(config: RealConfig): Promise<string> {
   if (versions.has(key)) return versions.get(key)!;
   const workflow = await request("/workflows", { name: `${campaign}-${key}` });
   const definition = cloudComparisonWorkflowDefinition();
+  if (cacheScope) Object.assign(definition, { cacheScope });
   if (key === "unsafe") {
     const publication = definition.steps.at(-1)!;
     if (publication.kind === "TOOL") publication.effectClass = "UNSAFE_WRITE";
@@ -120,6 +125,8 @@ interface Measurement {
   llmCalls: number; repeatedLlmCalls: number; inputTokens: number; outputTokens: number; usageProvenance: string;
   /** Provider calls avoided by LLM-journal replay, and the tokens those calls had cost (0 for systems without a journal). */
   journalReplays: number; tokensSavedByReplay: number;
+  /** Response-cache hits (identical earlier request) and the tokens they avoided; separate from journal replay. */
+  cacheHits: number; tokensSavedByCache: number;
   receiverEffects: number; duplicateEffects: number; missingEffects: number; invalidApprovalExecutions: number;
   checkpointBytes: number | null; checkpointMs: number[]; recoveryMs: number[]; correctReport: boolean;
   faultCount: number; error: string | null;
@@ -266,7 +273,10 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
       approvals: await request(`/runs/${config.runId}/approvals`), history: await request(`/runs/${config.runId}/history`),
       usage: await request(`/runs/${config.runId}/usage`), toolExecutions: await request(`/runs/${config.runId}/tool-executions`) };
   }
-  const usageSummary = (runtimeEvidence as { usage?: { summary?: { replayedCalls: number; savedByReplayInputTokens: number; savedByReplayOutputTokens: number } } } | null)?.usage?.summary;
+  const usageSummary = (runtimeEvidence as { usage?: { summary?: {
+    replayedCalls: number; savedByReplayInputTokens: number; savedByReplayOutputTokens: number;
+    cacheHitCalls?: number; savedByCacheInputTokens?: number; savedByCacheOutputTokens?: number;
+  } } } | null)?.usage?.summary;
   const measurement: Measurement = {
     trialId: config.trialId, pair: `${scenario}-${index}`, system, scenario, outcome, elapsedMs, restarts,
     repeatedOperations: starts.length - new Set(starts.map((e) => e.operation)).size,
@@ -276,6 +286,8 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
     outputTokens: usages.reduce((sum,e) => sum + (e.detail.usage?.outputTokens ?? 0),0), usageProvenance: "estimated-scripted-provider",
     journalReplays: usageSummary?.replayedCalls ?? 0,
     tokensSavedByReplay: (usageSummary?.savedByReplayInputTokens ?? 0) + (usageSummary?.savedByReplayOutputTokens ?? 0),
+    cacheHits: usageSummary?.cacheHitCalls ?? 0,
+    tokensSavedByCache: (usageSummary?.savedByCacheInputTokens ?? 0) + (usageSummary?.savedByCacheOutputTokens ?? 0),
     receiverEffects: effects.length, duplicateEffects: Math.max(0,effects.length-1),
     missingEffects: state.approved_hash && effects.length === 0 ? 1 : 0,
     invalidApprovalExecutions: effects.filter((e) => !state.approved_hash || e.request_hash !== state.approved_hash).length,
@@ -293,7 +305,7 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
 
 let revision = "unknown";
 try { revision = execFileSync("git", ["rev-parse","HEAD"], { encoding: "utf8" }).trim(); } catch {}
-const manifest = { campaign, seed, trials, systems, scenarios, sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
+const manifest = { campaign, seed, trials, systems, scenarios, cacheScope: cacheScope || "default (run)", sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
   node: process.version, hardware: { cpu: cpus()[0]?.model, logicalCpus: cpus().length, memoryBytes: totalmem() },
   corpusHash: cloudComparisonCorpusHash, dbosVersion: "5.2.11", policy: { leaseMs: base.leaseMs, schedulerPollMs: 50, outboxPollMs: 20,
     retryInitialMs: base.retryMs, maxAttempts: 3, maxRestarts: 3, observationMs: base.observationMs, workerConcurrency: 1, operationDelayMs: base.operationDelayMs },
@@ -314,7 +326,8 @@ try {
       medianElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.5),p95ElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.95),
       p95RecoveryMs:quantile(group.flatMap((r)=>r.recoveryMs),0.95),p95CheckpointMs:quantile(group.flatMap((r)=>r.checkpointMs),0.95),
       repeatedLlmCalls:group.reduce((s,r)=>s+r.repeatedLlmCalls,0),
-      journalReplays:group.reduce((s,r)=>s+r.journalReplays,0),tokensSavedByReplay:group.reduce((s,r)=>s+r.tokensSavedByReplay,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
+      journalReplays:group.reduce((s,r)=>s+r.journalReplays,0),tokensSavedByReplay:group.reduce((s,r)=>s+r.tokensSavedByReplay,0),
+      cacheHits:group.reduce((s,r)=>s+r.cacheHits,0),tokensSavedByCache:group.reduce((s,r)=>s+r.tokensSavedByCache,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
       invalidApprovals:group.reduce((s,r)=>s+r.invalidApprovalExecutions,0),committedReexecutions:group.reduce((s,r)=>s+r.reexecutedCommittedOperations,0),
       outcomes:Object.fromEntries([...new Set(group.map((r)=>r.outcome))].map((outcome)=>[outcome,group.filter((r)=>r.outcome===outcome).length])) };
   }));

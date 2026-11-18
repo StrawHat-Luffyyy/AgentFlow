@@ -190,6 +190,41 @@ export function usageTotal(summary: UsageSummary | null): string {
   return summary.unreportedRecords > 0 ? `${total}+` : total;
 }
 
+export interface ReuseSummaryLike {
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+  cacheScope: string | null;
+  cacheLookups: { hits: number; misses: number; off: number };
+}
+
+/**
+ * Footer lines for provider calls avoided, journal replay and response cache kept apart
+ * (they are different mechanisms). Returns no lines when nothing was looked up or reused.
+ */
+export function reuseDetail(summary: ReuseSummaryLike | null | undefined): string[] {
+  if (!summary) return [];
+  const lines: string[] = [];
+  if (summary.replayedCalls > 0) {
+    lines.push(`Journal replay: ${summary.replayedCalls} call${summary.replayedCalls === 1 ? "" : "s"} avoided · `
+      + `${summary.savedByReplayInputTokens.toLocaleString()} in · ${summary.savedByReplayOutputTokens.toLocaleString()} out saved`);
+  }
+  const { hits, misses, off } = summary.cacheLookups;
+  if (hits + misses + off > 0) {
+    const scope = summary.cacheScope ?? "run";
+    const saved = summary.cacheHitCalls > 0
+      ? ` · ${summary.savedByCacheInputTokens.toLocaleString()} in · ${summary.savedByCacheOutputTokens.toLocaleString()} out saved`
+      : "";
+    lines.push(off > 0 && hits + misses === 0
+      ? "Response cache: off"
+      : `Response cache (${scope}): ${hits} hit${hits === 1 ? "" : "s"} · ${misses} miss${misses === 1 ? "" : "es"}${saved}`);
+  }
+  return lines;
+}
+
 /** Tile/footer text for usage: persisted totals plus provenance exactly as the API returned it. */
 export function usageDetail(summary: UsageSummary | null): string {
   if (summary === null) return "No usage recorded yet";

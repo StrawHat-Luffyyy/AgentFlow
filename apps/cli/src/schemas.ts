@@ -142,6 +142,12 @@ export const usageSchema = z.object({
     savedByReplayInputTokens: z.number(),
     savedByReplayOutputTokens: z.number(),
     replayedCalls: z.number(),
+    // Response-cache fields (absent from older APIs).
+    cacheHitCalls: z.number().optional(),
+    savedByCacheInputTokens: z.number().optional(),
+    savedByCacheOutputTokens: z.number().optional(),
+    cacheScope: z.string().nullable().optional(),
+    cacheLookups: z.object({ hits: z.number(), misses: z.number(), off: z.number() }).optional(),
   }).passthrough().optional(),
 }).passthrough();
 

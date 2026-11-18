@@ -2750,6 +2750,8 @@ export interface HarnessReplaySavedUsage {
   totalTokens: number | null;
 }
 
+export type HarnessCacheLookup = "HIT" | "MISS" | "OFF";
+
 export type BegunHarnessLlmOperation =
   | {
       replayed: true;
@@ -2757,6 +2759,8 @@ export type BegunHarnessLlmOperation =
       output: Record<string, unknown>;
       continuationState: Record<string, unknown> | null;
       savedUsage: HarnessReplaySavedUsage | null;
+      /** Set when this request was answered from the response cache rather than the journal. */
+      cacheHit: { scope: "run" | "version"; sourceHarnessOperationId: string } | null;
     }
   | {
       replayed: false;
@@ -2765,6 +2769,8 @@ export type BegunHarnessLlmOperation =
       logicalOperationId: string;
       /** Earlier IN_FLIGHT calls whose outcome was lost (journal_orphaned) and are re-issued now. */
       orphanedCalls: number;
+      /** Cache decision for this logical operation; null for legacy (v1-hash) operations. */
+      cacheLookup: HarnessCacheLookup | null;
     };
 
 /** Journal hash for an LLM request. v2 covers provider, tools, and params; v1 is the legacy request hash. */
@@ -2796,14 +2802,21 @@ export async function beginHarnessLlmOperation(
         leaseEpoch: operation.leaseEpoch,
       });
       const begun = await beginHarnessLlmOperationInTransaction(database, operation, input);
-      span.setAttribute("agentflow.llm.journal.replayed", begun.replayed);
-      if (begun.replayed) {
-        span.setAttribute(
-          "agentflow.llm.tokens_saved_by_replay",
-          (begun.savedUsage?.inputTokens ?? 0) + (begun.savedUsage?.outputTokens ?? 0),
-        );
+      const savedTokens = begun.replayed
+        ? (begun.savedUsage?.inputTokens ?? 0) + (begun.savedUsage?.outputTokens ?? 0)
+        : 0;
+      if (begun.replayed && begun.cacheHit) {
+        span.setAttribute("agentflow.llm.journal.replayed", false);
+        span.setAttribute("agentflow.llm.cache.result", "hit");
+        span.setAttribute("agentflow.llm.cache.scope", begun.cacheHit.scope);
+        span.setAttribute("agentflow.llm.tokens_saved_by_cache", savedTokens);
+      } else if (begun.replayed) {
+        span.setAttribute("agentflow.llm.journal.replayed", true);
+        span.setAttribute("agentflow.llm.tokens_saved_by_replay", savedTokens);
       } else {
+        span.setAttribute("agentflow.llm.journal.replayed", false);
         span.setAttribute("agentflow.llm.journal.orphaned_calls", begun.orphanedCalls);
+        if (begun.cacheLookup) span.setAttribute("agentflow.llm.cache.result", begun.cacheLookup.toLowerCase());
       }
       return begun;
     } finally {
@@ -2886,9 +2899,10 @@ async function beginHarnessLlmOperationInTransaction(
       status: string;
       output_json: Record<string, unknown> | null;
       continuation_state_json: Record<string, unknown> | null;
+      cache_lookup: HarnessCacheLookup | null;
     }>(
       `SELECT id, kind, turn, max_turns, request_hash, request_hash_version, status,
-         output_json, continuation_state_json
+         output_json, continuation_state_json, cache_lookup
        FROM harness_operations WHERE step_id = $1 AND ordinal = $2 FOR UPDATE`,
       [operation.operationId, input.ordinal],
     );
@@ -2905,14 +2919,61 @@ async function beginHarnessLlmOperationInTransaction(
     }
     if (logical.status === "SUCCEEDED") {
       if (!logical.output_json) throw new ConflictError("Completed harness operation has no output");
-      const savedUsage = await recordHarnessReplay(transaction, operation, logical.id);
+      // A row that was itself answered from the cache has no provider call of its own,
+      // so replaying it records nothing new (its saving was counted at the cache hit).
+      const savedUsage = await recordHarnessReplay(transaction, operation, logical.id, logical.id, "JOURNAL");
       return {
         replayed: true,
         harnessOperationId: logical.id,
         output: logical.output_json,
         continuationState: logical.continuation_state_json,
         savedUsage,
+        cacheHit: null,
       };
+    }
+
+    // Response cache (brief §2.2): decided once per logical operation, before its first
+    // provider call, inside the same fenced transaction. Only v2 hashes participate,
+    // because only they bind provider, tools, and sampling parameters.
+    let cacheLookup: HarnessCacheLookup | null = logical.cache_lookup;
+    if (cacheLookup === null && storedVersion === 2) {
+      const scope = await workflowCacheScope(transaction, operation.runId);
+      if (scope === "off") {
+        cacheLookup = "OFF";
+      } else {
+        const cached = await findCachedLlmResponse(transaction, {
+          requestHash: logical.request_hash,
+          excludeId: logical.id,
+          runId: operation.runId,
+          scope,
+        });
+        if (cached) {
+          await transaction.query(
+            `UPDATE harness_operations SET status = 'SUCCEEDED', output_json = $1::jsonb,
+               continuation_state_json = $2::jsonb, completed_at = now(), cache_lookup = 'HIT'
+             WHERE id = $3`,
+            [
+              JSON.stringify(cached.output_json),
+              cached.continuation_state_json === null ? null : JSON.stringify(cached.continuation_state_json),
+              logical.id,
+            ],
+          );
+          const hitScope = cached.run_id === operation.runId ? "run" : "version";
+          const savedUsage = await recordHarnessReplay(
+            transaction, operation, logical.id, cached.id, hitScope === "run" ? "CACHE_RUN" : "CACHE_VERSION",
+          );
+          return {
+            replayed: true,
+            harnessOperationId: logical.id,
+            output: cached.output_json,
+            continuationState: cached.continuation_state_json,
+            savedUsage,
+            cacheHit: { scope: hitScope, sourceHarnessOperationId: cached.id },
+          };
+        }
+        cacheLookup = "MISS";
+      }
+      await transaction.query("UPDATE harness_operations SET cache_lookup = $1 WHERE id = $2", [cacheLookup, logical.id]);
     }
 
     const duplicateAttempt = await transaction.query(
@@ -3000,21 +3061,77 @@ async function beginHarnessLlmOperationInTransaction(
       providerCallId,
       logicalOperationId: logical.id,
       orphanedCalls: unresolvedCalls.rows.length,
+      cacheLookup,
     };
   });
 }
 
+/** The run's workflow-version cache scope; absent in the definition means "run". */
+async function workflowCacheScope(transaction: Transaction, runId: string): Promise<"run" | "version" | "off"> {
+  const result = await transaction.query<{ scope: string | null }>(
+    `SELECT wv.definition_json->>'cacheScope' AS scope
+     FROM workflow_runs wr JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     WHERE wr.id = $1`,
+    [runId],
+  );
+  const scope = result.rows[0]?.scope;
+  return scope === "version" || scope === "off" ? scope : "run";
+}
+
 /**
- * Records that this attempt consumed a journalled response instead of calling the
- * provider. Saved tokens are copied from the accepted call's billed usage record,
- * provenance included; usage_records is never written for a replay.
+ * Newest accepted LLM response for an identical v2 request: within the run, or (for
+ * "version") within any run of the same immutable workflow version, preferring the
+ * same run. Only operations whose own provider call was accepted can be a source, so
+ * every cached response traces back to one real, billed provider call.
+ */
+async function findCachedLlmResponse(
+  transaction: Transaction,
+  input: { requestHash: string; excludeId: string; runId: string; scope: "run" | "version" },
+) {
+  const result = await transaction.query<{
+    id: string;
+    run_id: string;
+    output_json: Record<string, unknown>;
+    continuation_state_json: Record<string, unknown> | null;
+  }>(
+    `SELECT ho.id, ho.run_id, ho.output_json, ho.continuation_state_json
+     FROM harness_operations ho
+     JOIN workflow_runs wr ON wr.id = ho.run_id
+     WHERE ho.kind = 'LLM' AND ho.status = 'SUCCEEDED' AND ho.request_hash_version = 2
+       AND ho.request_hash = $1 AND ho.id <> $2 AND ho.output_json IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM provider_calls pc
+         WHERE pc.harness_operation_id = ho.id AND pc.status = 'SUCCEEDED' AND pc.accepted
+       )
+       AND (
+         ho.run_id = $3
+         OR ($4 = 'version' AND wr.workflow_version_id =
+               (SELECT workflow_version_id FROM workflow_runs WHERE id = $3))
+       )
+     ORDER BY (ho.run_id = $3) DESC, ho.completed_at DESC, ho.id
+     LIMIT 1`,
+    [input.requestHash, input.excludeId, input.runId, input.scope],
+  );
+  return result.rows[0] ?? null;
+}
+
+type HarnessReplaySource = "JOURNAL" | "CACHE_RUN" | "CACHE_VERSION";
+
+/**
+ * Records that this attempt reused an accepted response instead of calling the
+ * provider: a journal replay of the same logical operation, or a cache hit on an
+ * identical earlier request (`sourceOperationId`). Saved tokens are copied from the
+ * source call's billed usage record, provenance included; usage_records is never
+ * written for a reuse.
  */
 async function recordHarnessReplay(
   transaction: Transaction,
   operation: ClaimedOperation,
   harnessOperationId: string,
+  sourceOperationId: string,
+  source: HarnessReplaySource,
 ): Promise<HarnessReplaySavedUsage | null> {
-  const source = await transaction.query<{
+  const sourceCall = await transaction.query<{
     provider_call_id: string;
     provider: string;
     model: string;
@@ -3033,9 +3150,9 @@ async function recordHarnessReplay(
      LEFT JOIN usage_records ur ON ur.provider_call_id = pc.id
      WHERE pc.harness_operation_id = $1 AND pc.status = 'SUCCEEDED' AND pc.accepted
      ORDER BY pc.call_no DESC LIMIT 1`,
-    [harnessOperationId],
+    [sourceOperationId],
   );
-  const row = source.rows[0];
+  const row = sourceCall.rows[0];
   if (!row) return null;
   const savedUsage: HarnessReplaySavedUsage = {
     sourceProviderCallId: row.provider_call_id,
@@ -3050,14 +3167,16 @@ async function recordHarnessReplay(
     `INSERT INTO harness_replays
        (id, run_id, step_id, attempt_id, harness_operation_id, source_provider_call_id,
         provider, model, provenance, saved_input_tokens, saved_output_tokens,
-        saved_cached_input_tokens, saved_reasoning_tokens, saved_total_tokens)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        saved_cached_input_tokens, saved_reasoning_tokens, saved_total_tokens,
+        source, source_harness_operation_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      ON CONFLICT (harness_operation_id, attempt_id) DO NOTHING`,
     [
       randomUUID(), operation.runId, operation.operationId, operation.attemptId,
       harnessOperationId, row.provider_call_id, row.provider, row.model,
       savedUsage.provenance, savedUsage.inputTokens, savedUsage.outputTokens,
       savedUsage.cachedInputTokens, savedUsage.reasoningTokens, savedUsage.totalTokens,
+      source, source === "JOURNAL" ? null : sourceOperationId,
     ],
   );
   if (inserted.rowCount === 1) {
@@ -3065,10 +3184,15 @@ async function recordHarnessReplay(
     await transaction.query(
       `INSERT INTO audit_events
          (id, run_id, sequence, step_id, attempt_id, type, payload_json)
-       VALUES ($1, $2, $3, $4, $5, 'LLM_JOURNAL_REPLAYED', $6::jsonb)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
       [
         randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId,
-        JSON.stringify({ harnessOperationId, ...savedUsage }),
+        source === "JOURNAL" ? "LLM_JOURNAL_REPLAYED" : "LLM_CACHE_HIT",
+        JSON.stringify({
+          harnessOperationId,
+          ...(source === "JOURNAL" ? {} : { source, sourceHarnessOperationId: sourceOperationId }),
+          ...savedUsage,
+        }),
       ],
     );
   }
@@ -3453,11 +3577,31 @@ export async function getRunReplays(database: Queryable, runId: string) {
        saved_input_tokens AS "savedInputTokens", saved_output_tokens AS "savedOutputTokens",
        saved_cached_input_tokens AS "savedCachedInputTokens",
        saved_reasoning_tokens AS "savedReasoningTokens",
-       saved_total_tokens AS "savedTotalTokens", created_at AS "createdAt"
+       saved_total_tokens AS "savedTotalTokens", source,
+       source_harness_operation_id AS "sourceHarnessOperationId", created_at AS "createdAt"
      FROM harness_replays WHERE run_id = $1 ORDER BY created_at, id`,
     [runId],
   );
   return result.rows;
+}
+
+/** The run's cache scope and each LLM logical operation's cache decision (null for legacy rows). */
+export async function getRunCacheLookups(database: Queryable, runId: string) {
+  const run = await database.query<{ scope: string | null }>(
+    `SELECT wv.definition_json->>'cacheScope' AS scope
+     FROM workflow_runs wr JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     WHERE wr.id = $1`,
+    [runId],
+  );
+  if (run.rowCount === 0) throw new NotFoundError("Run not found");
+  const raw = run.rows[0]!.scope;
+  const scope: "run" | "version" | "off" = raw === "version" || raw === "off" ? raw : "run";
+  const lookups = await database.query<{ stepId: string; cacheLookup: HarnessCacheLookup | null }>(
+    `SELECT step_id AS "stepId", cache_lookup AS "cacheLookup"
+     FROM harness_operations WHERE run_id = $1 AND kind = 'LLM' ORDER BY created_at, id`,
+    [runId],
+  );
+  return { scope, lookups: lookups.rows };
 }
 
 /** Token totals for one slice of a run (whole run, one step, or one provider/model). */
@@ -3469,15 +3613,29 @@ export interface UsageTotals {
   billedOutputTokens: number;
   billedCachedInputTokens: number;
   billedReasoningTokens: number;
+  /** Journal replays: the same logical operation re-used after a crash or retry. */
   replayedCalls: number;
   savedByReplayInputTokens: number;
   savedByReplayOutputTokens: number;
+  /** Response-cache hits: an identical earlier request answered this one (brief §2.2). */
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+}
+
+/** Cache decisions per LLM logical operation (HIT / MISS / OFF); legacy operations are not counted. */
+export interface CacheLookupCounts {
+  hits: number;
+  misses: number;
+  off: number;
 }
 
 export interface RunUsageSummary extends UsageTotals {
   /** Count of usage records per provenance. */
   provenance: Record<"reported" | "estimated" | "unknown", number>;
-  byStep: Array<UsageTotals & { stepId: string }>;
+  cacheScope: "run" | "version" | "off" | null;
+  cacheLookups: CacheLookupCounts;
+  byStep: Array<UsageTotals & { stepId: string; cacheLookups: CacheLookupCounts }>;
   byModel: Array<UsageTotals & { provider: string; model: string }>;
 }
 
@@ -3498,11 +3656,28 @@ interface SummarizableReplay {
   model: string;
   savedInputTokens: number | null;
   savedOutputTokens: number | null;
+  /** JOURNAL (default) or CACHE_RUN / CACHE_VERSION. */
+  source?: string;
+}
+
+interface SummarizableCache {
+  scope: "run" | "version" | "off";
+  lookups: ReadonlyArray<{ stepId: string; cacheLookup: HarnessCacheLookup | null }>;
+}
+
+function countLookups(lookups: SummarizableCache["lookups"]): CacheLookupCounts {
+  return {
+    hits: lookups.filter((l) => l.cacheLookup === "HIT").length,
+    misses: lookups.filter((l) => l.cacheLookup === "MISS").length,
+    off: lookups.filter((l) => l.cacheLookup === "OFF").length,
+  };
 }
 
 function totalsOf(usage: ReadonlyArray<SummarizableUsage>, replays: ReadonlyArray<SummarizableReplay>): UsageTotals {
   const sum = <T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null) =>
     rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  const journal = replays.filter((r) => (r.source ?? "JOURNAL") === "JOURNAL");
+  const cached = replays.filter((r) => (r.source ?? "JOURNAL") !== "JOURNAL");
   return {
     billedCalls: usage.length,
     unreportedCalls: usage.filter((r) => r.inputTokens === null && r.outputTokens === null).length,
@@ -3510,16 +3685,21 @@ function totalsOf(usage: ReadonlyArray<SummarizableUsage>, replays: ReadonlyArra
     billedOutputTokens: sum(usage, (r) => r.outputTokens),
     billedCachedInputTokens: sum(usage, (r) => r.cachedInputTokens),
     billedReasoningTokens: sum(usage, (r) => r.reasoningTokens),
-    replayedCalls: replays.length,
-    savedByReplayInputTokens: sum(replays, (r) => r.savedInputTokens),
-    savedByReplayOutputTokens: sum(replays, (r) => r.savedOutputTokens),
+    replayedCalls: journal.length,
+    savedByReplayInputTokens: sum(journal, (r) => r.savedInputTokens),
+    savedByReplayOutputTokens: sum(journal, (r) => r.savedOutputTokens),
+    cacheHitCalls: cached.length,
+    savedByCacheInputTokens: sum(cached, (r) => r.savedInputTokens),
+    savedByCacheOutputTokens: sum(cached, (r) => r.savedOutputTokens),
   };
 }
 
 export function summarizeRunUsage(
   usage: ReadonlyArray<SummarizableUsage>,
   replays: ReadonlyArray<SummarizableReplay>,
+  cache: SummarizableCache | null = null,
 ): RunUsageSummary {
+  const lookups = cache?.lookups ?? [];
   const provenance = { reported: 0, estimated: 0, unknown: 0 };
   for (const record of usage) {
     if (record.provenance === "reported" || record.provenance === "estimated" || record.provenance === "unknown") {
@@ -3528,13 +3708,17 @@ export function summarizeRunUsage(
   }
   const groupKeys = <K extends string>(key: (row: SummarizableUsage | SummarizableReplay) => K) =>
     [...new Set([...usage.map(key), ...replays.map(key)])];
+  const stepIds = [...new Set([...groupKeys((row) => row.stepId), ...lookups.map((l) => l.stepId)])];
   const modelKey = (row: SummarizableUsage | SummarizableReplay) => `${row.provider}\u0000${row.model}`;
   return {
     ...totalsOf(usage, replays),
     provenance,
-    byStep: groupKeys((row) => row.stepId).map((stepId) => ({
+    cacheScope: cache?.scope ?? null,
+    cacheLookups: countLookups(lookups),
+    byStep: stepIds.map((stepId) => ({
       stepId,
       ...totalsOf(usage.filter((r) => r.stepId === stepId), replays.filter((r) => r.stepId === stepId)),
+      cacheLookups: countLookups(lookups.filter((l) => l.stepId === stepId)),
     })),
     byModel: groupKeys(modelKey).map((key) => {
       const [provider, model] = key.split("\u0000") as [string, string];

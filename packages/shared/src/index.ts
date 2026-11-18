@@ -148,8 +148,19 @@ export const workflowStepDefinitionSchema = z.union([
   agentStepDefinitionSchema,
 ]);
 
+/**
+ * LLM response cache scope for a workflow version (brief §2.2). Absent means "run".
+ * There is deliberately no default, so definitions without it keep their hash.
+ * - run: reuse an accepted response for an identical request within the same run.
+ * - version: also reuse across runs of the same immutable workflow version (opt-in).
+ * - off: always call the provider (crash-recovery journal replay still applies).
+ */
+export const cacheScopeSchema = z.enum(["run", "version", "off"]);
+export type CacheScope = z.infer<typeof cacheScopeSchema>;
+
 export const workflowDefinitionSchema = z.object({
   steps: z.array(workflowStepDefinitionSchema).min(1).max(20),
+  cacheScope: cacheScopeSchema.optional(),
 }).superRefine((definition, context) => {
   const keys = new Set<string>();
   definition.steps.forEach((step, index) => {
