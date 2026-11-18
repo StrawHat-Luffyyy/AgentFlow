@@ -13,6 +13,7 @@ import { faultActions, type FaultSpec } from "./types.js";
 const runtimeFaultHookPoints = [
   "before-operation",
   "after-provider-response",
+  "after-llm-journal-commit",
   "after-receiver-commit",
   "before-checkpoint-commit",
   "after-checkpoint-commit",

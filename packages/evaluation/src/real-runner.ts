@@ -17,10 +17,10 @@ function argument(name: string, fallback: string): string {
 const seed = Number(argument("--seed", "42"));
 const trials = Number(argument("--trials", "1"));
 const systems = argument("--systems", "B0,B1,A1").split(",") as RealSystem[];
-const scenarios = argument("--scenarios", "E0,E1,E2,E3,E4,E5,E6,E7").split(",") as RealScenario[];
+const scenarios = argument("--scenarios", "E0,E1,E2,E2B,E3,E4,E5,E6,E7").split(",") as RealScenario[];
 if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
     systems.some((s) => !["B0","B1","A0","A1","DBOS"].includes(s)) ||
-    scenarios.some((s) => !["E0","E1","E2","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
+    scenarios.some((s) => !["E0","E1","E2","E2B","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
 const campaign = `real-${Date.now()}-${randomUUID().slice(0, 8)}`;
 const output = resolve(argument("--output", `evaluation-results/${campaign}`));
 const isDemo = scenarios.includes("DEMO");
@@ -118,6 +118,8 @@ interface Measurement {
   trialId: string; pair: string; system: RealSystem; scenario: RealScenario; outcome: string;
   elapsedMs: number; restarts: number; repeatedOperations: number; reexecutedCommittedOperations: number;
   llmCalls: number; repeatedLlmCalls: number; inputTokens: number; outputTokens: number; usageProvenance: string;
+  /** Provider calls avoided by LLM-journal replay, and the tokens those calls had cost (0 for systems without a journal). */
+  journalReplays: number; tokensSavedByReplay: number;
   receiverEffects: number; duplicateEffects: number; missingEffects: number; invalidApprovalExecutions: number;
   checkpointBytes: number | null; checkpointMs: number[]; recoveryMs: number[]; correctReport: boolean;
   faultCount: number; error: string | null;
@@ -264,6 +266,7 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
       approvals: await request(`/runs/${config.runId}/approvals`), history: await request(`/runs/${config.runId}/history`),
       usage: await request(`/runs/${config.runId}/usage`), toolExecutions: await request(`/runs/${config.runId}/tool-executions`) };
   }
+  const usageSummary = (runtimeEvidence as { usage?: { summary?: { replayedCalls: number; savedByReplayInputTokens: number; savedByReplayOutputTokens: number } } } | null)?.usage?.summary;
   const measurement: Measurement = {
     trialId: config.trialId, pair: `${scenario}-${index}`, system, scenario, outcome, elapsedMs, restarts,
     repeatedOperations: starts.length - new Set(starts.map((e) => e.operation)).size,
@@ -271,6 +274,8 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
     llmCalls: calls.length, repeatedLlmCalls: calls.length - new Set(calls.map((e) => e.operation)).size,
     inputTokens: usages.reduce((sum,e) => sum + (e.detail.usage?.inputTokens ?? 0),0),
     outputTokens: usages.reduce((sum,e) => sum + (e.detail.usage?.outputTokens ?? 0),0), usageProvenance: "estimated-scripted-provider",
+    journalReplays: usageSummary?.replayedCalls ?? 0,
+    tokensSavedByReplay: (usageSummary?.savedByReplayInputTokens ?? 0) + (usageSummary?.savedByReplayOutputTokens ?? 0),
     receiverEffects: effects.length, duplicateEffects: Math.max(0,effects.length-1),
     missingEffects: state.approved_hash && effects.length === 0 ? 1 : 0,
     invalidApprovalExecutions: effects.filter((e) => !state.approved_hash || e.request_hash !== state.approved_hash).length,
@@ -308,7 +313,8 @@ try {
       duplicateFree:wilsonInterval(group.filter((r)=>r.duplicateEffects===0).length,group.length),
       medianElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.5),p95ElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.95),
       p95RecoveryMs:quantile(group.flatMap((r)=>r.recoveryMs),0.95),p95CheckpointMs:quantile(group.flatMap((r)=>r.checkpointMs),0.95),
-      repeatedLlmCalls:group.reduce((s,r)=>s+r.repeatedLlmCalls,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
+      repeatedLlmCalls:group.reduce((s,r)=>s+r.repeatedLlmCalls,0),
+      journalReplays:group.reduce((s,r)=>s+r.journalReplays,0),tokensSavedByReplay:group.reduce((s,r)=>s+r.tokensSavedByReplay,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
       invalidApprovals:group.reduce((s,r)=>s+r.invalidApprovalExecutions,0),committedReexecutions:group.reduce((s,r)=>s+r.reexecutedCommittedOperations,0),
       outcomes:Object.fromEntries([...new Set(group.map((r)=>r.outcome))].map((outcome)=>[outcome,group.filter((r)=>r.outcome===outcome).length])) };
   }));

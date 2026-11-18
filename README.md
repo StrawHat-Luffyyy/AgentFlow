@@ -221,10 +221,11 @@ The evidence comes from two different kinds of campaign, and they must not be co
 - **A1 (Full AgentFlow):** The production sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
 - **DBOS (Reference):** Matched common subset executed using the DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
 
-### Injected Fault Scenarios (E0–E7, real runner)
+### Injected Fault Scenarios (E0–E7 + E2B, real runner)
 - **E0:** No fault (baseline overhead, checkpoint latency).
 - **E1:** Crash before executing step 6 (`analyze-features`), after five committed steps.
-- **E2:** Crash after the `analyze-features` provider response, before its local checkpoint commit.
+- **E2 (E2a, journal-write window):** Crash after the `analyze-features` provider response, before its local checkpoint commit. In AgentFlow the crash fires *before* the response reaches the LLM journal (hook `after-provider-response`), so the call is necessarily repeated. This is the unavoidable window between receiving a response and persisting it. The definition is unchanged from earlier campaigns, so their E2 results stay comparable.
+- **E2B (after journal commit):** Crash after the `analyze-features` response has been committed to the LLM journal, but before the step checkpoint (hook `after-llm-journal-commit`). AgentFlow replays the journalled response with zero provider calls. Baselines have no journal, so for them this is the same instant as E2: the response exists only in memory.
 - **E3:** Injected transient provider 503 on `analyze-pricing` (two failures, then success).
 - **E4:** Read timeout (50 ms) on `search-azure`.
 - **E5:** Remote success / local crash (worker killed after receiver commit, before step checkpoint).
@@ -296,6 +297,7 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 - **Single-Machine Testbed:** All experiments were conducted on a single host running containerized PostgreSQL and Redis. Distributed cluster partitions and multi-region failovers were outside the MVP scope.
 - **Token Count Estimates:** Token figures from the scripted provider are estimates based on word count, not billed provider tokens.
 - **Report Quality Not Evaluated:** The report-hash and citation checks prove artifact integrity, not semantic report quality.
+- **LLM Journal Window and DBOS Granularity:** AgentFlow journals each LLM response in its own short transaction (`harness_operations` + `provider_calls`), before the step checkpoint. A crash between the provider response and that commit (E2/E2a) still repeats the call and its billed tokens. The DBOS reference wraps each agent step in one DBOS step. A DBOS application that makes every LLM call its own `@step` would also avoid the E2B repeat, so the E2B difference measures *per-call journaling by default*, not a capability DBOS cannot express.
 - **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
 
 ---

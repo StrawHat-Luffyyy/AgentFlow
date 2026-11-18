@@ -792,6 +792,182 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     }
   }, 20_000);
 
+  it("replays journalled LLM responses across attempts and accounts for saved and orphaned calls", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "llm-journal-workflow", description: "LLM journal replay" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "journal-agent",
+              kind: "AGENT",
+              handler: "agent",
+              provider: "fake",
+              model: "fake-model",
+              instructions: "Test the LLM journal.",
+              allowedTools: [],
+              maxTurns: 3,
+            }],
+          },
+        }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "journal replay" },
+          creationKey: "integration-llm-journal",
+        }),
+      });
+      const step = created.steps[0]!;
+      const job = {
+        runId: created.id,
+        operationId: step.id,
+        workflowVersionId: version.id,
+        dispatchGeneration: step.dispatchGeneration,
+      };
+      // Simulates a worker crash: the lease expires and a new attempt is claimed at a higher epoch.
+      const crashAndReclaim = async (generation: number, workerId: string) => {
+        await database.query(
+          "UPDATE workflow_steps SET lease_expires_at = now() - interval '1 second' WHERE id = $1",
+          [step.id],
+        );
+        await repairScheduling(database, 10_000);
+        await database.query(
+          "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+          [step.id],
+        );
+        await repairScheduling(database, 10_000);
+        const next = await claimOperation(database, { ...job, dispatchGeneration: generation }, workerId, 15_000);
+        expect(next).not.toBeNull();
+        return next!;
+      };
+      const request0 = { model: "fake-model", messages: [{ role: "user", content: "turn one" }] };
+      const key0 = { hashVersion: 2, provider: "fake", adapterVersion: "1.0.0", ...request0, tools: [], params: {} };
+      const usage = {
+        provenance: "reported" as const,
+        inputTokens: 40,
+        outputTokens: 9,
+        cachedInputTokens: 0,
+        reasoningTokens: null,
+        raw: { input_tokens: 40, output_tokens: 9 },
+      };
+      const turnOne = { ordinal: 0, turn: 1, maxTurns: 3, provider: "fake", adapterVersion: "1.0.0", model: "fake-model" };
+
+      const first = await claimOperation(database, job, "journal-worker-1", 15_000);
+      const begun = await beginHarnessLlmOperation(database, first!, { ...turnOne, request: request0, journalKey: key0 });
+      if (begun.replayed) throw new Error("Expected a new provider call");
+      expect(begun.orphanedCalls).toBe(0);
+      const output = { text: "journalled", toolCalls: [], finishReason: "stop", usage };
+      await completeHarnessLlmOperation(database, first!, begun.providerCallId, {
+        output, continuationState: null, providerRequestId: "journal-1", resolvedModel: "fake-model-v1",
+        finishReason: "stop", usage,
+      });
+      const storedVersion = await database.query<{ request_hash_version: number }>(
+        "SELECT request_hash_version FROM harness_operations WHERE id = $1",
+        [begun.harnessOperationId],
+      );
+      expect(storedVersion.rows[0]?.request_hash_version).toBe(2);
+
+      // Crash after the journal commit, before the step checkpoint (E2B): the next attempt replays.
+      const second = await crashAndReclaim(2, "journal-worker-2");
+      const replay = await beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 });
+      expect(replay).toMatchObject({
+        replayed: true,
+        output,
+        savedUsage: { provenance: "reported", inputTokens: 40, outputTokens: 9, sourceProviderCallId: begun.providerCallId },
+      });
+      // A second begin in the same attempt is not double-counted.
+      expect(await beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 }))
+        .toMatchObject({ replayed: true });
+      // A changed request (different tool set) never replays the stored response.
+      await expect(beginHarnessLlmOperation(database, second, {
+        ...turnOne, request: request0, journalKey: { ...key0, tools: [{ name: "search", version: "1" }] },
+      })).rejects.toThrow("different request data");
+      // A v2 row cannot be matched by a caller that only supplies the legacy request hash.
+      await expect(beginHarnessLlmOperation(database, second, { ...turnOne, request: request0 }))
+        .rejects.toThrow("different request data");
+
+      // Turn two starts, then the worker crashes before the response is journalled (E2a window).
+      const request2 = { model: "fake-model", messages: [{ role: "user", content: "turn two" }] };
+      const turnTwo = { ...turnOne, ordinal: 2, turn: 2 };
+      const lost = await beginHarnessLlmOperation(database, second, {
+        ...turnTwo, request: request2, journalKey: { ...key0, messages: request2.messages },
+      });
+      if (lost.replayed) throw new Error("Expected a new provider call");
+
+      const third = await crashAndReclaim(3, "journal-worker-3");
+      // The stale attempt can no longer touch the journal.
+      await expect(beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 }))
+        .rejects.toThrow("lease fencing");
+      const reissued = await beginHarnessLlmOperation(database, third, {
+        ...turnTwo, request: request2, journalKey: { ...key0, messages: request2.messages },
+      });
+      if (reissued.replayed) throw new Error("A lost response must be re-issued, not replayed");
+      expect(reissued.orphanedCalls).toBe(1);
+
+      // Rows written before migration 0014 (hash v1) still replay after the upgrade.
+      const request4 = { model: "fake-model", messages: [{ role: "user", content: "turn three" }] };
+      const turnThree = { ...turnOne, ordinal: 4, turn: 3 };
+      const legacy = await beginHarnessLlmOperation(database, third, { ...turnThree, request: request4 });
+      if (legacy.replayed) throw new Error("Expected a new provider call");
+      await completeHarnessLlmOperation(database, third, legacy.providerCallId, {
+        output, continuationState: null, providerRequestId: "journal-legacy", resolvedModel: "fake-model-v1",
+        finishReason: "stop", usage,
+      });
+      expect(await beginHarnessLlmOperation(database, third, {
+        ...turnThree, request: request4, journalKey: { ...key0, messages: request4.messages },
+      })).toMatchObject({ replayed: true });
+
+      const replays = await database.query<{ attempt_id: string; saved_input_tokens: number }>(
+        "SELECT attempt_id, saved_input_tokens FROM harness_replays WHERE run_id = $1 ORDER BY created_at",
+        [created.id],
+      );
+      expect(replays.rows).toEqual([
+        { attempt_id: second.attemptId, saved_input_tokens: 40 },
+        { attempt_id: third.attemptId, saved_input_tokens: 40 },
+      ]);
+      await expect(database.query("UPDATE harness_replays SET saved_input_tokens = 0 WHERE run_id = $1", [created.id]))
+        .rejects.toThrow("immutable");
+
+      const history = await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(
+        `/runs/${created.id}/history`,
+      );
+      expect(history.events.filter((event) => event.type === "LLM_JOURNAL_REPLAYED")).toHaveLength(2);
+      expect(history.events.filter((event) => event.type === "LLM_JOURNAL_ORPHANED")).toHaveLength(1);
+
+      const usageResponse = await request<{
+        usage: Array<{ provenance: string }>;
+        replays: Array<{ savedInputTokens: number; savedOutputTokens: number }>;
+        summary: Record<string, unknown>;
+      }>(`/runs/${created.id}/usage`);
+      // Billed rows: turn one, the lost turn-two call (unknown), turn three. Replays never add billed rows.
+      expect(usageResponse.usage.map((record) => record.provenance).sort()).toEqual(["reported", "reported", "unknown"]);
+      expect(usageResponse.summary).toEqual({
+        billedCalls: 3,
+        billedInputTokens: 80,
+        billedOutputTokens: 18,
+        billedCachedInputTokens: 0,
+        replayedCalls: 2,
+        savedByReplayInputTokens: 80,
+        savedByReplayOutputTokens: 18,
+        provenance: { reported: 2, estimated: 0, unknown: 1 },
+      });
+      await controlRun(database, created.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
   it("commits both deterministic operations and ignores duplicate delivery", async () => {
     const workflow = await request<{ id: string }>("/workflows", {
       method: "POST",

@@ -22,6 +22,7 @@ export class ConflictError extends Error {}
 export type ExecutionFaultBoundary =
   | "before-operation"
   | "after-provider-response"
+  | "after-llm-journal-commit"
   | "after-receiver-commit"
   | "completion-start"
   | "before-checkpoint-commit"
@@ -2728,7 +2729,24 @@ export interface BeginHarnessLlmInput {
   provider: string;
   adapterVersion: string;
   model: string;
+  /** Legacy (v1) hash input: the provider request without tools. */
   request: Record<string, unknown>;
+  /**
+   * v2 hash input: everything that determines the provider response (provider,
+   * adapter version, model, instructions, messages, tool definitions, params,
+   * opaque state). When present, new journal rows are bound to sha256 of its
+   * canonical JSON so a response is never replayed for a different request.
+   */
+  journalKey?: Record<string, unknown>;
+}
+
+export interface HarnessReplaySavedUsage {
+  sourceProviderCallId: string;
+  provenance: "reported" | "estimated" | "unknown";
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  reasoningTokens: number | null;
 }
 
 export type BegunHarnessLlmOperation =
@@ -2737,19 +2755,63 @@ export type BegunHarnessLlmOperation =
       harnessOperationId: string;
       output: Record<string, unknown>;
       continuationState: Record<string, unknown> | null;
+      savedUsage: HarnessReplaySavedUsage | null;
     }
   | {
       replayed: false;
       harnessOperationId: string;
       providerCallId: string;
       logicalOperationId: string;
+      /** Earlier IN_FLIGHT calls whose outcome was lost (journal_orphaned) and are re-issued now. */
+      orphanedCalls: number;
     };
+
+/** Journal hash for an LLM request. v2 covers provider, tools, and params; v1 is the legacy request hash. */
+export function harnessLlmRequestHash(
+  input: Pick<BeginHarnessLlmInput, "request" | "journalKey">,
+  version: 1 | 2,
+): string | null {
+  if (version === 1) return hash(input.request);
+  return input.journalKey === undefined ? null : hash(input.journalKey);
+}
 
 /**
  * Creates one durable LLM logical operation and one physical provider-call record.
- * A completed logical operation is replayed without contacting the provider again.
+ * A completed logical operation is replayed without contacting the provider again;
+ * each replaying attempt is recorded in harness_replays with the tokens it saved.
  */
 export async function beginHarnessLlmOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  input: BeginHarnessLlmInput,
+): Promise<BegunHarnessLlmOperation> {
+  return tracer.startActiveSpan("agentflow.harness.llm.begin", async (span) => {
+    try {
+      setExecutionSpanAttributes(span, {
+        runId: operation.runId,
+        stepId: operation.operationId,
+        stepKey: operation.nodeKey,
+        attemptId: operation.attemptId,
+        leaseEpoch: operation.leaseEpoch,
+      });
+      const begun = await beginHarnessLlmOperationInTransaction(database, operation, input);
+      span.setAttribute("agentflow.llm.journal.replayed", begun.replayed);
+      if (begun.replayed) {
+        span.setAttribute(
+          "agentflow.llm.tokens_saved_by_replay",
+          (begun.savedUsage?.inputTokens ?? 0) + (begun.savedUsage?.outputTokens ?? 0),
+        );
+      } else {
+        span.setAttribute("agentflow.llm.journal.orphaned_calls", begun.orphanedCalls);
+      }
+      return begun;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+async function beginHarnessLlmOperationInTransaction(
   database: Database,
   operation: ClaimedOperation,
   input: BeginHarnessLlmInput,
@@ -2793,12 +2855,14 @@ export async function beginHarnessLlmOperation(
       throw new ConflictError("Harness operation rejected by lease fencing");
     }
 
-    const requestHash = hash(input.request);
+    const hashVersion: 1 | 2 = input.journalKey === undefined ? 1 : 2;
+    const requestHash = harnessLlmRequestHash(input, hashVersion)!;
     const proposedId = randomUUID();
     await transaction.query(
       `INSERT INTO harness_operations
-         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash)
-       VALUES ($1, $2, $3, $4, 'LLM', $5, $6, 'PENDING', $7)
+         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash,
+          request_hash_version)
+       VALUES ($1, $2, $3, $4, 'LLM', $5, $6, 'PENDING', $7, $8)
        ON CONFLICT (step_id, ordinal) DO NOTHING`,
       [
         proposedId,
@@ -2808,6 +2872,7 @@ export async function beginHarnessLlmOperation(
         input.turn,
         input.maxTurns,
         requestHash,
+        hashVersion,
       ],
     );
     const existing = await transaction.query<{
@@ -2816,29 +2881,36 @@ export async function beginHarnessLlmOperation(
       turn: number;
       max_turns: number;
       request_hash: string;
+      request_hash_version: number;
       status: string;
       output_json: Record<string, unknown> | null;
       continuation_state_json: Record<string, unknown> | null;
     }>(
-      `SELECT id, kind, turn, max_turns, request_hash, status, output_json,
-         continuation_state_json
+      `SELECT id, kind, turn, max_turns, request_hash, request_hash_version, status,
+         output_json, continuation_state_json
        FROM harness_operations WHERE step_id = $1 AND ordinal = $2 FOR UPDATE`,
       [operation.operationId, input.ordinal],
     );
     const logical = existing.rows[0]!;
+    // Compare against the hash version the row was written with, so rows created
+    // before migration 0014 (v1) still replay; a mismatch never replays.
+    const storedVersion: 1 | 2 = logical.request_hash_version === 2 ? 2 : 1;
     if (
       logical.kind !== "LLM" || logical.turn !== input.turn ||
-      logical.max_turns !== input.maxTurns || logical.request_hash !== requestHash
+      logical.max_turns !== input.maxTurns ||
+      logical.request_hash !== harnessLlmRequestHash(input, storedVersion)
     ) {
       throw new ConflictError("Harness operation identity is bound to different request data");
     }
     if (logical.status === "SUCCEEDED") {
       if (!logical.output_json) throw new ConflictError("Completed harness operation has no output");
+      const savedUsage = await recordHarnessReplay(transaction, operation, logical.id);
       return {
         replayed: true,
         harnessOperationId: logical.id,
         output: logical.output_json,
         continuationState: logical.continuation_state_json,
+        savedUsage,
       };
     }
 
@@ -2879,6 +2951,21 @@ export async function beginHarnessLlmOperation(
           unresolved.id, unresolved.provider, unresolved.requested_model,
         ],
       );
+      // journal_orphaned: the response never reached the journal, so the call is re-issued below.
+      const sequence = await nextEventSequence(transaction, operation.runId);
+      await transaction.query(
+        `INSERT INTO audit_events
+           (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, $5, 'LLM_JOURNAL_ORPHANED', $6::jsonb)`,
+        [
+          randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId,
+          JSON.stringify({
+            harnessOperationId: logical.id,
+            orphanedProviderCallId: unresolved.id,
+            orphanedAttemptId: unresolved.attempt_id,
+          }),
+        ],
+      );
     }
     const callCount = await transaction.query<{ next_call: number }>(
       `SELECT COALESCE(MAX(call_no), 0)::integer + 1 AS next_call
@@ -2911,8 +2998,78 @@ export async function beginHarnessLlmOperation(
       harnessOperationId: logical.id,
       providerCallId,
       logicalOperationId: logical.id,
+      orphanedCalls: unresolvedCalls.rows.length,
     };
   });
+}
+
+/**
+ * Records that this attempt consumed a journalled response instead of calling the
+ * provider. Saved tokens are copied from the accepted call's billed usage record,
+ * provenance included; usage_records is never written for a replay.
+ */
+async function recordHarnessReplay(
+  transaction: Transaction,
+  operation: ClaimedOperation,
+  harnessOperationId: string,
+): Promise<HarnessReplaySavedUsage | null> {
+  const source = await transaction.query<{
+    provider_call_id: string;
+    provider: string;
+    model: string;
+    provenance: "reported" | "estimated" | "unknown" | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cached_input_tokens: number | null;
+    reasoning_tokens: number | null;
+  }>(
+    `SELECT pc.id AS provider_call_id, pc.provider,
+       COALESCE(ur.model, pc.resolved_model, pc.requested_model) AS model,
+       ur.provenance, ur.input_tokens, ur.output_tokens, ur.cached_input_tokens,
+       ur.reasoning_tokens
+     FROM provider_calls pc
+     LEFT JOIN usage_records ur ON ur.provider_call_id = pc.id
+     WHERE pc.harness_operation_id = $1 AND pc.status = 'SUCCEEDED' AND pc.accepted
+     ORDER BY pc.call_no DESC LIMIT 1`,
+    [harnessOperationId],
+  );
+  const row = source.rows[0];
+  if (!row) return null;
+  const savedUsage: HarnessReplaySavedUsage = {
+    sourceProviderCallId: row.provider_call_id,
+    provenance: row.provenance ?? "unknown",
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    cachedInputTokens: row.cached_input_tokens,
+    reasoningTokens: row.reasoning_tokens,
+  };
+  const inserted = await transaction.query(
+    `INSERT INTO harness_replays
+       (id, run_id, step_id, attempt_id, harness_operation_id, source_provider_call_id,
+        provider, model, provenance, saved_input_tokens, saved_output_tokens,
+        saved_cached_input_tokens, saved_reasoning_tokens)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (harness_operation_id, attempt_id) DO NOTHING`,
+    [
+      randomUUID(), operation.runId, operation.operationId, operation.attemptId,
+      harnessOperationId, row.provider_call_id, row.provider, row.model,
+      savedUsage.provenance, savedUsage.inputTokens, savedUsage.outputTokens,
+      savedUsage.cachedInputTokens, savedUsage.reasoningTokens,
+    ],
+  );
+  if (inserted.rowCount === 1) {
+    const sequence = await nextEventSequence(transaction, operation.runId);
+    await transaction.query(
+      `INSERT INTO audit_events
+         (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+       VALUES ($1, $2, $3, $4, $5, 'LLM_JOURNAL_REPLAYED', $6::jsonb)`,
+      [
+        randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId,
+        JSON.stringify({ harnessOperationId, ...savedUsage }),
+      ],
+    );
+  }
+  return savedUsage;
 }
 
 export interface CompleteHarnessLlmInput {
@@ -3277,4 +3434,57 @@ export async function getRunUsage(database: Queryable, runId: string) {
     [runId],
   );
   return result.rows;
+}
+
+/** Journal replays for a run: provider calls avoided and the billed tokens they would have cost. */
+export async function getRunReplays(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const result = await database.query(
+    `SELECT id, step_id AS "stepId", attempt_id AS "attemptId",
+       harness_operation_id AS "harnessOperationId",
+       source_provider_call_id AS "sourceProviderCallId", provider, model, provenance,
+       saved_input_tokens AS "savedInputTokens", saved_output_tokens AS "savedOutputTokens",
+       saved_cached_input_tokens AS "savedCachedInputTokens",
+       saved_reasoning_tokens AS "savedReasoningTokens", created_at AS "createdAt"
+     FROM harness_replays WHERE run_id = $1 ORDER BY created_at, id`,
+    [runId],
+  );
+  return result.rows;
+}
+
+export interface RunUsageSummary {
+  billedCalls: number;
+  billedInputTokens: number;
+  billedOutputTokens: number;
+  billedCachedInputTokens: number;
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  /** Count of usage records per provenance; null token fields are excluded from sums, never estimated. */
+  provenance: Record<"reported" | "estimated" | "unknown", number>;
+}
+
+export function summarizeRunUsage(
+  usage: ReadonlyArray<{ provenance: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null }>,
+  replays: ReadonlyArray<{ savedInputTokens: number | null; savedOutputTokens: number | null }>,
+): RunUsageSummary {
+  const provenance = { reported: 0, estimated: 0, unknown: 0 };
+  for (const record of usage) {
+    if (record.provenance === "reported" || record.provenance === "estimated" || record.provenance === "unknown") {
+      provenance[record.provenance] += 1;
+    }
+  }
+  const sum = <T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null) =>
+    rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  return {
+    billedCalls: usage.length,
+    billedInputTokens: sum(usage, (r) => r.inputTokens),
+    billedOutputTokens: sum(usage, (r) => r.outputTokens),
+    billedCachedInputTokens: sum(usage, (r) => r.cachedInputTokens),
+    replayedCalls: replays.length,
+    savedByReplayInputTokens: sum(replays, (r) => r.savedInputTokens),
+    savedByReplayOutputTokens: sum(replays, (r) => r.savedOutputTokens),
+    provenance,
+  };
 }

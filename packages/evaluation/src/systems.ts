@@ -11,15 +11,17 @@ import type {
 
 interface SystemCapabilities {
   durableCheckpoints: boolean;
+  /** Each LLM response is committed to a durable journal before the step checkpoint. */
+  llmJournal: boolean;
   stableReceiverKey: boolean;
   receiverAware: boolean;
 }
 
 const capabilities: Record<EvaluationSystem, SystemCapabilities> = {
-  B0: { durableCheckpoints: false, stableReceiverKey: false, receiverAware: false },
-  B1: { durableCheckpoints: false, stableReceiverKey: true, receiverAware: false },
-  A0: { durableCheckpoints: true, stableReceiverKey: false, receiverAware: false },
-  A1: { durableCheckpoints: true, stableReceiverKey: true, receiverAware: true },
+  B0: { durableCheckpoints: false, llmJournal: false, stableReceiverKey: false, receiverAware: false },
+  B1: { durableCheckpoints: false, llmJournal: false, stableReceiverKey: true, receiverAware: false },
+  A0: { durableCheckpoints: true, llmJournal: true, stableReceiverKey: false, receiverAware: false },
+  A1: { durableCheckpoints: true, llmJournal: true, stableReceiverKey: true, receiverAware: true },
 };
 
 function isMandatoryBoundary(operation: EvaluationOperation): boolean {
@@ -48,6 +50,7 @@ export function runSystemTrial(input: {
   const system = capabilities[input.system];
   const calls = new Map<string, number>();
   const llmCalls = new Map<string, number>();
+  const journaledLlm = new Set<string>();
   const acceptedReceiverKeys = new Set<string>();
   const durableApprovals = new Set<string>();
   let durableCursor = 0;
@@ -72,7 +75,7 @@ export function runSystemTrial(input: {
     const operation = input.workload.operations[cursor]!;
     const priorCalls = calls.get(operation.id) ?? 0;
     calls.set(operation.id, priorCalls + 1);
-    if (operation.kind === "LLM") {
+    if (operation.kind === "LLM" && !journaledLlm.has(operation.id)) {
       llmCalls.set(operation.id, (llmCalls.get(operation.id) ?? 0) + 1);
     }
 
@@ -83,8 +86,10 @@ export function runSystemTrial(input: {
         controller.hit("before-operation", operation.id, elapsedMs);
         elapsedMs += operation.latencyMs;
 
-        if (operation.kind === "LLM") {
+        if (operation.kind === "LLM" && !journaledLlm.has(operation.id)) {
           controller.hit("after-provider-response", operation.id, elapsedMs);
+          if (system.llmJournal) journaledLlm.add(operation.id);
+          controller.hit("after-llm-journal-commit", operation.id, elapsedMs);
         }
 
         if (operation.kind === "APPROVAL") {
@@ -157,7 +162,7 @@ export function runSystemTrial(input: {
           }
           elapsedMs += attempt * 5;
           calls.set(operation.id, (calls.get(operation.id) ?? 0) + 1);
-          if (operation.kind === "LLM") {
+          if (operation.kind === "LLM" && !journaledLlm.has(operation.id)) {
             llmCalls.set(operation.id, (llmCalls.get(operation.id) ?? 0) + 1);
           }
           continue;

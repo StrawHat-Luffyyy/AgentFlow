@@ -85,6 +85,11 @@ export async function executeBoundedAgentOperation(
       adapterVersion: provider.adapterVersion,
       model: config.model,
       request: jsonRecord(request, "Provider request"),
+      journalKey: harness.journalKey({
+        provider: config.provider,
+        request,
+        allowedTools: config.allowedTools,
+      }),
     });
 
     let response: LLMResponse;
@@ -143,6 +148,8 @@ export async function executeBoundedAgentOperation(
         );
         throw mapHarnessError(error);
       }
+      // The response is now journalled: a crash from here on replays it instead of re-calling the provider.
+      await faultHooks?.hit("after-llm-journal-commit", operation);
     }
 
     if (response.toolCalls.length === 0) {

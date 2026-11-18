@@ -25,6 +25,7 @@ import {
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getRunReplays,
   getRunUsage,
   getWorkflow,
   listAvailableProviders,
@@ -32,6 +33,7 @@ import {
   listRuns,
   listWorkflows,
   reconcileToolExecution,
+  summarizeRunUsage,
 } from "@agentflow/runtime";
 import {
   approvalDecisionSchema,
@@ -251,7 +253,9 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
 
   app.get("/runs/:id/usage", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
-    response.json({ usage: await getRunUsage(database, runId) });
+    const usage = await getRunUsage(database, runId);
+    const replays = await getRunReplays(database, runId);
+    response.json({ usage, replays, summary: summarizeRunUsage(usage, replays) });
   });
 
   app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {

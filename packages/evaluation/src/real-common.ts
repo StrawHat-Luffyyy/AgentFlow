@@ -7,7 +7,7 @@ import { AgentHarness, ProviderRegistry, ToolRegistry, type LLMRequest, type Pro
 import { AttemptTimeoutError, RetryableOperationError, publishToControlledReceiver } from "@agentflow/runtime";
 
 export type RealSystem = "B0" | "B1" | "A0" | "A1" | "DBOS";
-export type RealScenario = "E0" | "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "DEMO";
+export type RealScenario = "E0" | "E1" | "E2" | "E2B" | "E3" | "E4" | "E5" | "E6" | "E7" | "DEMO";
 export interface RealConfig {
   trialId: string; system: RealSystem; scenario: RealScenario; databaseUrl: string;
   dbosUrl: string; queue: string; redisUrl: string; runId?: string;
@@ -44,6 +44,7 @@ export class Evidence {
     let repeats = 1;
     if ((scenario === "E1" || scenario === "DEMO") && boundary === "before-operation" && operation === "analyze-features") action = "crash";
     if (scenario === "E2" && boundary === "after-provider-response" && operation === "analyze-features") action = "crash";
+    if (scenario === "E2B" && boundary === "after-llm-journal-commit" && operation === "analyze-features") action = "crash";
     if (scenario === "E3" && boundary === "before-operation" && operation === "analyze-pricing") { action = "transient"; repeats = 2; }
     if (scenario === "E4" && boundary === "before-operation" && operation === "search-azure") action = "timeout";
     if (["E5", "E6", "DEMO"].includes(scenario) && boundary === "after-receiver-commit" && operation === "publish-report") action = "crash";
@@ -90,6 +91,9 @@ export async function executeCommonOperation(
       context: { runId: evidence.config.trialId, logicalOperationId: step.key, attemptId: randomUUID(), deadlineAt: new Date(Date.now() + 60_000) },
     });
     await evidence.boundary("after-provider-response", step.key);
+    // Baselines have no LLM journal, so "journal committed" is the same instant as
+    // "response received": the response is in memory only and the step is uncommitted.
+    await evidence.boundary("after-llm-journal-commit", step.key);
     return { ...input, [step.outputKey!]: { content: response.text, finishReason: response.finishReason,
       provider: step.provider, model: response.resolvedModel, turns: 1 } };
   }

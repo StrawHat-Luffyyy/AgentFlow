@@ -1,7 +1,7 @@
 export const evaluationSystems = ["B0", "B1", "A0", "A1"] as const;
 export type EvaluationSystem = (typeof evaluationSystems)[number];
 
-export const experimentScenarios = ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7"] as const;
+export const experimentScenarios = ["E0", "E1", "E2", "E2B", "E3", "E4", "E5", "E6", "E7"] as const;
 export type ExperimentScenario = (typeof experimentScenarios)[number];
 
 export type OperationKind = "READ" | "LLM" | "APPROVAL" | "WRITE";
@@ -26,6 +26,7 @@ export interface EvaluationWorkload {
 export const faultHookPoints = [
   "before-operation",
   "after-provider-response",
+  "after-llm-journal-commit",
   "after-receiver-commit",
   "before-checkpoint-commit",
   "after-checkpoint-commit",
