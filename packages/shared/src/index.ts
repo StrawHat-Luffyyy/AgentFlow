@@ -123,6 +123,11 @@ const toolStepDefinitionSchema = z.object({
   ]),
 });
 
+const agentInputPathSchema = z.string().max(200).regex(
+  /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*$/,
+  "Agent input must be a dot-path such as sourceSet or request.assumptions",
+);
+
 const agentStepDefinitionSchema = z.object({
   key: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9-]*$/),
   kind: z.literal("AGENT"),
@@ -134,10 +139,19 @@ const agentStepDefinitionSchema = z.object({
   maxTurns: z.number().int().min(1).max(20).default(10),
   maxOutputTokens: z.number().int().min(1).max(100_000).optional(),
   outputKey: z.string().min(1).max(100).regex(/^[a-z][a-zA-Z0-9]*$/).optional(),
+  /**
+   * Per-step context minimization (brief §2.4): dot-paths into the step's input state
+   * that the prompt may include. Absent means the full input (backward compatible).
+   * The step's output still carries the full state; only the prompt is narrowed.
+   */
+  inputs: z.array(agentInputPathSchema).min(1).max(20).optional(),
 }).superRefine((definition, context) => {
   const unique = new Set(definition.allowedTools);
   if (unique.size !== definition.allowedTools.length) {
     context.addIssue({ code: "custom", path: ["allowedTools"], message: "Agent tool allowlist contains duplicates" });
+  }
+  if (definition.inputs && new Set(definition.inputs).size !== definition.inputs.length) {
+    context.addIssue({ code: "custom", path: ["inputs"], message: "Agent inputs contain duplicates" });
   }
 });
 
@@ -173,7 +187,103 @@ export const workflowDefinitionSchema = z.object({
     }
     keys.add(step.key);
   });
+  // Declared agent inputs must be produced upstream. Every handler's output keys are
+  // known statically (stepOutputKeys); only the run input itself is an open set, so
+  // roots are checked here whenever the state shape is known, and at runtime always.
+  let state: StateKeys = { open: true, keys: new Set() };
+  definition.steps.forEach((step, index) => {
+    if (step.kind === "AGENT" && step.inputs && !state.open) {
+      step.inputs.forEach((path, inputIndex) => {
+        const root = path.split(".")[0]!;
+        if (!state.keys.has(root)) {
+          context.addIssue({
+            code: "custom",
+            path: ["steps", index, "inputs", inputIndex],
+            message: `Agent input ${path}: no upstream step produces ${root}`,
+          });
+        }
+      });
+    }
+    state = stepOutputKeys(step, state);
+  });
 });
+
+/** Statically known top-level keys of the state object flowing between steps. */
+export interface StateKeys {
+  /** True while the shape still includes the arbitrary run input. */
+  open: boolean;
+  keys: ReadonlySet<string>;
+}
+
+const agentResultKeys = ["content", "finishReason", "provider", "model", "turns"];
+
+/** Output-key contract of each step kind/handler (mirrors the handlers in runtime and research). */
+export function stepOutputKeys(step: WorkflowStepDefinition, previous: StateKeys): StateKeys {
+  const closed = (keys: Iterable<string>): StateKeys => ({ open: false, keys: new Set(keys) });
+  switch (step.kind) {
+    case "APPROVAL":
+      return previous;
+    case "TOOL":
+      return closed(["published", "receiverId", "receipt", "receiverReplayed"]);
+    case "AGENT":
+      return step.outputKey
+        ? { open: previous.open, keys: new Set([...previous.keys, step.outputKey]) }
+        : closed(agentResultKeys);
+    default:
+      switch (step.handler) {
+        case "generate-summary":
+          return closed(["summary", "source"]);
+        case "finalize":
+          return closed(["finalized", "result"]);
+        case "generate-cloud-report":
+          return closed(["report", "publication", "sourceSet", "approvalBinding"]);
+        default:
+          // select-*-sources and collect-sources wrap the run input as `request`
+          // (or carry an existing reference state forward) and add `sourceSet`.
+          return closed([...previous.keys, "request", "sourceSet"]);
+      }
+  }
+}
+
+export class AgentInputProjectionError extends Error {
+  constructor(readonly path: string) {
+    super(`Declared agent input ${path} is missing from the step input`);
+    this.name = "AgentInputProjectionError";
+  }
+}
+
+/**
+ * Builds the prompt input for an AGENT step that declares `inputs`: only the declared
+ * dot-paths, with their nesting preserved. A missing root is a definition or handler
+ * bug and throws; a missing nested segment (an optional field) is omitted.
+ */
+export function projectAgentInput(input: Record<string, unknown>, paths: readonly string[]): Record<string, unknown> {
+  const projected: Record<string, unknown> = {};
+  for (const path of paths) {
+    const segments = path.split(".");
+    if (!Object.prototype.hasOwnProperty.call(input, segments[0]!)) throw new AgentInputProjectionError(path);
+    let source: unknown = input;
+    let found = true;
+    for (const segment of segments) {
+      if (source === null || typeof source !== "object" || Array.isArray(source) ||
+          !Object.prototype.hasOwnProperty.call(source, segment)) {
+        found = false;
+        break;
+      }
+      source = (source as Record<string, unknown>)[segment];
+    }
+    if (!found) continue;
+    let target = projected;
+    segments.slice(0, -1).forEach((segment) => {
+      const next = target[segment];
+      target = (next !== null && typeof next === "object" && !Array.isArray(next)
+        ? next
+        : (target[segment] = {})) as Record<string, unknown>;
+    });
+    target[segments.at(-1)!] = structuredClone(source);
+  }
+  return projected;
+}
 
 export type WorkflowDefinition = z.infer<typeof workflowDefinitionSchema>;
 export type WorkflowStepDefinition = z.infer<typeof workflowStepDefinitionSchema>;

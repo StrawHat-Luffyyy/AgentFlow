@@ -13,10 +13,11 @@ import { createOutboxDispatcher } from "../../../apps/api/src/outbox.js";
 import { createRecoveryScheduler } from "../../../apps/api/src/scheduler.js";
 import { redisConnection } from "../../../apps/api/src/redis.js";
 import { processOperationJob } from "../../../apps/worker/src/worker.js";
-import { definition, Evidence, evidenceDatabase, executeCommonOperation, measuredHarness,
+import { referenceDefinition, Evidence, evidenceDatabase, executeCommonOperation, measuredHarness,
   publicationTarget, digest, type RealConfig } from "./real-common.js";
 
 const config = JSON.parse(process.env.AGENTFLOW_EVALUATION_CONFIG!) as RealConfig;
+const definition = referenceDefinition(config.context ?? "full");
 const db = evidenceDatabase(config.databaseUrl);
 const evidence = new Evidence(db, config);
 const role = process.argv[2];

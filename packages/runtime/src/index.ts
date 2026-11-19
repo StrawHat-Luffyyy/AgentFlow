@@ -95,6 +95,8 @@ async function materializeStep(
           ? {} : { maxOutputTokens: input.definition.maxOutputTokens }),
         ...(input.definition.outputKey === undefined
           ? {} : { outputKey: input.definition.outputKey }),
+        ...(input.definition.inputs === undefined
+          ? {} : { inputs: input.definition.inputs }),
       }) : null,
     ],
   );
@@ -1095,6 +1097,8 @@ export interface ClaimedOperation {
     maxTurns: number;
     maxOutputTokens?: number;
     outputKey?: string;
+    /** Declared prompt inputs (brief §2.4); absent means the full step input. */
+    inputs?: string[];
   } | null;
 }
 

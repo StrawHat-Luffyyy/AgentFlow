@@ -22,6 +22,11 @@ const scenarios = argument("--scenarios", "E0,E1,E2,E2B,E3,E4,E5,E6,E7").split("
 // definition unchanged (runtime default "run"), so earlier campaigns stay comparable.
 const cacheScope = argument("--cache-scope", "");
 if (!["", "run", "version", "off"].includes(cacheScope)) throw new Error("--cache-scope must be run, version, or off");
+// Reference workflow context (brief §2.4). Default "full" keeps prompts identical to the
+// cited campaigns; "minimal" gives every system (AgentFlow and baselines) the projected prompts.
+const contextArgument = argument("--context", "full");
+if (contextArgument !== "full" && contextArgument !== "minimal") throw new Error("--context must be full or minimal");
+const context: "full" | "minimal" = contextArgument;
 if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
     systems.some((s) => !["B0","B1","A0","A1","DBOS"].includes(s)) ||
     scenarios.some((s) => !["E0","E1","E2","E2B","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
@@ -43,7 +48,7 @@ const base: RealConfig = {
   redisUrl: process.env.EVALUATION_REDIS_URL ?? "redis://localhost:6379", queue: `agentflow-${campaign}`,
   leaseMs: Number(argument("--lease-ms", "1000")), retryMs: 20,
   operationDelayMs: Number(argument("--operation-delay-ms", defaultDelayMs)), observationMs: Number(argument("--observation-ms", isDemo ? "600000" : "120000")),
-  apiPort,
+  apiPort, context,
 };
 if (!new URL(base.dbosUrl).pathname.endsWith("_eval")) throw new Error("DBOS database must end in _eval");
 await mkdir(output, { recursive: true });
@@ -108,7 +113,7 @@ async function versionFor(config: RealConfig): Promise<string> {
   const key = config.scenario === "E6" && config.system === "A1" ? "unsafe" : "supported";
   if (versions.has(key)) return versions.get(key)!;
   const workflow = await request("/workflows", { name: `${campaign}-${key}` });
-  const definition = cloudComparisonWorkflowDefinition();
+  const definition = cloudComparisonWorkflowDefinition({ context });
   if (cacheScope) Object.assign(definition, { cacheScope });
   if (key === "unsafe") {
     const publication = definition.steps.at(-1)!;
@@ -305,7 +310,7 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
 
 let revision = "unknown";
 try { revision = execFileSync("git", ["rev-parse","HEAD"], { encoding: "utf8" }).trim(); } catch {}
-const manifest = { campaign, seed, trials, systems, scenarios, cacheScope: cacheScope || "default (run)", sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
+const manifest = { campaign, seed, trials, systems, scenarios, cacheScope: cacheScope || "default (run)", context, sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
   node: process.version, hardware: { cpu: cpus()[0]?.model, logicalCpus: cpus().length, memoryBytes: totalmem() },
   corpusHash: cloudComparisonCorpusHash, dbosVersion: "5.2.11", policy: { leaseMs: base.leaseMs, schedulerPollMs: 50, outboxPollMs: 20,
     retryInitialMs: base.retryMs, maxAttempts: 3, maxRestarts: 3, observationMs: base.observationMs, workerConcurrency: 1, operationDelayMs: base.operationDelayMs },

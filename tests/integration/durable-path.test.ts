@@ -18,7 +18,7 @@ import {
   type LLMResponse,
 } from "@agentflow/harness";
 import { defaultWorkflowDefinition } from "@agentflow/shared";
-import { ScriptedResearchProvider, fixedSourceContentHash } from "@agentflow/research";
+import { ScriptedResearchProvider, ensureCloudComparisonWorkflow, fixedSourceContentHash } from "@agentflow/research";
 import {
   beginHarnessLlmOperation,
   claimOperation,
@@ -1152,6 +1152,75 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 30_000);
+
+  it("sends only declared agent inputs to the provider while the step output keeps the full state", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "context-minimization-workflow", description: "Declared agent inputs" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "minimal-agent", kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+              instructions: "Use only what you are given.", allowedTools: [], maxTurns: 1,
+              outputKey: "analysis", inputs: ["topic", "nested.keep", "nested.absent"],
+            }],
+          },
+        }),
+      });
+      const runWith = async (input: Record<string, unknown>, creationKey: string) => {
+        const created = await request<{ id: string; steps: Array<{ id: string; dispatchGeneration: number }> }>("/runs", {
+          method: "POST",
+          body: JSON.stringify({ workflowVersionId: version.id, input, creationKey }),
+        });
+        const fake = new DeterministicFakeProvider();
+        const harness = new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry());
+        const step = created.steps[0]!;
+        const result = await processOperationJob(
+          database, "context-worker", 15_000,
+          { data: { runId: created.id, operationId: step.id, workflowVersionId: version.id, dispatchGeneration: step.dispatchGeneration } } as Job,
+          5_000, 60_000, harness,
+        );
+        return { created, fake, result };
+      };
+
+      const full = { topic: "pricing", nested: { keep: "yes", drop: "no" }, publicationTarget: "controlled://publications/x" };
+      const ok = await runWith(full, "context-minimization-ok");
+      expect(ok.result).toMatchObject({ skipped: false, runCompleted: true });
+      expect(ok.fake.calls).toHaveLength(1);
+      // Only the declared paths reach the provider; the absent optional path is omitted.
+      expect(JSON.parse(ok.fake.calls[0]!.request.messages[0]!.content)).toEqual({ topic: "pricing", nested: { keep: "yes" } });
+      const completed = await request<{ steps: Array<{ acceptedOutput: Record<string, unknown> }> }>(`/runs/${ok.created.id}`);
+      expect(completed.steps[0]?.acceptedOutput).toMatchObject({
+        ...full,
+        analysis: expect.objectContaining({ content: "fake-response-1" }),
+      });
+
+      // A declared root missing at runtime is a definition bug: permanent failure, no provider call.
+      const missing = await runWith({ nested: { keep: "yes" } }, "context-minimization-missing");
+      expect(missing.result).toMatchObject({ failed: true, failure: { errorClass: "PERMANENT", code: "DECLARED_INPUT_MISSING" } });
+      expect(missing.fake.calls).toHaveLength(0);
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("registers a new reference workflow version when its definition changes instead of failing", async () => {
+    const owner = "context-version-owner";
+    const full = await ensureCloudComparisonWorkflow(database, { context: "full" }, owner);
+    const minimal = await ensureCloudComparisonWorkflow(database, { context: "minimal" }, owner);
+    const again = await ensureCloudComparisonWorkflow(database, { context: "minimal" }, owner);
+    const fullAgain = await ensureCloudComparisonWorkflow(database, { context: "full" }, owner);
+    expect(full).toMatchObject({ version: 1, created: true });
+    expect(minimal).toMatchObject({ version: 2, created: true, workflowId: full.workflowId });
+    expect(again).toMatchObject({ version: 2, created: false, workflowVersionId: minimal.workflowVersionId });
+    expect(fullAgain).toMatchObject({ version: 1, created: false, workflowVersionId: full.workflowVersionId });
+  });
 
   it("commits both deterministic operations and ignores duplicate delivery", async () => {
     const workflow = await request<{ id: string }>("/workflows", {

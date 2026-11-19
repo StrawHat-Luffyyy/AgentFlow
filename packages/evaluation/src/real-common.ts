@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDatabase, type Database } from "@agentflow/db";
 import { ScriptedResearchProvider, cloudComparisonWorkflowDefinition, executeReferenceTransform } from "@agentflow/research";
-import { canonicalJson, type WorkflowStepDefinition } from "@agentflow/shared";
+import { canonicalJson, projectAgentInput, type WorkflowStepDefinition } from "@agentflow/shared";
 import { AgentHarness, ProviderRegistry, ToolRegistry, type LLMRequest, type ProviderExecutionContext } from "@agentflow/harness";
 import { AttemptTimeoutError, RetryableOperationError, publishToControlledReceiver } from "@agentflow/runtime";
 
@@ -13,8 +13,11 @@ export interface RealConfig {
   dbosUrl: string; queue: string; redisUrl: string; runId?: string;
   leaseMs: number; retryMs: number; operationDelayMs: number; observationMs: number;
   apiPort?: number;
+  /** Reference workflow context mode (brief §2.4). Absent means "full", the pre-2.4 prompts. */
+  context?: "minimal" | "full";
 }
-export const definition = cloudComparisonWorkflowDefinition();
+/** The reference definition every system runs; "full" reproduces the cited campaigns' prompts. */
+export const referenceDefinition = (context: "minimal" | "full" = "full") => cloudComparisonWorkflowDefinition({ context });
 export const digest = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");
 export const publicationTarget = (id: string) => `controlled://publications/${id.toLowerCase()}`;
 
@@ -86,7 +89,9 @@ export async function executeCommonOperation(
   if (step.kind === "AGENT") {
     const response = await measuredHarness(evidence).executeModelOperation({
       provider: step.provider, request: { model: step.model, instructions: step.instructions,
-        messages: [{ role: "user", content: JSON.stringify(input) }], maxOutputTokens: step.maxOutputTokens! },
+        // Same projection as the AgentFlow worker, so every system sends an identical prompt.
+        messages: [{ role: "user", content: JSON.stringify(step.inputs ? projectAgentInput(input, step.inputs) : input) }],
+        maxOutputTokens: step.maxOutputTokens! },
       allowedTools: step.allowedTools, turn: 1, maxTurns: step.maxTurns,
       context: { runId: evidence.config.trialId, logicalOperationId: step.key, attemptId: randomUUID(), deadlineAt: new Date(Date.now() + 60_000) },
     });

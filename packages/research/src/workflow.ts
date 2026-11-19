@@ -10,6 +10,12 @@ export const cloudComparisonSetupSchema = z.object({
   reviewerRole: z.string().trim().min(1).max(100).default("research-reviewer"),
   approvalExpiresAfterMs: z.number().int().min(1_000).max(30 * 24 * 60 * 60 * 1_000)
     .default(24 * 60 * 60 * 1_000),
+  /**
+   * Per-step context minimization (brief §2.4). "minimal": each analysis step sees only
+   * the corpus and the workload assumptions. "full": the original definition, where each
+   * analysis prompt carries the whole accumulated state (kept for comparable campaigns).
+   */
+  context: z.enum(["minimal", "full"]).default("minimal"),
 }).superRefine((input, context) => {
   if (input.mode === "live" && (!input.provider || !input.model)) {
     context.addIssue({
@@ -31,10 +37,14 @@ function workflowIdentity(provider: string, model: string): string {
   return `${slug.slice(0, 48)}-${hash({ provider, model }).slice(0, 8)}`;
 }
 
+/** What each analysis step needs: the verified corpus and the workload assumptions, nothing else. */
+export const cloudComparisonAnalysisInputs = ["sourceSet", "request.assumptions"] as const;
+
 export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSetup> = {}): WorkflowDefinition {
   const setup = cloudComparisonSetupSchema.parse(raw);
   const provider = setup.mode === "scripted" ? "scripted-research" : setup.provider!;
   const model = setup.mode === "scripted" ? "cloud-comparison-scripted-v1" : setup.model!;
+  const inputs = setup.context === "minimal" ? { inputs: [...cloudComparisonAnalysisInputs] } : {};
   return workflowDefinitionSchema.parse({
     steps: [
       { key: "search-aws", kind: "DETERMINISTIC", handler: "select-aws-sources" },
@@ -52,6 +62,7 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
         maxTurns: 2,
         maxOutputTokens: 1_500,
         outputKey: "pricingAnalysis",
+        ...inputs,
       },
       {
         key: "analyze-features",
@@ -64,6 +75,7 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
         maxTurns: 2,
         maxOutputTokens: 1_500,
         outputKey: "featureAnalysis",
+        ...inputs,
       },
       { key: "generate-report", kind: "DETERMINISTIC", handler: "generate-cloud-report" },
       {
@@ -110,35 +122,37 @@ export async function ensureCloudComparisonWorkflow(
       "SELECT id FROM workflows WHERE name = $1 AND owner_id = $2",
       [workflowName, ownerId],
     )).rows[0]!.id;
-    const proposedVersionId = randomUUID();
-    const insertedVersion = await transaction.query<{ id: string; definition_hash: string }>(
-      `INSERT INTO workflow_versions
-         (id, workflow_id, version, definition_json, definition_hash)
-       VALUES ($1, $2, 1, $3::jsonb, $4)
-       ON CONFLICT (workflow_id, version) DO NOTHING
-       RETURNING id, definition_hash`,
-      [proposedVersionId, resolvedWorkflowId, JSON.stringify(definition), definitionHash],
-    );
-    const createdVersion = insertedVersion.rows[0];
-    const resolvedVersion = createdVersion ?? (await transaction.query<{
-      id: string;
-      definition_hash: string;
-    }>(
-      "SELECT id, definition_hash FROM workflow_versions WHERE workflow_id = $1 AND version = 1",
-      [resolvedWorkflowId],
-    )).rows[0]!;
-    if (resolvedVersion.definition_hash !== definitionHash) {
-      throw new Error(`Reference workflow ${workflowName} version 1 already has a different definition`);
+    // Versions are immutable: reuse the version with this exact definition, otherwise
+    // append the next version number (e.g. when the reference definition changes).
+    const findVersion = async () => (await transaction.query<{ id: string; version: number }>(
+      "SELECT id, version FROM workflow_versions WHERE workflow_id = $1 AND definition_hash = $2",
+      [resolvedWorkflowId, definitionHash],
+    )).rows[0];
+    let resolvedVersion = await findVersion();
+    let createdVersion = false;
+    for (let attempt = 0; !resolvedVersion && attempt < 5; attempt += 1) {
+      const inserted = await transaction.query<{ id: string; version: number }>(
+        `INSERT INTO workflow_versions
+           (id, workflow_id, version, definition_json, definition_hash)
+         SELECT $1, $2, COALESCE(MAX(version), 0) + 1, $3::jsonb, $4
+         FROM workflow_versions WHERE workflow_id = $2
+         ON CONFLICT DO NOTHING
+         RETURNING id, version`,
+        [randomUUID(), resolvedWorkflowId, JSON.stringify(definition), definitionHash],
+      );
+      createdVersion = inserted.rowCount === 1;
+      resolvedVersion = inserted.rows[0] ?? await findVersion();
     }
+    if (!resolvedVersion) throw new Error(`Could not register a version of reference workflow ${workflowName}`);
     return {
       workflowId: resolvedWorkflowId,
       workflowVersionId: resolvedVersion.id,
       workflowName,
-      version: 1,
+      version: resolvedVersion.version,
       mode: setup.mode,
       provider,
       model,
-      created: Boolean(createdVersion),
+      created: createdVersion,
       definition,
     };
   });

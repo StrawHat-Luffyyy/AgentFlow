@@ -7,6 +7,7 @@ import {
   type LLMResponse,
 } from "@agentflow/harness";
 import type { Database } from "@agentflow/db";
+import { AgentInputProjectionError, projectAgentInput } from "@agentflow/shared";
 import {
   AttemptTimeoutError,
   PermanentOperationError,
@@ -65,7 +66,18 @@ export async function executeBoundedAgentOperation(
   if (operation.kind !== "AGENT" || !config) {
     throw new PermanentOperationError("Operation has no bounded agent configuration", "INVALID_AGENT_OPERATION");
   }
-  const messages: LLMMessage[] = [{ role: "user", content: JSON.stringify(operation.input) }];
+  // Context minimization (brief §2.4): the prompt carries only the declared inputs when
+  // the step declares them; the step output below still carries the full state.
+  let promptInput: Record<string, unknown>;
+  try {
+    promptInput = config.inputs ? projectAgentInput(operation.input, config.inputs) : operation.input;
+  } catch (error) {
+    if (error instanceof AgentInputProjectionError) {
+      throw new PermanentOperationError(error.message, "DECLARED_INPUT_MISSING");
+    }
+    throw error;
+  }
+  const messages: LLMMessage[] = [{ role: "user", content: JSON.stringify(promptInput) }];
   let opaqueState: JsonObject | undefined;
 
   for (let turn = 1; turn <= config.maxTurns; turn += 1) {
