@@ -10,6 +10,7 @@ import {
   settleOperationFailure,
   settleUnknownToolOutcome,
   UnknownEffectError,
+  BudgetExceededError,
   type ExecutionFaultHooks,
 } from "@agentflow/runtime";
 import {
@@ -99,6 +100,12 @@ export async function processOperationJob(
             : executeDeterministicOperation(operation);
         }
       } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          // enforceRunBudget already moved the run to BUDGET_EXCEEDED under the lease
+          // fence; settling the failure would only be rejected by the terminal run.
+          span.setAttribute("agentflow.failure.class", "BUDGET_EXCEEDED");
+          return { skipped: false, budgetExceeded: true, budget: error.check };
+        }
         if (error instanceof UnknownEffectError) {
           const settlement = await settleUnknownToolOutcome(database, operation, error);
           return { skipped: false, unknown: true, settlement };

@@ -15,6 +15,7 @@ const toneByStatus: Record<string, Tone> = {
   APPROVED: "success",
   FAILED: "danger",
   TIMED_OUT: "danger",
+  BUDGET_EXCEEDED: "danger",
   REJECTED: "danger",
   EXPIRED: "danger",
   RUNNING: "running",

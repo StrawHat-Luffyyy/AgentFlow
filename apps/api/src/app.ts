@@ -25,6 +25,7 @@ import {
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getRunBudget,
   getRunCacheLookups,
   getRunReplays,
   getRunUsage,
@@ -42,6 +43,7 @@ import {
   createWorkflowSchema,
   createWorkflowVersionSchema,
   reconciliationDecisionSchema,
+  type ModelPriceTable,
 } from "@agentflow/shared";
 import {
   cloudComparisonCorpusManifest,
@@ -52,7 +54,17 @@ import type { Queue } from "bullmq";
 import express from "express";
 import { z } from "zod";
 
-export function createApp(database: Database, queue: Queue, credentials: readonly Credential[] = readCredentials()): express.Express {
+export interface AppOptions {
+  /** Operator-configured model prices for run cost budgets (AGENTFLOW_MODEL_PRICES). */
+  modelPrices?: ModelPriceTable;
+}
+
+export function createApp(
+  database: Database,
+  queue: Queue,
+  credentials: readonly Credential[] = readCredentials(),
+  options: AppOptions = {},
+): express.Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -210,7 +222,7 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
       ...(body.creationKey === undefined ? {} : {
         creationKey: createHash("sha256").update(JSON.stringify([response.locals.principal.id, body.creationKey])).digest("hex"),
       }),
-    });
+    }, { modelPrices: options.modelPrices ?? {} });
     response.status(201).json(run);
   });
 
@@ -257,7 +269,8 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     const usage = await getRunUsage(database, runId);
     const replays = await getRunReplays(database, runId);
     const cache = await getRunCacheLookups(database, runId);
-    response.json({ usage, replays, summary: summarizeRunUsage(usage, replays, cache) });
+    const budget = await getRunBudget(database, runId);
+    response.json({ usage, replays, summary: { ...summarizeRunUsage(usage, replays, cache), budget } });
   });
 
   app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {

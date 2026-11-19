@@ -60,6 +60,9 @@ export interface RunDetail {
   steps: Step[];
   checkpoint: { id: string; revision: number; reason: string; createdAt: string };
   providers?: string[];
+  /** Run budget (brief 2.5); null or absent when unbudgeted. */
+  maxTokens?: number | null;
+  maxCostUsd?: number | null;
 }
 
 export interface Attempt {
@@ -172,6 +175,8 @@ export interface CreateRunBody {
   input: Record<string, unknown>;
   creationKey?: string;
   deadlineMs?: number;
+  maxTokens?: number;
+  maxCostUsd?: number;
 }
 
 /** HTTP status 0 means the API could not be reached at all. */

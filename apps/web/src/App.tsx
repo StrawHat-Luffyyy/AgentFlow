@@ -29,7 +29,7 @@ import {
   type UsageRecord,
 } from "./api.js";
 import { NewRunDrawer } from "./NewRunDrawer.js";
-import { summarizeUsage, usageDetail, usageTotal } from "./new-run.js";
+import { budgetLabel, summarizeUsage, usageDetail, usageTotal } from "./new-run.js";
 import { ModeBadge, ResultPanel } from "./ResultPanel.js";
 import {
   BrandMark,
@@ -102,7 +102,7 @@ function Stat({ label, value, detail }: { label: string; value: string | number;
 function historyTone(type: string): string {
   // Lease expiry is a recovery signal, not a terminal failure.
   if (/UNKNOWN|LEASE|RETRY|ABANDON|CANCEL|PAUSE/.test(type)) return "warning";
-  if (/FAILED|EXPIRED|TIMED_OUT|REJECTED/.test(type)) return "danger";
+  if (/FAILED|EXPIRED|TIMED_OUT|BUDGET_EXCEEDED|REJECTED/.test(type)) return "danger";
   if (/SUCCEEDED|APPROVED|RESUMED/.test(type)) return "success";
   return "neutral";
 }
@@ -375,6 +375,7 @@ function Operations({ principal, signOut, onSessionExpired }: { principal: Princ
                   <div><dt>Created</dt><dd>{formatDate(run.createdAt)}</dd></div>
                   <div><dt>{run.finishedAt ? "Finished" : "Deadline"}</dt><dd>{formatDate(run.finishedAt ?? run.deadlineAt)}</dd></div>
                   <div><dt>Revision</dt><dd>{run.stateRevision}</dd></div>
+                  {budgetLabel(run) && <div><dt>Budget</dt><dd>{budgetLabel(run)}</dd></div>}
                 </dl>
               </div>
               <div className="run-controls" aria-label="Run controls">

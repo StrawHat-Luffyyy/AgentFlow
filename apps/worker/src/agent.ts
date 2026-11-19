@@ -10,12 +10,14 @@ import type { Database } from "@agentflow/db";
 import { AgentInputProjectionError, projectAgentInput } from "@agentflow/shared";
 import {
   AttemptTimeoutError,
+  BudgetExceededError,
   PermanentOperationError,
   RetryableOperationError,
   beginHarnessLlmOperation,
   beginHarnessToolOperation,
   completeHarnessLlmOperation,
   completeHarnessToolOperation,
+  enforceRunBudget,
   failHarnessLlmOperation,
   recordUnacceptedHarnessLlmResponse,
   type ClaimedOperation,
@@ -106,9 +108,13 @@ export async function executeBoundedAgentOperation(
 
     let response: LLMResponse;
     if (llm.replayed) {
+      // Journal replays and cache hits make no provider call, so they consume no budget.
       response = replayedResponse(llm.output);
       opaqueState = llm.continuationState as JsonObject | null ?? undefined;
     } else {
+      // Run budget (brief §2.5): checked before every real provider call.
+      const beforeCall = await enforceRunBudget(database, operation, "before-call", llm.providerCallId);
+      if (beforeCall?.exceeded) throw new BudgetExceededError(beforeCall);
       const controller = new AbortController();
       const remainingMs = Math.max(0, operation.attemptDeadlineAt.getTime() - Date.now());
       const timer = setTimeout(() => controller.abort(), remainingMs);
@@ -151,7 +157,11 @@ export async function executeBoundedAgentOperation(
       try {
         await completeHarnessLlmOperation(database, operation, llm.providerCallId, completion);
         opaqueState = response.opaqueState ?? undefined;
+        // ...and after every billed response, from the usage record just persisted.
+        const afterResponse = await enforceRunBudget(database, operation, "after-response");
+        if (afterResponse?.exceeded) throw new BudgetExceededError(afterResponse);
       } catch (error) {
+        if (error instanceof BudgetExceededError) throw error;
         await recordUnacceptedHarnessLlmResponse(
           database,
           operation,

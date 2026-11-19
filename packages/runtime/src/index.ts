@@ -14,6 +14,9 @@ import {
   type RetryPolicy,
   type WorkflowDefinition,
   type WorkflowStepDefinition,
+  type ModelPrice,
+  type ModelPriceTable,
+  usageCostUsd,
 } from "@agentflow/shared";
 
 export class NotFoundError extends Error {}
@@ -206,7 +209,10 @@ export async function createRun(
     creationKey?: string | undefined;
     deadlineMs?: number | undefined;
     retryPolicy?: RetryPolicy | undefined;
+    maxTokens?: number | undefined;
+    maxCostUsd?: number | undefined;
   },
+  options: { modelPrices?: ModelPriceTable } = {},
 ) {
   return tracer.startActiveSpan("agentflow.run.create", async (span) => {
     try {
@@ -224,10 +230,13 @@ export async function createRun(
             retry_initial_ms: number;
             retry_multiplier: number;
             retry_cap_ms: number;
+            max_tokens: string | null;
+            max_cost_usd: string | null;
           }>(
             `SELECT wr.id, wr.workflow_version_id, wr.input_hash,
                EXTRACT(EPOCH FROM (wr.deadline_at - wr.created_at)) * 1000 AS deadline_ms,
-               ws.max_attempts, ws.retry_initial_ms, ws.retry_multiplier, ws.retry_cap_ms
+               ws.max_attempts, ws.retry_initial_ms, ws.retry_multiplier, ws.retry_cap_ms,
+               wr.max_tokens, wr.max_cost_usd
              FROM workflow_runs wr
              JOIN workflow_steps ws ON ws.run_id = wr.id AND ws.position = 0
              WHERE wr.creation_key = $1`,
@@ -242,7 +251,9 @@ export async function createRun(
               row.max_attempts !== retryPolicy.maxAttempts ||
               row.retry_initial_ms !== retryPolicy.initialBackoffMs ||
               row.retry_multiplier !== retryPolicy.multiplier ||
-              row.retry_cap_ms !== retryPolicy.maxBackoffMs
+              row.retry_cap_ms !== retryPolicy.maxBackoffMs ||
+              (row.max_tokens === null ? undefined : Number(row.max_tokens)) !== input.maxTokens ||
+              (row.max_cost_usd === null ? undefined : Number(row.max_cost_usd)) !== input.maxCostUsd
             ) {
               throw new ConflictError("Creation key is already bound to different input or policy");
             }
@@ -262,6 +273,21 @@ export async function createRun(
         const definition = workflowDefinitionSchema.parse(versionRow.definition_json);
         const firstDefinition = definition.steps[0];
         if (!firstDefinition) throw new ConflictError("Workflow version has no steps");
+        // A cost budget needs a configured price for every model this version can call;
+        // the relevant prices are snapshotted on the run so later edits never change it.
+        let priceSnapshot: ModelPriceTable | null = null;
+        if (input.maxCostUsd !== undefined) {
+          priceSnapshot = {};
+          for (const step of definition.steps) {
+            if (step.kind !== "AGENT") continue;
+            const key = `${step.provider}/${step.model}`;
+            const price = options.modelPrices?.[key];
+            if (!price) {
+              throw new ConflictError(`maxCostUsd requires a configured price for ${key} (AGENTFLOW_MODEL_PRICES)`);
+            }
+            priceSnapshot[key] = price;
+          }
+        }
 
         const runId = randomUUID();
         setExecutionSpanAttributes(span, { runId });
@@ -270,8 +296,10 @@ export async function createRun(
 
         await transaction.query(
           `INSERT INTO workflow_runs
-             (id, workflow_version_id, creation_key, input_json, input_hash, lifecycle, deadline_at)
-           VALUES ($1, $2, $3, $4::jsonb, $5, 'OPEN', now() + ($6 * interval '1 millisecond'))`,
+             (id, workflow_version_id, creation_key, input_json, input_hash, lifecycle, deadline_at,
+              max_tokens, max_cost_usd, price_table_json)
+           VALUES ($1, $2, $3, $4::jsonb, $5, 'OPEN', now() + ($6 * interval '1 millisecond'),
+             $7, $8, $9::jsonb)`,
           [
             runId,
             input.workflowVersionId,
@@ -279,6 +307,9 @@ export async function createRun(
             JSON.stringify(input.input),
             hash(input.input),
             deadlineMs,
+            input.maxTokens ?? null,
+            input.maxCostUsd ?? null,
+            priceSnapshot === null ? null : JSON.stringify(priceSnapshot),
           ],
         );
         const first = await materializeStep(transaction, {
@@ -431,6 +462,7 @@ export async function getRun(database: Queryable, runId: string) {
        input_json AS input, state_revision AS "stateRevision",
        current_checkpoint_id AS "currentCheckpointId", created_at AS "createdAt",
        finished_at AS "finishedAt", deadline_at AS "deadlineAt", failure_json AS failure,
+       max_tokens::float8 AS "maxTokens", max_cost_usd::float8 AS "maxCostUsd",
        (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers
      FROM workflow_runs WHERE id = $1`,
     [runId],
@@ -1100,6 +1132,8 @@ export interface ClaimedOperation {
     /** Declared prompt inputs (brief §2.4); absent means the full step input. */
     inputs?: string[];
   } | null;
+  /** Run-level budget (brief §2.5), read at claim time; null or absent means unbudgeted. */
+  budget?: { maxTokens: number | null; maxCostUsd: number | null } | null;
 }
 
 export async function claimOperation(
@@ -1131,13 +1165,15 @@ export async function claimOperation(
       position: number;
       input_json: Record<string, unknown>;
       agent_config_json: ClaimedOperation["agentConfig"];
+      max_tokens: string | null;
+      max_cost_usd: string | null;
     }>(
       `SELECT wr.id AS run_id, ws.id AS operation_id,
          wr.workflow_version_id, wr.lifecycle, wr.control, wr.wait_reason,
          (wr.deadline_at > now()) AS deadline_valid, ws.status,
          ws.dispatch_generation, ws.attempt_count, ws.lease_epoch,
          ws.node_key, ws.kind, ws.handler, ws.effect_class, ws.tool_version,
-         ws.position, ws.input_json, ws.agent_config_json
+         ws.position, ws.input_json, ws.agent_config_json, wr.max_tokens, wr.max_cost_usd
        FROM workflow_runs wr
        JOIN workflow_steps ws ON ws.run_id = wr.id
        WHERE wr.id = $1 AND ws.id = $2
@@ -1192,6 +1228,10 @@ export async function claimOperation(
       input: row.input_json,
       attemptDeadlineAt: new Date(Date.now() + attemptTimeoutMs),
       agentConfig: row.agent_config_json,
+      budget: row.max_tokens === null && row.max_cost_usd === null ? null : {
+        maxTokens: row.max_tokens === null ? null : Number(row.max_tokens),
+        maxCostUsd: row.max_cost_usd === null ? null : Number(row.max_cost_usd),
+      },
     };
   });
 }
@@ -1525,6 +1565,17 @@ export class AttemptTimeoutError extends Error {
 export class UnknownEffectError extends Error {
   constructor(message: string, readonly causeValue?: unknown) {
     super(message);
+  }
+}
+
+/**
+ * Thrown by the worker after enforceRunBudget has already moved the run to
+ * BUDGET_EXCEEDED. The run is terminal, so this must not go through failure settlement.
+ */
+export class BudgetExceededError extends Error {
+  constructor(readonly check: RunBudgetCheck) {
+    super(`Run budget exceeded (${check.phase})`);
+    this.name = "BudgetExceededError";
   }
 }
 
@@ -2055,6 +2106,72 @@ export interface SchedulingRepairResult {
  * Repairs database-authoritative work that can no longer make progress.
  * Every mutation and replacement outbox intent is committed atomically.
  */
+/**
+ * Terminates an OPEN run inside the caller's transaction: fails the running attempt and
+ * every open step, cancels pending approvals, marks in-flight tool executions and
+ * idempotency records UNKNOWN (their outcome is ambiguous), sets the terminal lifecycle,
+ * and appends one audit event. Shared by deadline expiry and budget breaches.
+ */
+async function terminateRun(
+  transaction: Transaction,
+  runId: string,
+  options: {
+    lifecycle: "TIMED_OUT" | "BUDGET_EXCEEDED";
+    attemptErrorClass: "TIMEOUT" | "PERMANENT";
+    stepFailure: Record<string, unknown>;
+    runFailure: Record<string, unknown>;
+    eventType: string;
+    eventPayload: Record<string, unknown>;
+    stepId?: string | null;
+    attemptId?: string | null;
+  },
+): Promise<void> {
+  const stepFailure = JSON.stringify(options.stepFailure);
+  await transaction.query(
+    `UPDATE step_attempts SET status = 'FAILED', finished_at = now(),
+       error_class = $2, retryable = false, error_json = $3::jsonb
+     WHERE status = 'RUNNING' AND step_id IN
+       (SELECT id FROM workflow_steps WHERE run_id = $1)`,
+    [runId, options.attemptErrorClass, stepFailure],
+  );
+  await transaction.query(
+    `UPDATE workflow_steps SET status = 'FAILED', lease_owner = NULL,
+       lease_expires_at = NULL, next_attempt_at = NULL, completed_at = now(),
+       failure_json = $2::jsonb
+     WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
+    [runId, stepFailure],
+  );
+  await transaction.query(
+    `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
+     WHERE run_id = $1 AND status = 'PENDING'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+     WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+     WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE workflow_runs SET lifecycle = $2, wait_reason = 'NONE',
+       failure_json = $3::jsonb, finished_at = now() WHERE id = $1`,
+    [runId, options.lifecycle, JSON.stringify(options.runFailure)],
+  );
+  const sequence = await nextEventSequence(transaction, runId);
+  await transaction.query(
+    `INSERT INTO audit_events (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+    [
+      randomUUID(), runId, sequence, options.stepId ?? null, options.attemptId ?? null,
+      options.eventType, JSON.stringify(options.eventPayload),
+    ],
+  );
+}
+
 export async function repairScheduling(
   database: Database,
   dispatchRecoveryMs: number,
@@ -2114,48 +2231,15 @@ export async function repairScheduling(
       [batchSize],
     );
     for (const run of timedOut.rows) {
-      await transaction.query(
-        `UPDATE step_attempts SET status = 'FAILED', finished_at = now(),
-           error_class = 'TIMEOUT', retryable = false,
-           error_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED')
-         WHERE status = 'RUNNING' AND step_id IN
-           (SELECT id FROM workflow_steps WHERE run_id = $1)`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE workflow_steps SET status = 'FAILED', lease_owner = NULL,
-           lease_expires_at = NULL, next_attempt_at = NULL, completed_at = now(),
-           failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED')
-         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
-         WHERE run_id = $1 AND status = 'PENDING'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
-         WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
-         WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE workflow_runs SET lifecycle = 'TIMED_OUT', wait_reason = 'NONE',
-           failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED'),
-           finished_at = now() WHERE id = $1`,
-        [run.id],
-      );
-      const sequence = await nextEventSequence(transaction, run.id);
-      await transaction.query(
-        `INSERT INTO audit_events (id, run_id, sequence, type, payload_json)
-         VALUES ($1, $2, $3, 'RUN_TIMED_OUT', '{"code":"RUN_DEADLINE_EXCEEDED"}'::jsonb)`,
-        [randomUUID(), run.id, sequence],
-      );
+      const failure = { code: "RUN_DEADLINE_EXCEEDED" };
+      await terminateRun(transaction, run.id, {
+        lifecycle: "TIMED_OUT",
+        attemptErrorClass: "TIMEOUT",
+        stepFailure: failure,
+        runFailure: failure,
+        eventType: "RUN_TIMED_OUT",
+        eventPayload: failure,
+      });
       timedOutRuns += 1;
     }
 
@@ -2723,6 +2807,132 @@ export async function completeOperation(
     } finally {
       span.end();
     }
+  });
+}
+
+export interface RunBudgetCheck {
+  phase: "before-call" | "after-response";
+  exceeded: boolean;
+  tokensUsed: number;
+  maxTokens: number | null;
+  costUsd: number | null;
+  maxCostUsd: number | null;
+  /** Billed calls with no reported counts; they cannot be charged against the budget. */
+  unreportedCalls: number;
+}
+
+/**
+ * Totals a run's billed usage (input + output tokens, and cost from the run's price
+ * snapshot) and compares it with the run budget. Pure, so it is unit-testable.
+ * Before a call a run is over budget once usage reaches the limit (another call can only
+ * add tokens); after a response only when usage exceeds it, so a call that lands exactly
+ * on the budget still completes its step.
+ */
+export function evaluateRunBudget(
+  phase: RunBudgetCheck["phase"],
+  budget: { maxTokens: number | null; maxCostUsd: number | null },
+  usage: ReadonlyArray<{ provider: string; model: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null }>,
+  prices: Record<string, ModelPrice> | null,
+): RunBudgetCheck {
+  let tokensUsed = 0;
+  let costUsd = prices ? 0 : null;
+  let unreportedCalls = 0;
+  for (const record of usage) {
+    if (record.inputTokens === null && record.outputTokens === null) {
+      unreportedCalls += 1;
+      continue;
+    }
+    tokensUsed += (record.inputTokens ?? 0) + (record.outputTokens ?? 0);
+    const price = prices?.[`${record.provider}/${record.model}`];
+    if (costUsd !== null && price) costUsd += usageCostUsd(record, price) ?? 0;
+  }
+  const over = (used: number, max: number) => (phase === "before-call" ? used >= max : used > max);
+  const exceeded =
+    (budget.maxTokens !== null && over(tokensUsed, budget.maxTokens)) ||
+    (budget.maxCostUsd !== null && costUsd !== null && over(costUsd, budget.maxCostUsd));
+  return { phase, exceeded, tokensUsed, maxTokens: budget.maxTokens, costUsd, maxCostUsd: budget.maxCostUsd, unreportedCalls };
+}
+
+/**
+ * Enforces the run budget from persisted usage_records (brief §2.5), under the lease
+ * fence, before each LLM call and after each response. On a breach the run is moved to
+ * BUDGET_EXCEEDED in this transaction; the caller then throws BudgetExceededError.
+ * Unbudgeted runs return immediately without touching the database.
+ */
+export async function enforceRunBudget(
+  database: Database,
+  operation: ClaimedOperation,
+  phase: RunBudgetCheck["phase"],
+  /** before-call: the just-begun provider call, closed as never sent on a breach. */
+  unsentProviderCallId?: string,
+): Promise<RunBudgetCheck | null> {
+  const budget = operation.budget;
+  if (!budget || (budget.maxTokens === null && budget.maxCostUsd === null)) return null;
+  return withTransaction(database, async (transaction) => {
+    const fence = await transaction.query<{
+      lifecycle: string;
+      step_status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+      price_table_json: Record<string, ModelPrice> | null;
+    }>(
+      `SELECT wr.lifecycle, ws.status AS step_status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status,
+         wr.price_table_json
+       FROM workflow_runs wr
+       JOIN workflow_steps ws ON ws.run_id = wr.id
+       JOIN step_attempts sa ON sa.step_id = ws.id
+       WHERE wr.id = $1 AND ws.id = $2 AND sa.id = $3
+       FOR UPDATE OF wr, ws, sa`,
+      [operation.runId, operation.operationId, operation.attemptId],
+    );
+    const row = fence.rows[0];
+    if (
+      !row || row.lifecycle !== "OPEN" || row.step_status !== "RUNNING" ||
+      row.lease_owner !== operation.workerId || row.lease_epoch !== operation.leaseEpoch ||
+      !row.lease_valid || row.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Budget enforcement rejected by lease fencing");
+    }
+    const usage = await transaction.query<{
+      provider: string;
+      model: string;
+      inputTokens: number | null;
+      outputTokens: number | null;
+      cachedInputTokens: number | null;
+    }>(
+      `SELECT provider, model, input_tokens AS "inputTokens", output_tokens AS "outputTokens",
+         cached_input_tokens AS "cachedInputTokens"
+       FROM usage_records WHERE run_id = $1`,
+      [operation.runId],
+    );
+    const check = evaluateRunBudget(phase, budget, usage.rows, row.price_table_json);
+    if (check.exceeded && unsentProviderCallId) {
+      // The request was never sent, so nothing was billed: no usage record is written.
+      await transaction.query(
+        `UPDATE provider_calls SET status = 'FAILED', finished_at = now(),
+           error_json = '{"code":"RUN_BUDGET_EXCEEDED","sent":false}'::jsonb
+         WHERE id = $1 AND attempt_id = $2 AND status = 'IN_FLIGHT'`,
+        [unsentProviderCallId, operation.attemptId],
+      );
+    }
+    if (check.exceeded) {
+      const failure = { code: "RUN_BUDGET_EXCEEDED" };
+      const detail = { ...failure, ...check, stepId: operation.operationId, stepKey: operation.nodeKey };
+      await terminateRun(transaction, operation.runId, {
+        lifecycle: "BUDGET_EXCEEDED",
+        attemptErrorClass: "PERMANENT",
+        stepFailure: failure,
+        runFailure: detail,
+        eventType: "RUN_BUDGET_EXCEEDED",
+        eventPayload: detail,
+        stepId: operation.operationId,
+        attemptId: operation.attemptId,
+      });
+    }
+    return check;
   });
 }
 
@@ -3587,6 +3797,31 @@ export async function getRunReplays(database: Queryable, runId: string) {
     [runId],
   );
   return result.rows;
+}
+
+/** The run's budget and how much of it persisted billed usage has consumed (null when unbudgeted). */
+export async function getRunBudget(database: Queryable, runId: string) {
+  const run = await database.query<{
+    max_tokens: string | null;
+    max_cost_usd: string | null;
+    price_table_json: Record<string, ModelPrice> | null;
+  }>("SELECT max_tokens, max_cost_usd, price_table_json FROM workflow_runs WHERE id = $1", [runId]);
+  const row = run.rows[0];
+  if (!row) throw new NotFoundError("Run not found");
+  if (row.max_tokens === null && row.max_cost_usd === null) return null;
+  const usage = await database.query<{
+    provider: string; model: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null;
+  }>(
+    `SELECT provider, model, input_tokens AS "inputTokens", output_tokens AS "outputTokens",
+       cached_input_tokens AS "cachedInputTokens" FROM usage_records WHERE run_id = $1`,
+    [runId],
+  );
+  const check = evaluateRunBudget("after-response", {
+    maxTokens: row.max_tokens === null ? null : Number(row.max_tokens),
+    maxCostUsd: row.max_cost_usd === null ? null : Number(row.max_cost_usd),
+  }, usage.rows, row.price_table_json);
+  const { phase: _phase, exceeded: _exceeded, ...budget } = check;
+  return budget;
 }
 
 /** The run's cache scope and each LLM logical operation's cache decision (null for legacy rows). */

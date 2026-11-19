@@ -79,6 +79,11 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
   - **Reference workflow:** in `minimal` context (now the default for the dashboard's reference workflow), both analysis steps declare `["sourceSet", "request.assumptions"]`. `analyze-features` no longer receives the pricing analysis, and neither prompt carries the per-run `publicationTarget`, so `version`-scoped cache hits become possible across runs.
   - **Versioning:** changing the reference definition registers a new immutable workflow version instead of failing.
   - **Evaluation:** `--context full|minimal` on the real runner. The default `full` reproduces the cited campaigns' prompts. `minimal` gives every system (AgentFlow and the baselines) the same projected prompt.
+- **Run Token & Cost Budgets:** `POST /runs` (and `agentflow runs start --max-tokens / --max-cost-usd`, plus the dashboard's New run form) accepts `maxTokens` (billed input + output tokens) and `maxCostUsd`.
+  - **Enforcement:** both are enforced from persisted `usage_records`, under the lease fence, before every real provider call and after every billed response. Journal replays and cache hits make no call, so they consume no budget.
+  - **Breach:** the run moves to the terminal lifecycle `BUDGET_EXCEEDED` with a `RUN_BUDGET_EXCEEDED` history event (phase, tokens/cost used, limits, unreported calls). The current attempt fails `PERMANENT`, and later steps never run. `agentflow runs watch` exits **15**.
+  - **Boundary semantics:** before a call, a run at its limit stops; after a response, only usage *above* the limit stops it.
+  - **Prices:** cost budgets use operator-configured prices (`AGENTFLOW_MODEL_PRICES`, USD per 1M tokens per `provider/model`). The relevant prices are snapshotted on the run at creation. A run whose workflow uses an unpriced model is refused (409). AgentFlow ships no prices.
 - **Observability:** Native OpenTelemetry instrumentation exports standardized spans; execution history logs provide an immutable audit trail (`GET /runs/:id/history`).
 - **Dual Authentication & Ownership:** Session-cookie authentication (`HttpOnly`, `SameSite=Lax`) with `scrypt` password hashing for the operations dashboard; constant-time SHA-256 bearer tokens for CLI, runners, and automated integrations; immutable workflow ownership inherited by runs.
 
@@ -314,6 +319,7 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 - **LLM Journal Window and DBOS Granularity:** AgentFlow journals each LLM response in its own short transaction (`harness_operations` + `provider_calls`), before the step checkpoint. A crash between the provider response and that commit (E2/E2a) still repeats the call and its billed tokens. The DBOS reference wraps each agent step in one DBOS step. A DBOS application that makes every LLM call its own `@step` would also avoid the E2B repeat, so the E2B difference measures *per-call journaling by default*, not a capability DBOS cannot express.
 - **Response Cache Scope and Claims:** In the reference workflow every AGENT step has distinct instructions, so the default `run` scope practically never hits. With `full` context each analysis prompt carries the per-run `publicationTarget`, so `version`-scope hits need byte-identical run input. With `minimal` context (§2.4) the analysis prompts no longer depend on it, so repeated runs over the same corpus and assumptions can hit. A `version`-scoped hit returns a previously generated response for an identical request. That deliberately removes live-provider nondeterminism for repeated runs, which is why it is opt-in. Cache savings come from repeated work, not from fault tolerance. They are reported separately from journal replay and are not part of any fault-scenario comparison against DBOS or the baselines.
 - **Context Minimization Is Not a Fault-Tolerance Result:** Declaring `inputs` is prompt design that any orchestrator's workflow author could do. Its savings are reported as their own ablation, with the same prompts given to every system in a `--context minimal` campaign, and are never credited to AgentFlow's recovery mechanisms. Scripted-provider reductions are word-count estimates of the JSON prompt (`estimated`). Only live provider runs give `reported` billed reductions.
+- **Budgets Are Checked Between Calls:** A budget is evaluated before each provider call and after each response, never mid-call, so one call can overshoot by its own size. Calls whose usage the provider did not report (provenance `unknown`, for example lost responses) cannot be charged; they are reported as `unreportedCalls`. Cost accuracy depends entirely on the configured price table.
 - **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
 
 ---
@@ -524,6 +530,7 @@ pnpm --silent agentflow runs list --json | jq -r '.runs[] | select(.publicStatus
 | 4 | Not found (HTTP 404, unknown run-ID prefix) |
 | 5 | Conflict (HTTP 409) |
 | 10 / 11 / 14 | `watch`: run `FAILED` / `CANCELLED` / `TIMED_OUT` |
+| 15 | `watch`: run `BUDGET_EXCEEDED` (token or cost budget breached) |
 | 12 | `watch`: run reached `WAITING_APPROVAL` or `NEEDS_ATTENTION` (pass `--until-terminal` to keep watching) |
 | 13 | `watch`: `--timeout` elapsed |
 | 130 | Interrupted (Ctrl-C); the run itself is unaffected |

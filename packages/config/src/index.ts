@@ -49,6 +49,17 @@ const environmentSchema = z.object({
     z.string().min(1).optional(),
   ),
   GROQ_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
+  // Operator-supplied model prices for run cost budgets (brief §2.5), as JSON:
+  // {"<provider>/<model>": {"inputPer1M": n, "cachedInputPer1M"?: n, "outputPer1M": n}}.
+  // Shape is validated by the API with @agentflow/shared's modelPriceTableSchema.
+  AGENTFLOW_MODEL_PRICES: z.preprocess((value) => {
+    if (value === undefined || value === "") return undefined;
+    try {
+      return JSON.parse(String(value)) as unknown;
+    } catch {
+      return value;
+    }
+  }, z.record(z.string(), z.unknown()).optional()),
   AGENTFLOW_ADMIN_USERNAME: z.string().min(1).max(100).default("admin"),
   AGENTFLOW_ADMIN_PASSWORD: z.preprocess(
     (value) => (value === "" ? undefined : value),

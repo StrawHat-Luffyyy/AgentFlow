@@ -8,6 +8,7 @@ const STATUS_FORMAT: Record<string, Format> = {
   APPROVED: "green",
   FAILED: "red",
   TIMED_OUT: "red",
+  BUDGET_EXCEEDED: "red",
   REJECTED: "red",
   WAITING_APPROVAL: "yellow",
   NEEDS_ATTENTION: "yellow",

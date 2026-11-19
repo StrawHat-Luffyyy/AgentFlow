@@ -25,6 +25,8 @@ import {
   completeHarnessLlmOperation,
   completeOperation,
   controlRun,
+  createRun,
+  enforceRunBudget,
   executeDeterministicOperation,
   executeToolOperation,
   prepareToolExecution,
@@ -979,6 +981,7 @@ describe("durable API → outbox → BullMQ → worker path", () => {
         provenance: { reported: 2, estimated: 0, unknown: 1 },
         cacheScope: "run",
         cacheLookups,
+        budget: null,
         byStep: [{ stepId: step.id, ...totals, cacheLookups }],
         byModel: [
           {
@@ -1209,6 +1212,130 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 20_000);
+
+  it("enforces run token and cost budgets from persisted usage and ends the run BUDGET_EXCEEDED", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "budget-workflow", description: "Run budgets" }),
+      });
+      const agentStep = (key: string, outputKey: string) => ({
+        key, kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+        instructions: `Budget ${key}.`, allowedTools: [], maxTurns: 1, outputKey,
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: { steps: [agentStep("first", "one"), agentStep("second", "two")] } }),
+      });
+      // Every fake call reports 40 input + 20 output = 60 billed tokens.
+      const billed: LLMResponse = {
+        text: "ok", toolCalls: [], finishReason: "stop",
+        usage: { provenance: "reported", inputTokens: 40, outputTokens: 20, cachedInputTokens: 0, reasoningTokens: 0, raw: {} },
+        providerRequestId: null, resolvedModel: "fake-model", opaqueState: null,
+      };
+      const processStep = async (runId: string, position: number) => {
+        const step = await database.query<{ id: string; dispatch_generation: number }>(
+          "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = $2",
+          [runId, position],
+        );
+        const fake = new DeterministicFakeProvider([billed]);
+        const harness = new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry());
+        const result = await processOperationJob(
+          database, "budget-worker", 15_000,
+          { data: { runId, operationId: step.rows[0]!.id, workflowVersionId: version.id, dispatchGeneration: step.rows[0]!.dispatch_generation } } as Job,
+          5_000, 60_000, harness,
+        );
+        return { result, fake, stepId: step.rows[0]!.id };
+      };
+      const startRun = (body: Record<string, unknown>) => request<{ id: string; maxTokens: number | null }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, ...body }),
+      });
+      const runState = async (runId: string) => request<{
+        lifecycle: string; publicStatus: string; failure: Record<string, unknown> | null;
+      }>(`/runs/${runId}`);
+      const events = async (runId: string, type: string) =>
+        (await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(`/runs/${runId}/history`))
+          .events.filter((event) => event.type === type);
+
+      // 1. A response that pushes usage past the budget ends the run after that response.
+      const over = await startRun({ maxTokens: 50, creationKey: "budget-over" });
+      expect(over.maxTokens).toBe(50);
+      const first = await processStep(over.id, 0);
+      expect(first.result).toMatchObject({ budgetExceeded: true });
+      expect(first.fake.calls).toHaveLength(1);
+      expect(await runState(over.id)).toMatchObject({ lifecycle: "BUDGET_EXCEEDED", publicStatus: "BUDGET_EXCEEDED" });
+      expect(await events(over.id, "RUN_BUDGET_EXCEEDED")).toEqual([expect.objectContaining({
+        payload: expect.objectContaining({ code: "RUN_BUDGET_EXCEEDED", phase: "after-response", tokensUsed: 60, maxTokens: 50 }),
+      })]);
+      const attempt = await database.query<{ status: string; error_class: string }>(
+        "SELECT status, error_class FROM step_attempts WHERE step_id = $1", [first.stepId],
+      );
+      expect(attempt.rows).toEqual([{ status: "FAILED", error_class: "PERMANENT" }]);
+      const secondStep = await database.query("SELECT 1 FROM workflow_steps WHERE run_id = $1 AND position = 1", [over.id]);
+      expect(secondStep.rowCount).toBe(0);
+
+      // 2. Landing exactly on the budget completes the step; the next call is never sent.
+      const exact = await startRun({ maxTokens: 60 });
+      expect((await processStep(exact.id, 0)).result).toMatchObject({ skipped: false, runCompleted: false });
+      const stopped = await processStep(exact.id, 1);
+      expect(stopped.result).toMatchObject({ budgetExceeded: true, budget: { phase: "before-call", tokensUsed: 60 } });
+      expect(stopped.fake.calls).toHaveLength(0);
+      const unsent = await database.query<{ status: string; error_json: Record<string, unknown> }>(
+        `SELECT pc.status, pc.error_json FROM provider_calls pc WHERE pc.step_id = $1`, [stopped.stepId],
+      );
+      expect(unsent.rows).toEqual([{ status: "FAILED", error_json: { code: "RUN_BUDGET_EXCEEDED", sent: false } }]);
+      const exactUsage = await request<{ usage: unknown[]; summary: { budget: Record<string, unknown> } }>(`/runs/${exact.id}/usage`);
+      expect(exactUsage.usage).toHaveLength(1);
+      expect(exactUsage.summary.budget).toMatchObject({ maxTokens: 60, tokensUsed: 60, maxCostUsd: null, costUsd: null });
+      expect((await runState(exact.id)).publicStatus).toBe("BUDGET_EXCEEDED");
+
+      // 3. Under budget the run succeeds normally.
+      const under = await startRun({ maxTokens: 1_000 });
+      await processStep(under.id, 0);
+      expect((await processStep(under.id, 1)).result).toMatchObject({ runCompleted: true });
+      expect((await runState(under.id)).lifecycle).toBe("SUCCEEDED");
+
+      // 4. Cost budgets need a configured price; this API has none, so creation is refused.
+      const unpriced = await rawRequest("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, maxCostUsd: 1 }),
+      });
+      expect(unpriced.status).toBe(409);
+      expect(await unpriced.text()).toContain("fake/fake-model");
+      // With a price snapshot, $1000 per 1M tokens makes one 60-token call cost $0.06 > $0.05.
+      const priced = await createRun(database, { workflowVersionId: version.id, input: { topic: "budget" }, maxCostUsd: 0.05 },
+        { modelPrices: { "fake/fake-model": { inputPer1M: 1_000, outputPer1M: 1_000 } } });
+      expect((await processStep(priced.id, 0)).result).toMatchObject({ budgetExceeded: true });
+      expect(await events(priced.id, "RUN_BUDGET_EXCEEDED")).toEqual([expect.objectContaining({
+        payload: expect.objectContaining({ maxCostUsd: 0.05, costUsd: expect.closeTo(0.06, 9) }),
+      })]);
+
+      // 5. Replaying a creation key with a different budget is a conflict.
+      const replay = await rawRequest("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, maxTokens: 51, creationKey: "budget-over" }),
+      });
+      expect(replay.status).toBe(409);
+
+      // 6. A stale lease cannot enforce (and so cannot terminate) a run.
+      const fenced = await startRun({ maxTokens: 10 });
+      const step = await database.query<{ id: string; dispatch_generation: number }>(
+        "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = 0", [fenced.id],
+      );
+      const stale = await claimOperation(database, {
+        runId: fenced.id, operationId: step.rows[0]!.id, workflowVersionId: version.id,
+        dispatchGeneration: step.rows[0]!.dispatch_generation,
+      }, "stale-budget-worker", 15_000);
+      await database.query("UPDATE workflow_steps SET lease_epoch = lease_epoch + 1 WHERE id = $1", [step.rows[0]!.id]);
+      await expect(enforceRunBudget(database, stale!, "before-call")).rejects.toThrow("lease fencing");
+      expect((await runState(fenced.id)).lifecycle).toBe("OPEN");
+      await controlRun(database, fenced.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
 
   it("registers a new reference workflow version when its definition changes instead of failing", async () => {
     const owner = "context-version-owner";

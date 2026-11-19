@@ -117,6 +117,17 @@ describe("runs start", () => {
     expect(fake.stdout()).toContain(`Started run ${TARGET}`);
   });
 
+  it("sends token and cost budgets and validates them client-side", async () => {
+    await serve(() => ({ status: 201, body: detail(TARGET, "QUEUED") }));
+    const fake = await authedIO(api!.url);
+    expect(await run(["runs", "start", VERSION_ID, "--max-tokens", "5000", "--max-cost-usd", "0.25", "-q"], fake.io)).toBe(0);
+    expect(api!.requests[0]?.body).toMatchObject({ maxTokens: 5000, maxCostUsd: 0.25 });
+    const bad = await authedIO(api!.url);
+    expect(await run(["runs", "start", VERSION_ID, "--max-tokens", "1.5"], bad.io)).toBe(2);
+    expect(await run(["runs", "start", VERSION_ID, "--max-cost-usd", "-1"], bad.io)).toBe(2);
+    expect(api!.requests).toHaveLength(1);
+  });
+
   it("validates the deadline client-side", async () => {
     await serve(() => ({ status: 201, body: detail(TARGET) }));
     const fake = await authedIO(api!.url);

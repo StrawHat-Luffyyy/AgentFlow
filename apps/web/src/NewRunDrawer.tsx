@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, Play, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, type ProviderAvailability, type WorkflowSummary, type WorkflowVersionSummary } from "./api.js";
 import {
-  deadlineMsFromMinutes, LIVE_PROVIDERS, liveProviderLabel, parseRunInput, readiness, referenceTemplate,
+  budgetFromText, deadlineMsFromMinutes, LIVE_PROVIDERS, liveProviderLabel, parseRunInput, readiness, referenceTemplate,
   SCRIPTED_PROVIDER, selectedVersionFor, type LiveProviderName,
 } from "./new-run.js";
 import { Button, IconButton, InlineAlert } from "./ui.js";
@@ -33,7 +33,7 @@ export function NewRunDrawer({
   onSessionExpired: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const ids = { title: useId(), workflow: useId(), version: useId(), provider: useId(), model: useId(), input: useId(), inputError: useId(), key: useId(), deadline: useId() };
+  const ids = { title: useId(), workflow: useId(), version: useId(), provider: useId(), model: useId(), input: useId(), inputError: useId(), key: useId(), deadline: useId(), maxTokens: useId(), maxCost: useId() };
 
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [workflowId, setWorkflowId] = useState<string>(REFERENCE);
@@ -48,6 +48,8 @@ export function NewRunDrawer({
   const [advanced, setAdvanced] = useState(false);
   const [creationKey, setCreationKey] = useState("");
   const [deadline, setDeadline] = useState("5");
+  const [maxTokens, setMaxTokens] = useState("");
+  const [maxCost, setMaxCost] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,9 +132,11 @@ export function NewRunDrawer({
   const ready = readiness(required, availability);
   const parsedInput = parseRunInput(inputText);
   const parsedDeadline = deadlineMsFromMinutes(deadline);
+  const parsedMaxTokens = budgetFromText(maxTokens, "tokens");
+  const parsedMaxCost = budgetFromText(maxCost, "usd");
   const keyTooLong = creationKey.trim().length > 200;
   const missingVersion = !isReference && !selectedVersion;
-  const canStart = parsedInput.ok && parsedDeadline.ok && !keyTooLong && !ready.blocking && !missingVersion && !submitting;
+  const canStart = parsedInput.ok && parsedDeadline.ok && parsedMaxTokens.ok && parsedMaxCost.ok && !keyTooLong && !ready.blocking && !missingVersion && !submitting;
   const liveProvider = isReference
     ? (mode === "live" ? liveProviderName : undefined)
     : (selectedVersion?.providers ?? []).find((name) => name !== SCRIPTED_PROVIDER);
@@ -140,7 +144,7 @@ export function NewRunDrawer({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!canStart || !parsedInput.ok || !parsedDeadline.ok) return;
+    if (!canStart || !parsedInput.ok || !parsedDeadline.ok || !parsedMaxTokens.ok || !parsedMaxCost.ok) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -152,6 +156,8 @@ export function NewRunDrawer({
         input: parsedInput.value,
         deadlineMs: parsedDeadline.value,
         ...(creationKey.trim() ? { creationKey: creationKey.trim() } : {}),
+        ...(parsedMaxTokens.value === undefined ? {} : { maxTokens: parsedMaxTokens.value }),
+        ...(parsedMaxCost.value === undefined ? {} : { maxCostUsd: parsedMaxCost.value }),
       });
       setInputDirty(false);
       setCreationKey("");
@@ -283,6 +289,24 @@ export function NewRunDrawer({
                 <input id={ids.deadline} className="text-input" inputMode="numeric" value={deadline}
                   aria-invalid={!parsedDeadline.ok} onChange={(event) => setDeadline(event.target.value)} />
                 {!parsedDeadline.ok && <span className="field-error">{parsedDeadline.error}</span>}
+              </div>
+            </div>
+          )}
+          {advanced && (
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor={ids.maxTokens}>Token budget</label>
+                <input id={ids.maxTokens} className="text-input" inputMode="numeric" value={maxTokens}
+                  placeholder="Optional — billed input + output tokens" aria-invalid={!parsedMaxTokens.ok}
+                  onChange={(event) => setMaxTokens(event.target.value)} />
+                {!parsedMaxTokens.ok && <span className="field-error">{parsedMaxTokens.error}</span>}
+              </div>
+              <div className="field">
+                <label htmlFor={ids.maxCost}>Cost budget (USD)</label>
+                <input id={ids.maxCost} className="text-input" inputMode="decimal" value={maxCost}
+                  placeholder="Optional — needs configured model prices" aria-invalid={!parsedMaxCost.ok}
+                  onChange={(event) => setMaxCost(event.target.value)} />
+                {!parsedMaxCost.ok && <span className="field-error">{parsedMaxCost.error}</span>}
               </div>
             </div>
           )}

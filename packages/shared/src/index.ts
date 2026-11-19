@@ -67,7 +67,7 @@ export const stepStatuses = [
   "CANCELLED",
 ] as const;
 
-export const runLifecycles = ["OPEN", "SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"] as const;
+export const runLifecycles = ["OPEN", "SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "BUDGET_EXCEEDED"] as const;
 export const runControls = ["RUN", "PAUSE_REQUESTED", "PAUSED", "CANCEL_REQUESTED"] as const;
 export const runWaitReasons = ["NONE", "RETRY", "APPROVAL", "RECONCILIATION"] as const;
 
@@ -322,7 +322,45 @@ export const createRunSchema = z.object({
   creationKey: z.string().min(1).max(200).optional(),
   deadlineMs: z.number().int().min(1_000).max(86_400_000).default(300_000),
   retryPolicy: retryPolicySchema.default(defaultRetryPolicy),
+  /** Run-level budget on billed LLM tokens (input + output, brief §2.5). */
+  maxTokens: z.number().int().min(1).max(1_000_000_000).optional(),
+  /** Run-level budget in USD; requires a configured price for every AGENT model. */
+  maxCostUsd: z.number().positive().max(1_000_000).optional(),
 });
+
+/** Operator-configured price for one provider/model, in USD per million tokens. */
+export const modelPriceSchema = z.object({
+  inputPer1M: z.number().min(0),
+  cachedInputPer1M: z.number().min(0).optional(),
+  outputPer1M: z.number().min(0),
+}).strict();
+export type ModelPrice = z.infer<typeof modelPriceSchema>;
+
+/** Keyed by "<provider>/<model>", e.g. "gemini/gemini-3.5-flash". */
+export const modelPriceTableSchema = z.record(z.string().regex(/^[^/\s]+\/.+$/, "Price keys are provider/model"), modelPriceSchema);
+export type ModelPriceTable = z.infer<typeof modelPriceTableSchema>;
+
+export interface PriceableUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+}
+
+/**
+ * USD cost of one billed usage record under the normalized usage convention: cached
+ * tokens are a subset of input (billed at the cached rate when one is configured) and
+ * reasoning tokens are already inside output. Returns null when the provider reported
+ * no counts; such calls are never estimated.
+ */
+export function usageCostUsd(usage: PriceableUsage, price: ModelPrice): number | null {
+  if (usage.inputTokens === null && usage.outputTokens === null) return null;
+  const input = usage.inputTokens ?? 0;
+  const cached = Math.min(usage.cachedInputTokens ?? 0, input);
+  const output = usage.outputTokens ?? 0;
+  return ((input - cached) * price.inputPer1M
+    + cached * (price.cachedInputPer1M ?? price.inputPer1M)
+    + output * price.outputPer1M) / 1_000_000;
+}
 
 export const approvalDecisionSchema = z.object({
   decisionRequestId: z.string().uuid(),

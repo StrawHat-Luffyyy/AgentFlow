@@ -51,6 +51,16 @@ export interface StartOptions {
   set: string[];
   creationKey?: string;
   deadline?: string;
+  maxTokens?: string;
+  maxCostUsd?: string;
+}
+
+function positiveNumber(flag: string, raw: string, integer: boolean): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0 || (integer && !Number.isInteger(value))) {
+    throw new UsageError(`${flag} must be a positive ${integer ? "integer" : "number"}`);
+  }
+  return value;
 }
 
 export async function startRun(ctx: CliContext, workflowVersionId: string, opts: StartOptions): Promise<RunDetail> {
@@ -63,6 +73,8 @@ export async function startRun(ctx: CliContext, workflowVersionId: string, opts:
     input: applySets(base as Record<string, unknown>, opts.set),
     ...(opts.creationKey === undefined ? {} : { creationKey: opts.creationKey }),
     ...(opts.deadline === undefined ? {} : { deadlineMs: parseDuration(opts.deadline) }),
+    ...(opts.maxTokens === undefined ? {} : { maxTokens: positiveNumber("--max-tokens", opts.maxTokens, true) }),
+    ...(opts.maxCostUsd === undefined ? {} : { maxCostUsd: positiveNumber("--max-cost-usd", opts.maxCostUsd, false) }),
   });
   return ctx.client.createRun(body);
 }
@@ -229,6 +241,8 @@ export function registerRunCommands(program: Command, getContext: ContextFactory
     .option("--set <key=value>", "set a top-level input field (repeatable; value parsed as JSON when valid)", collect, [])
     .option("--creation-key <key>", "idempotency key: repeating it returns the same run")
     .option("--deadline <duration>", "run deadline, e.g. 5m (default 5m)")
+    .option("--max-tokens <n>", "run budget on billed LLM tokens; exceeding it ends the run BUDGET_EXCEEDED")
+    .option("--max-cost-usd <usd>", "run budget in USD (needs AGENTFLOW_MODEL_PRICES on the API)")
     .option("--watch", "watch the run after starting it (exit code reflects its outcome)", false);
   addWatchFlags(start).action(async (workflowVersionId: string, opts: StartOptions & WatchFlags & { watch: boolean }) => {
     const ctx = await getContext();

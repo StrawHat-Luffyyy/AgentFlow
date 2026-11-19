@@ -16,6 +16,7 @@ const TERMINAL: Record<string, number> = {
   FAILED: ExitCode.RUN_FAILED,
   CANCELLED: ExitCode.RUN_CANCELLED,
   TIMED_OUT: ExitCode.RUN_TIMED_OUT,
+  BUDGET_EXCEEDED: ExitCode.RUN_BUDGET_EXCEEDED,
 };
 const WAITING = new Set(["WAITING_APPROVAL", "NEEDS_ATTENTION"]);
 

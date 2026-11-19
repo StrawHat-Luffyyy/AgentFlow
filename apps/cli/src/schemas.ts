@@ -62,6 +62,9 @@ export const runDetailSchema = z.object({
   finishedAt: nullableTimestamp,
   deadlineAt: timestamp,
   failure: z.unknown().optional(),
+  // Run budget (absent from older APIs).
+  maxTokens: z.number().nullable().optional(),
+  maxCostUsd: z.number().nullable().optional(),
   steps: z.array(stepSchema),
 }).passthrough();
 

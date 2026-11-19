@@ -124,6 +124,35 @@ export function extractReport(steps: Array<{ acceptedOutput: unknown }>): Report
   return null;
 }
 
+/** Optional positive budget field: empty means no budget. */
+export function budgetFromText(
+  text: string,
+  kind: "tokens" | "usd",
+): { ok: true; value: number | undefined } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (trimmed === "") return { ok: true, value: undefined };
+  const value = Number(trimmed);
+  if (kind === "tokens") {
+    if (!/^\d+$/.test(trimmed) || value < 1 || value > 1_000_000_000) {
+      return { ok: false, error: "Token budget must be a whole number between 1 and 1,000,000,000" };
+    }
+    return { ok: true, value };
+  }
+  if (!Number.isFinite(value) || value <= 0 || value > 1_000_000) {
+    return { ok: false, error: "Cost budget must be a positive amount in USD" };
+  }
+  return { ok: true, value };
+}
+
+/** "N tokens · $X" for runs with a budget, or null. */
+export function budgetLabel(run: { maxTokens?: number | null; maxCostUsd?: number | null }): string | null {
+  const parts = [
+    run.maxTokens ? `${run.maxTokens.toLocaleString()} tokens` : null,
+    run.maxCostUsd ? `$${run.maxCostUsd}` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function deadlineMsFromMinutes(text: string): { ok: true; value: number } | { ok: false; error: string } {
   if (!/^\d+$/.test(text.trim())) return { ok: false, error: "Deadline must be a whole number of minutes" };
   const minutes = Number(text.trim());
