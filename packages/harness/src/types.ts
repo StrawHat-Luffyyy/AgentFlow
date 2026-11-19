@@ -44,6 +44,8 @@ export interface LLMRequest {
   tools?: ProviderTool[];
   maxOutputTokens?: number;
   temperature?: number;
+  /** Best-effort deterministic sampling where the provider supports it (Gemini, Groq). */
+  seed?: number;
   opaqueState?: JsonObject;
 }
 

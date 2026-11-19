@@ -238,8 +238,14 @@ The evidence comes from two different kinds of campaign, and they must not be co
 - **A0 (AgentFlow Ablation):** Full AgentFlow checkpoint durability, but with receiver cooperation disabled (`UNSAFE_WRITE`) by an evaluation-only adapter.
 - **A1 (Full AgentFlow):** The production sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
 - **DBOS (Reference):** Matched common subset executed using the DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
+- **C1 (Temporal-style baseline, in-repo):** Every workflow step is an activity whose result is recorded on completion and replayed after a restart. Every LLM call is also its own recorded activity, so a recorded response is never re-requested. Activities retry whole on failure. No Temporal server is used: this is a minimal reimplementation of the semantics.
+- **C2 (LangGraph-style baseline, in-repo):** A full-state checkpoint after each node; a restart resumes from the last checkpoint. The LLM call inside a node is not journaled separately.
+- **A1-nojournal (ablation):** A1 with LLM journal replay disabled through an evaluation-only worker option (each attempt gets fresh harness ordinals), and with the response cache off. It isolates what the journal contributes.
+- **A1-cache (ablation, R1 only):** A1 on a workflow version with `cacheScope: "version"`, so identical requests are answered across runs.
 
-### Injected Fault Scenarios (E0–E7 + E2B, real runner)
+On this workload every AGENT step makes exactly one LLM call. C1 therefore records responses at the same granularity as AgentFlow's journal and is **expected to tie A1** under crash faults. DBOS and C2 checkpoint per step/node, so they repeat a response that arrived but was not yet checkpointed (E2B). A tool-using workload where one step makes several calls, which would separate per-call journaling from per-node checkpointing *within* a step, is future work.
+
+### Injected Fault Scenarios (E0–E8 + E2B, R1; real runner)
 - **E0:** No fault (baseline overhead, checkpoint latency).
 - **E1:** Crash before executing step 6 (`analyze-features`), after five committed steps.
 - **E2 (E2a, journal-write window):** Crash after the `analyze-features` provider response, before its local checkpoint commit. In AgentFlow the crash fires *before* the response reaches the LLM journal (hook `after-provider-response`), so the call is necessarily repeated. This is the unavoidable window between receiving a response and persisting it. The definition is unchanged from earlier campaigns, so their E2 results stay comparable.
@@ -249,6 +255,9 @@ The evidence comes from two different kinds of campaign, and they must not be co
 - **E5:** Remote success / local crash (worker killed after receiver commit, before step checkpoint).
 - **E6:** Same crash as E5, but the publication is declared `UNSAFE_WRITE` (no receiver idempotency).
 - **E7:** API and worker processes killed and restarted while an approval is pending.
+- **E8:** Provider HTTP 429 on the first two `analyze-pricing` calls (injected at the provider boundary, so every system sees the same rejections), followed by retries. Rejected calls are counted as calls but not as billed tokens. With a live provider, genuine 429s are counted the same way. Real runner only: the simulator would wrongly bill rejected calls.
+- **R1:** Repeated identical fault-free runs (requires `--context minimal`). It measures the version-scoped response cache (A1-cache vs A1) and is the only scenario where A1-cache is allowed, so cache savings never mix with fault results.
+- **E9 (crash mid-stream) is not implemented:** no provider adapter streams responses.
 
 The simulator uses the same scenario names, but its fault positions are not identical (for example, simulator E1 crashes after the `collect-sources` checkpoint).
 
@@ -320,7 +329,18 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 - **Response Cache Scope and Claims:** In the reference workflow every AGENT step has distinct instructions, so the default `run` scope practically never hits. With `full` context each analysis prompt carries the per-run `publicationTarget`, so `version`-scope hits need byte-identical run input. With `minimal` context (§2.4) the analysis prompts no longer depend on it, so repeated runs over the same corpus and assumptions can hit. A `version`-scoped hit returns a previously generated response for an identical request. That deliberately removes live-provider nondeterminism for repeated runs, which is why it is opt-in. Cache savings come from repeated work, not from fault tolerance. They are reported separately from journal replay and are not part of any fault-scenario comparison against DBOS or the baselines.
 - **Context Minimization Is Not a Fault-Tolerance Result:** Declaring `inputs` is prompt design that any orchestrator's workflow author could do. Its savings are reported as their own ablation, with the same prompts given to every system in a `--context minimal` campaign, and are never credited to AgentFlow's recovery mechanisms. Scripted-provider reductions are word-count estimates of the JSON prompt (`estimated`). Only live provider runs give `reported` billed reductions.
 - **Budgets Are Checked Between Calls:** A budget is evaluated before each provider call and after each response, never mid-call, so one call can overshoot by its own size. Calls whose usage the provider did not report (provenance `unknown`, for example lost responses) cannot be charged; they are reported as `unreportedCalls`. Cost accuracy depends entirely on the configured price table.
+- **Campaign Cost Guard:** Live campaigns require `--max-campaign-tokens`. The runner stops before the next trial once the reported tokens spent reach the ceiling, so the trial in progress can overshoot it. `--dry-run` projections are planning estimates, not usage.
 - **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
+
+### Threats to Validity
+
+- **Provider determinism:** the scripted provider has zero nondeterminism. Live models do not, even at temperature 0 with a seed, so repeated calls can differ in tokens and text.
+- **Testbed:** a single machine with containerized PostgreSQL and Redis. No network partitions or multi-node scheduling.
+- **Sample size:** campaigns run a small number of trials per condition. Intervals are 95% bootstrap (means) and Wilson (rates), and are descriptive when n is small.
+- **Baseline fidelity:** DBOS uses its real SDK, but on a matched common subset. C1 (Temporal-style) and C2 (LangGraph-style) are in-repo reimplementations of the relevant semantics, not the products, and none were tuned by their maintainers. A DBOS app that wraps each LLM call in its own step would behave like C1.
+- **Workload shape:** with one LLM call per AGENT step, per-call journaling (A1, C1) and per-step checkpointing (DBOS, C2) differ only when the crash lands between response and checkpoint (E2B).
+- **Pricing and caching assumptions:** cost figures depend on the operator-configured price table. Provider-side prompt caching (for example Groq's automatic cache) and its TTL can change billed input between otherwise identical runs.
+- **Tokenizers differ across providers:** token counts are compared between systems within one provider, never across providers.
 
 ---
 
@@ -562,7 +582,22 @@ node --import tsx packages/evaluation/src/cli.ts --systems A1 --scenarios E0,E1,
 
 # 7. Live Google Gemini provider validation (requires GEMINI_API_KEY)
 pnpm validate:gemini
+
+# 8. Token-efficiency matrix (scripted, no cost): every system on the token-critical scenarios
+node --import tsx packages/evaluation/src/real-runner.ts --systems B0,B1,A1,A1-nojournal,DBOS,C1,C2 --scenarios E0,E2,E2B,E8 --trials 3 --context minimal --output evaluation-results/scratch-token-matrix
+
+# 9. Repeated-run cache scenario
+node --import tsx packages/evaluation/src/real-runner.ts --systems A1,A1-cache,DBOS --scenarios R1 --trials 3 --context minimal --output evaluation-results/scratch-r1
+
+# 10. Live campaigns: project first, then run under a hard token ceiling
+node --import tsx packages/evaluation/src/real-runner.ts --provider groq --systems A1,DBOS,C1,C2 --scenarios E2,E2B,E8 --trials 30 --context minimal --dry-run
+node --import tsx packages/evaluation/src/real-runner.ts --provider groq --systems A1,DBOS,C1,C2 --scenarios E2,E2B,E8 --trials 30 --context minimal --max-campaign-tokens 400000 --min-trial-interval-ms 2000
+
+# 11. Regenerate token-report.md and summary.json tokenSummary for any campaign directory
+pnpm eval:token-report evaluation-results/scratch-token-matrix
 ```
+
+Every campaign writes `token-report.md`: per system and scenario, it gives billed tokens per successful run, repeated tokens per run (95% bootstrap CI), repeated calls, duplicates, committed re-executions, recovery p50/p95, and journal/cache savings kept separate. It also writes a generated headline sentence per scenario that states ties and losses plainly. Scripted campaigns are labelled as estimated token counts, never as billed usage.
 
 ---
 

@@ -53,7 +53,7 @@ export class AgentHarness {
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
-    const { model, messages, instructions, maxOutputTokens, temperature, opaqueState } = input.request;
+    const { model, messages, instructions, maxOutputTokens, temperature, seed, opaqueState } = input.request;
     return JSON.parse(JSON.stringify({
       hashVersion: llmJournalKeyVersion,
       provider: provider.name,
@@ -62,7 +62,8 @@ export class AgentHarness {
       instructions: instructions ?? null,
       messages,
       tools,
-      params: { maxOutputTokens: maxOutputTokens ?? null, temperature: temperature ?? null },
+      // seed is included only when set, so keys (and journal hashes) of unseeded requests are unchanged.
+      params: { maxOutputTokens: maxOutputTokens ?? null, temperature: temperature ?? null, ...(seed === undefined ? {} : { seed }) },
       opaqueState: opaqueState ?? null,
     })) as JsonObject;
   }

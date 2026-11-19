@@ -100,6 +100,9 @@ async function materializeStep(
           ? {} : { outputKey: input.definition.outputKey }),
         ...(input.definition.inputs === undefined
           ? {} : { inputs: input.definition.inputs }),
+        ...(input.definition.temperature === undefined
+          ? {} : { temperature: input.definition.temperature }),
+        ...(input.definition.seed === undefined ? {} : { seed: input.definition.seed }),
       }) : null,
     ],
   );
@@ -1131,6 +1134,8 @@ export interface ClaimedOperation {
     outputKey?: string;
     /** Declared prompt inputs (brief §2.4); absent means the full step input. */
     inputs?: string[];
+    temperature?: number;
+    seed?: number;
   } | null;
   /** Run-level budget (brief §2.5), read at claim time; null or absent means unbudgeted. */
   budget?: { maxTokens: number | null; maxCostUsd: number | null } | null;

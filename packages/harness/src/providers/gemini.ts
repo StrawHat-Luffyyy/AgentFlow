@@ -181,6 +181,10 @@ export class GeminiProvider implements LLMProvider {
       config.temperature = request.temperature;
     }
 
+    if (request.seed !== undefined) {
+      config.seed = request.seed;
+    }
+
     if (context.signal) {
       config.abortSignal = context.signal;
     }

@@ -58,11 +58,26 @@ function mapHarnessError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+export interface AgentExecutionOptions {
+  /**
+   * Evaluation-only ablation switch (default true). When false, each attempt uses its
+   * own harness ordinals, so a retried attempt never replays an earlier attempt's
+   * journalled responses. Production never sets this.
+   */
+  llmJournalReplay?: boolean;
+}
+
+/** Harness ordinal for an operation: attempt-scoped when journal replay is disabled. */
+export function harnessOrdinal(base: number, attemptNo: number, options: AgentExecutionOptions = {}): number {
+  return options.llmJournalReplay === false ? attemptNo * 1_000 + base : base;
+}
+
 export async function executeBoundedAgentOperation(
   database: Database,
   operation: ClaimedOperation,
   harness: AgentHarness,
   faultHooks?: ExecutionFaultHooks,
+  options: AgentExecutionOptions = {},
 ): Promise<Record<string, unknown>> {
   const config = operation.agentConfig;
   if (operation.kind !== "AGENT" || !config) {
@@ -89,10 +104,12 @@ export async function executeBoundedAgentOperation(
       messages,
       instructions: config.instructions,
       ...(config.maxOutputTokens === undefined ? {} : { maxOutputTokens: config.maxOutputTokens }),
+      ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+      ...(config.seed === undefined ? {} : { seed: config.seed }),
       ...(opaqueState === undefined ? {} : { opaqueState }),
     };
     const llm = await beginHarnessLlmOperation(database, operation, {
-      ordinal: (turn - 1) * 2,
+      ordinal: harnessOrdinal((turn - 1) * 2, operation.attemptNo, options),
       turn,
       maxTurns: config.maxTurns,
       provider: provider.name,
@@ -194,7 +211,7 @@ export async function executeBoundedAgentOperation(
     }
     const call = response.toolCalls[0]!;
     const tool = await beginHarnessToolOperation(database, operation, {
-      ordinal: (turn - 1) * 2 + 1,
+      ordinal: harnessOrdinal((turn - 1) * 2 + 1, operation.attemptNo, options),
       turn,
       maxTurns: config.maxTurns,
       request: jsonRecord(call, "Tool call"),

@@ -10,6 +10,7 @@
     "test": "vitest run --no-file-parallelism",
     "test:integration": "vitest run --no-file-parallelism tests/integration",
     "eval:run": "node --import tsx packages/evaluation/src/real-runner.ts",
+    "eval:token-report": "node --import tsx packages/evaluation/src/token-report.ts",
     "eval:dbos": "node --import tsx packages/evaluation/src/real-runner.ts --systems DBOS --scenarios E0,E1,E2,E5,E7 --trials 30",
     "db:migrate": "tsx packages/db/src/cli.ts",
     "dev:api": "pnpm --filter @agentflow/api dev",

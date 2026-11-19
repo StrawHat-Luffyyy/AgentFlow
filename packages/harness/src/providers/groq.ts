@@ -190,6 +190,7 @@ export class GroqProvider implements LLMProvider {
       messages: toGroqMessages(request),
       ...(request.maxOutputTokens === undefined ? {} : { max_completion_tokens: request.maxOutputTokens }),
       ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
+      ...(request.seed === undefined ? {} : { seed: request.seed }),
     };
     if (tools.length > 0) {
       body.tools = tools.map((tool) => ({

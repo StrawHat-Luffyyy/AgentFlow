@@ -45,6 +45,9 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
   const provider = setup.mode === "scripted" ? "scripted-research" : setup.provider!;
   const model = setup.mode === "scripted" ? "cloud-comparison-scripted-v1" : setup.model!;
   const inputs = setup.context === "minimal" ? { inputs: [...cloudComparisonAnalysisInputs] } : {};
+  // Live campaigns sample as deterministically as the provider allows; scripted
+  // definitions stay byte-identical to the ones the cited evidence used.
+  const sampling = setup.mode === "live" ? { temperature: 0, seed: 7 } : {};
   return workflowDefinitionSchema.parse({
     steps: [
       { key: "search-aws", kind: "DETERMINISTIC", handler: "select-aws-sources" },
@@ -63,6 +66,7 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
         maxOutputTokens: 1_500,
         outputKey: "pricingAnalysis",
         ...inputs,
+        ...sampling,
       },
       {
         key: "analyze-features",
@@ -76,6 +80,7 @@ export function cloudComparisonWorkflowDefinition(raw: Partial<CloudComparisonSe
         maxOutputTokens: 1_500,
         outputKey: "featureAnalysis",
         ...inputs,
+        ...sampling,
       },
       { key: "generate-report", kind: "DETERMINISTIC", handler: "generate-cloud-report" },
       {

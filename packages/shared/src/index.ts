@@ -138,6 +138,9 @@ const agentStepDefinitionSchema = z.object({
   allowedTools: z.array(z.string().min(1).max(128)).max(20).default([]),
   maxTurns: z.number().int().min(1).max(20).default(10),
   maxOutputTokens: z.number().int().min(1).max(100_000).optional(),
+  /** Sampling temperature (0 = most deterministic) and best-effort seed for live providers. */
+  temperature: z.number().min(0).max(2).optional(),
+  seed: z.number().int().min(0).max(2_147_483_647).optional(),
   outputKey: z.string().min(1).max(100).regex(/^[a-z][a-zA-Z0-9]*$/).optional(),
   /**
    * Per-step context minimization (brief §2.4): dot-paths into the step's input state

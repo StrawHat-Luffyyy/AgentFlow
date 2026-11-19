@@ -34,6 +34,8 @@ import {
   renewOperationLease,
   repairScheduling,
   settleOperationFailure,
+  RetryableOperationError,
+  type ExecutionFaultHooks,
 } from "../../packages/runtime/src/index.ts";
 import { Queue, QueueEvents, type Job, type Worker } from "bullmq";
 import type { Server } from "node:http";
@@ -1332,6 +1334,62 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await expect(enforceRunBudget(database, stale!, "before-call")).rejects.toThrow("lease fencing");
       expect((await runState(fenced.id)).lifecycle).toBe("OPEN");
       await controlRun(database, fenced.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("replays a journalled response on retry by default and re-calls the provider only in the no-journal ablation", async () => {
+    await worker.pause();
+    try {
+      const retriedCalls = async (name: string, cacheScope: string | undefined, llmJournalReplay: boolean | undefined) => {
+        const workflow = await request<{ id: string }>("/workflows", {
+          method: "POST",
+          body: JSON.stringify({ name, description: "Journal ablation" }),
+        });
+        const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST",
+          body: JSON.stringify({
+            version: 1,
+            definition: {
+              ...(cacheScope ? { cacheScope } : {}),
+              steps: [{ key: "agent", kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+                instructions: "Journal ablation.", allowedTools: [], maxTurns: 1 }],
+            },
+          }),
+        });
+        const created = await request<{ id: string }>("/runs", {
+          method: "POST",
+          body: JSON.stringify({ workflowVersionId: version.id, input: { topic: name },
+            retryPolicy: { maxAttempts: 3, initialBackoffMs: 0, multiplier: 1, maxBackoffMs: 0 } }),
+        });
+        const options = llmJournalReplay === undefined ? {} : { llmJournalReplay };
+        const process = async (faultHooks?: ExecutionFaultHooks) => {
+          const step = await database.query<{ id: string; dispatch_generation: number }>(
+            "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1", [created.id]);
+          const fake = new DeterministicFakeProvider();
+          const result = await processOperationJob(
+            database, "journal-ablation-worker", 15_000,
+            { data: { runId: created.id, operationId: step.rows[0]!.id, workflowVersionId: version.id, dispatchGeneration: step.rows[0]!.dispatch_generation } } as Job,
+            5_000, 60_000, new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry()), faultHooks, options,
+          );
+          return { result, calls: fake.calls.length, stepId: step.rows[0]!.id };
+        };
+        // Attempt 1 journals the response, then fails transiently before the step commits.
+        const first = await process({
+          hit(boundary) {
+            if (boundary === "after-llm-journal-commit") throw new RetryableOperationError("injected", "INJECTED_TRANSIENT");
+          },
+        });
+        expect(first).toMatchObject({ calls: 1, result: { failed: true } });
+        await database.query("UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1", [first.stepId]);
+        await repairScheduling(database, 10_000);
+        const second = await process();
+        expect(second.result).toMatchObject({ runCompleted: true });
+        return second.calls;
+      };
+      expect(await retriedCalls("journal-ablation-default", undefined, undefined)).toBe(0);
+      expect(await retriedCalls("journal-ablation-off", "off", false)).toBe(1);
     } finally {
       await worker.resume();
     }

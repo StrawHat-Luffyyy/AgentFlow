@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Queue, Worker } from "bullmq";
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { migrate } from "@agentflow/db";
+import type { LLMResponse } from "@agentflow/harness";
 import { claimOperation, classifyOperationError, completeOperation, prepareToolExecution,
   publishToControlledReceiver, type ExecutionFaultHooks } from "@agentflow/runtime";
 import { operationJobSchema } from "@agentflow/shared";
@@ -14,10 +15,10 @@ import { createRecoveryScheduler } from "../../../apps/api/src/scheduler.js";
 import { redisConnection } from "../../../apps/api/src/redis.js";
 import { processOperationJob } from "../../../apps/worker/src/worker.js";
 import { referenceDefinition, Evidence, evidenceDatabase, executeCommonOperation, measuredHarness,
-  publicationTarget, digest, type RealConfig } from "./real-common.js";
+  publicationTarget, digest, type LlmRecorder, type RealConfig } from "./real-common.js";
 
 const config = JSON.parse(process.env.AGENTFLOW_EVALUATION_CONFIG!) as RealConfig;
-const definition = referenceDefinition(config.context ?? "full");
+const definition = referenceDefinition(config);
 const db = evidenceDatabase(config.databaseUrl);
 const evidence = new Evidence(db, config);
 const role = process.argv[2];
@@ -25,17 +26,68 @@ const connection = redisConnection(config.redisUrl);
 const notify = (message: unknown) => process.send?.(message);
 const initialInput = { publicationTarget: publicationTarget(config.trialId) };
 
-async function boundedOperation(step: typeof definition.steps[number], input: Record<string, unknown>) {
+type Step = typeof definition.steps[number];
+
+async function boundedOperation(step: Step, input: Record<string, unknown>, options: { llmRecorder?: LlmRecorder } = {}) {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    try { return await executeCommonOperation(step, input, evidence); }
+    try { return await executeCommonOperation(step, input, evidence, options); }
     catch (error) {
       const failure = classifyOperationError(error);
       await evidence.event("operation-error", step.key, failure);
       if (failure.errorClass === "PERMANENT" || attempt === 3) throw error;
-      await delay(randomInt(config.retryMs * 2 ** (attempt - 1) + 1));
+      const backoff = randomInt(config.retryMs * 2 ** (attempt - 1) + 1);
+      await delay(Math.max(backoff, failure.retryAfterMs ?? 0));
     }
   }
   throw new Error("Retry budget exhausted");
+}
+
+/** C1 activity history: a recorded result is replayed instead of re-executed (Temporal-style). */
+const activityHistory = {
+  async get<T>(key: string): Promise<T | null> {
+    const row = await db.query<{ result_json: T }>(
+      "SELECT result_json FROM evaluation_activity_history WHERE trial_id=$1 AND activity_key=$2", [config.trialId, key]);
+    return row.rows[0]?.result_json ?? null;
+  },
+  async put(key: string, value: unknown): Promise<void> {
+    await db.query(`INSERT INTO evaluation_activity_history(trial_id, activity_key, result_json)
+      VALUES($1,$2,$3::jsonb) ON CONFLICT DO NOTHING`, [config.trialId, key, JSON.stringify(value)]);
+  },
+};
+
+async function runTemporalStyle(): Promise<void> {
+  const llmRecorder: LlmRecorder = {
+    lookup: (key) => activityHistory.get<LLMResponse>(`llm:${key}`),
+    store: (key, response) => activityHistory.put(`llm:${key}`, response),
+  };
+  let state: Record<string, unknown> = initialInput;
+  for (const step of definition.steps) {
+    const key = `step:${step.key}`;
+    const recorded = await activityHistory.get<Record<string, unknown>>(key);
+    if (recorded) {
+      state = recorded;
+      await evidence.event("activity-replayed", step.key, { activityKey: key });
+      continue;
+    }
+    state = await boundedOperation(step, state, { llmRecorder });
+    await activityHistory.put(key, state);
+    await evidence.event("reference-checkpoint", step.key);
+  }
+}
+
+async function runCheckpointerStyle(): Promise<void> {
+  const last = await db.query<{ position: number; state_json: Record<string, unknown> }>(
+    `SELECT position, state_json FROM evaluation_node_checkpoints WHERE trial_id=$1
+     ORDER BY position DESC LIMIT 1`, [config.trialId]);
+  let state: Record<string, unknown> = last.rows[0]?.state_json ?? initialInput;
+  const start = last.rows[0] ? last.rows[0].position + 1 : 0;
+  for (let position = start; position < definition.steps.length; position++) {
+    const step = definition.steps[position]!;
+    state = await boundedOperation(step, state);
+    await db.query(`INSERT INTO evaluation_node_checkpoints(trial_id, position, node_key, state_json)
+      VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING`, [config.trialId, position, step.key, JSON.stringify(state)]);
+    await evidence.event("reference-checkpoint", step.key);
+  }
 }
 
 if (role === "api") {
@@ -82,6 +134,8 @@ if (role === "api") {
       await evidence.boundary(boundary, operation.nodeKey, detail);
     },
   };
+  // A1-nojournal is an evaluation-only ablation: production never disables journal replay.
+  const agentOptions = config.system === "A1-nojournal" ? { llmJournalReplay: false } : {};
   const worker = new Worker(config.queue, async (job) => {
     // A0 removes only receiver cooperation in this evaluation adapter. Production A1 is unchanged.
     const step = config.system === "A0"
@@ -97,7 +151,7 @@ if (role === "api") {
       return completeOperation(db, operation, { published: true, receiverId: result.receiverId, receipt: result.receipt }, hooks);
     }
     return processOperationJob(db, `eval-${process.pid}`, config.leaseMs, job,
-      Math.max(100, Math.floor(config.leaseMs / 3)), 60_000, measuredHarness(evidence), hooks);
+      Math.max(100, Math.floor(config.leaseMs / 3)), 60_000, measuredHarness(evidence), hooks, agentOptions);
   }, { connection, concurrency: 1, lockDuration: config.leaseMs });
   worker.on("error", (error) => console.error(error));
   worker.on("failed", (_job, error) => console.error(error));
@@ -123,6 +177,10 @@ if (role === "api") {
       await handle.getResult();
       await evidence.event("reference-steps", null, await DBOS.listWorkflowSteps(handle.workflowID));
       await DBOS.shutdown();
+    } else if (config.system === "C1") {
+      await runTemporalStyle();
+    } else if (config.system === "C2") {
+      await runCheckpointerStyle();
     } else {
       // The supervisor preserves identity, but this process always starts with an empty cursor/state.
       let state: Record<string, unknown> = initialInput;

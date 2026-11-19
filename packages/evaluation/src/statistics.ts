@@ -57,6 +57,28 @@ export function pairedBootstrapInterval(
   };
 }
 
+/** Percentile bootstrap interval of a mean (unpaired, seeded, deterministic). */
+export function bootstrapMeanInterval(
+  values: readonly number[],
+  seed: number,
+  resamples = 10_000,
+): ConfidenceInterval | null {
+  if (values.length === 0 || resamples < 100) return null;
+  const random = new SeededRandom(seed);
+  const means: number[] = [];
+  for (let sample = 0; sample < resamples; sample += 1) {
+    let total = 0;
+    for (let index = 0; index < values.length; index += 1) total += values[random.integer(0, values.length - 1)]!;
+    means.push(total / values.length);
+  }
+  return {
+    estimate: values.reduce((sum, value) => sum + value, 0) / values.length,
+    lower: quantile(means, 0.025)!,
+    upper: quantile(means, 0.975)!,
+    confidence: 0.95,
+  };
+}
+
 export interface ResultSummary {
   system: string;
   scenario: string;
