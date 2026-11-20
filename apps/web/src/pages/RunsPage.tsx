@@ -167,6 +167,7 @@ export function RunsPage() {
         onClose={() => { if (!startedRef.current) setDrawer(false); startedRef.current = false; }}
         onStarted={(id) => { startedRef.current = true; navigate(`/runs/${id}`); }}
         onSessionExpired={() => navigate("/login")}
+        {...(query.workflow ? { initialWorkflowId: query.workflow } : {})}
       />
     </div>
   );

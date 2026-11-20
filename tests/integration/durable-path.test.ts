@@ -2765,4 +2765,43 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 20_000);
+
+  it("reports owner-wide usage by day that agrees with per-run summaries and stays owner-scoped", async () => {
+    type Totals = Record<"billedCalls" | "billedInputTokens" | "billedOutputTokens" | "replayedCalls"
+      | "savedByReplayInputTokens" | "savedByReplayOutputTokens" | "cacheHitCalls"
+      | "savedByCacheInputTokens" | "savedByCacheOutputTokens", number>;
+    const fields: Array<keyof Totals> = ["billedCalls", "billedInputTokens", "billedOutputTokens", "replayedCalls",
+      "savedByReplayInputTokens", "savedByReplayOutputTokens", "cacheHitCalls", "savedByCacheInputTokens",
+      "savedByCacheOutputTokens"];
+    const from = new Date(Date.now() - 86_400_000).toISOString();
+    const to = new Date(Date.now() + 60_000).toISOString();
+    for (const authorization of [testAuthorization, "Bearer other-test-token"]) {
+      const headers = { authorization };
+      const expected = Object.fromEntries(fields.map((field) => [field, 0])) as Totals;
+      for (let offset = 0; ; offset += 100) {
+        const page = await request<{ runs: Array<{ id: string }>; total: number }>(
+          `/runs?limit=100&offset=${offset}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers },
+        );
+        for (const run of page.runs) {
+          const { summary } = await request<{ summary: Totals }>(`/runs/${run.id}/usage`, { headers });
+          for (const field of fields) expected[field] += summary[field];
+        }
+        if (offset + 100 >= page.total) break;
+      }
+      const series = await request<{ totals: Totals; days: Array<Totals & { day: string }> }>(
+        `/usage?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers },
+      );
+      expect(series.totals).toMatchObject(expected);
+      for (const field of fields) {
+        expect(series.days.reduce((sum, day) => sum + day[field], 0)).toBe(expected[field]);
+      }
+      if (authorization === testAuthorization) {
+        // Earlier tests in this file billed calls and replayed from both the journal and the cache.
+        expect(expected.billedCalls).toBeGreaterThan(0);
+        expect(expected.replayedCalls).toBeGreaterThan(0);
+        expect(expected.cacheHitCalls).toBeGreaterThan(0);
+      }
+    }
+    expect((await rawRequest("/usage?from=2026-01-01&to=2025-01-01")).status).toBe(400);
+  }, 60_000);
 });

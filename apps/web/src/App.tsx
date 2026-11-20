@@ -5,7 +5,10 @@ import { SessionProvider, useSession } from "./lib/session.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RunDetailPage } from "./pages/RunDetailPage.js";
 import { RunsPage } from "./pages/RunsPage.js";
-import { UpcomingPage } from "./pages/UpcomingPage.js";
+import { ApprovalsPage } from "./pages/ApprovalsPage.js";
+import { SettingsPage } from "./pages/SettingsPage.js";
+import { UsagePage } from "./pages/UsagePage.js";
+import { WorkflowDetailPage, WorkflowsPage } from "./pages/WorkflowsPage.js";
 import { AppShell } from "./shell/AppShell.js";
 
 function RequireSession({ children }: { children: ReactNode }) {
@@ -22,6 +25,13 @@ function RequireSession({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** /runs/new opens the New run drawer over the runs list; ?workflow=<id> preselects a workflow. */
+function NewRunRedirect() {
+  const params = new URLSearchParams(useLocation().search);
+  params.set("new", "1");
+  return <Navigate to={`/runs?${params.toString()}`} replace />;
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -34,12 +44,13 @@ export function App() {
                 <Route element={<RequireSession><AppShell /></RequireSession>}>
                   <Route index element={<Navigate to="/runs" replace />} />
                   <Route path="/runs" element={<RunsPage />} />
-                  <Route path="/runs/new" element={<Navigate to="/runs?new=1" replace />} />
+                  <Route path="/runs/new" element={<NewRunRedirect />} />
                   <Route path="/runs/:id" element={<RunDetailPage />} />
-                  <Route path="/approvals/*" element={<UpcomingPage title="Approvals" description="Pending human checkpoints across your runs." interim="Until then, pending approvals can be decided from each run's page." />} />
-                  <Route path="/workflows" element={<UpcomingPage title="Workflows" description="Workflow definitions and their immutable versions." />} />
-                  <Route path="/usage" element={<UpcomingPage title="Usage" description="Billed, cached and saved tokens over time." interim="Per-run token figures are already on each run's page." />} />
-                  <Route path="/settings" element={<UpcomingPage title="Settings" description="Appearance and session." interim="The theme toggle is in the top bar." />} />
+                  <Route path="/approvals" element={<ApprovalsPage />} />
+                  <Route path="/workflows" element={<WorkflowsPage />} />
+                  <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+                  <Route path="/usage" element={<UsagePage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to="/runs" replace />} />
                 </Route>
               </Routes>

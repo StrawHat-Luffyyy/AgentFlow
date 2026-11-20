@@ -1,4 +1,4 @@
-import { Check, History as HistoryIcon, Pause, Play, RotateCcw, ShieldCheck, Square, X } from "lucide-react";
+import { History as HistoryIcon, Pause, Play, RotateCcw, ShieldCheck, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import {
@@ -12,6 +12,8 @@ import {
 import { formatAbsolute, formatClock, formatCost, formatNumber, formatRelative, formatSpan, formatTokens, humanize, shortId } from "../lib/format.js";
 import { deriveRecoveryEvents, historyTone } from "../lib/recovery.js";
 import { errorMessage, useNow, usePolling, useSession } from "../lib/session.js";
+import { ApprovalCard } from "../components/ApprovalCard.js";
+import { ReconcileAction } from "../components/ReconcileAction.js";
 import { ResultPanel } from "../ResultPanel.js";
 import { useBreadcrumbs } from "../shell/AppShell.js";
 import { LiveIndicator, ProviderBadge, stepType } from "./common.js";
@@ -98,7 +100,7 @@ function TokenPanel({ summary, usage }: { summary: ServerUsageSummary | null; us
 
 /* --------------------------------------------------------------- Inspector */
 function StepInspector({
-  step, tab, onTab, attempts, usage, stepSummary, tools, now,
+  step, tab, onTab, attempts, usage, stepSummary, tools, now, onChanged,
 }: {
   step: Step;
   tab: InspectorTab;
@@ -108,6 +110,7 @@ function StepInspector({
   stepSummary: StepUsageSummary | undefined;
   tools: ToolExecution[];
   now: number;
+  onChanged: () => void;
 }) {
   const type = stepType(step.kind);
   return (
@@ -219,9 +222,7 @@ function StepInspector({
                     { label: "Request hash", value: <code title={tool.requestHash}>{tool.requestHash.slice(0, 16)}…</code> },
                     { label: "Sent", value: tool.sentAt ? formatAbsolute(tool.sentAt) : "—" },
                   ]} />
-                  {tool.invocationStatus === "UNKNOWN" && (
-                    <InlineAlert tone="warning">Outcome unknown: the runtime will not resend. An operator resolves it with <code>POST /tool-executions/{shortId(tool.id)}…/reconcile</code>.</InlineAlert>
-                  )}
+                  {tool.invocationStatus === "UNKNOWN" && <ReconcileAction tool={tool} onResolved={onChanged} />}
                   {tool.receipt !== null && <CodeBlock value={tool.receipt} label="Receipt" maxHeight={200} />}
                 </li>
               ))}
@@ -231,60 +232,6 @@ function StepInspector({
         <TabPanel value="raw"><CodeBlock value={step} /></TabPanel>
       </Tabs>
     </aside>
-  );
-}
-
-/* ---------------------------------------------------------------- Approval */
-function ApprovalCard({ approval, onDecided }: { approval: Approval; onDecided: () => void }) {
-  const { principal } = useSession();
-  const toast = useToast();
-  const [confirm, setConfirm] = useState<"APPROVE" | "REJECT" | null>(null);
-  const [busy, setBusy] = useState(false);
-  const canDecide = principal?.roles.includes(approval.reviewerRole) ?? false;
-  async function decide(decision: "APPROVE" | "REJECT") {
-    setBusy(true);
-    try {
-      await api.decideApproval(approval, decision);
-      toast.show({ tone: "success", title: decision === "APPROVE" ? "Publication approved" : "Publication rejected" });
-      onDecided();
-    } catch (cause) {
-      toast.show({ tone: "danger", title: "Decision failed", description: errorMessage(cause) });
-    } finally {
-      setBusy(false);
-      setConfirm(null);
-    }
-  }
-  return (
-    <Card id="approval" title="Approval required" meta={`Expires ${formatAbsolute(approval.expiresAt)}`}
-      className="approval-card" actions={<ShieldCheck size={16} aria-hidden="true" />}>
-      <p className="approval-lead">The decision is bound to the exact persisted payload by its hash. A changed payload cannot reuse it.</p>
-      <KeyValue columns={2} items={[
-        { label: "Required role", value: <code>{approval.reviewerRole}</code> },
-        { label: "Payload hash", value: <IdChip value={approval.payloadHash} display={`${approval.payloadHash.slice(0, 16)}…`} /> },
-      ]} />
-      <CodeBlock value={approval.proposal} label="Proposal" maxHeight={260} />
-      <div className="approval-actions">
-        {!canDecide && <span className="approval-note">You need the <code>{approval.reviewerRole}</code> role to decide.</span>}
-        <Button variant="danger" icon={<X size={16} />} disabled={!canDecide || busy} onClick={() => setConfirm("REJECT")}>Reject</Button>
-        <Button variant="primary" icon={<Check size={16} />} disabled={!canDecide || busy} onClick={() => setConfirm("APPROVE")}>Approve</Button>
-      </div>
-      <Dialog
-        open={confirm !== null}
-        onOpenChange={(open) => { if (!open) setConfirm(null); }}
-        title={confirm === "APPROVE" ? "Approve this publication?" : "Reject this publication?"}
-        description={confirm === "APPROVE"
-          ? "The run continues and publishes the exact payload shown, once."
-          : "The run fails with APPROVAL_REJECTED. Starting again means a new run."}
-        footer={(
-          <>
-            <Button onClick={() => setConfirm(null)} autoFocus>Keep reviewing</Button>
-            <Button variant={confirm === "APPROVE" ? "primary" : "danger"} loading={busy} onClick={() => void decide(confirm!)}>
-              {confirm === "APPROVE" ? "Approve" : "Reject"}
-            </Button>
-          </>
-        )}
-      />
-    </Card>
   );
 }
 
@@ -382,7 +329,7 @@ export function RunDetailPage() {
         </div>
         <div className="run-actions">
           <LiveIndicator updatedAt={bundle.updatedAt} refreshing={bundle.refreshing} error={bundle.error} now={now} />
-          {pending.length > 0 && <a className="btn btn--primary btn--md" href="#approval"><ShieldCheck size={16} aria-hidden="true" /><span>Review approval</span></a>}
+          {pending.length > 0 && <a className="btn btn--primary btn--md" href={`#approval-${pending[0]!.id}`}><ShieldCheck size={16} aria-hidden="true" /><span>Review approval</span></a>}
           {run.lifecycle === "OPEN" && run.control === "RUN" && <Button icon={<Pause size={16} />} disabled={mutating} onClick={() => void control("pause")}>Pause</Button>}
           {run.lifecycle === "OPEN" && run.control === "PAUSED" && <Button variant="primary" icon={<Play size={16} />} disabled={mutating} onClick={() => void control("resume")}>Resume</Button>}
           {run.lifecycle === "OPEN" && (
@@ -491,6 +438,7 @@ export function RunDetailPage() {
             stepSummary={summaryByStep.get(selectedStep.id)}
             tools={data.tools.filter((tool) => tool.stepId === selectedStep.id)}
             now={now}
+            onChanged={() => void bundle.refresh()}
           />
         )}
       </div>

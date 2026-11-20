@@ -4,6 +4,8 @@ import {
 } from "../../apps/web/src/lib/format.js";
 import { deriveRecoveryEvents, historyTone } from "../../apps/web/src/lib/recovery.js";
 import { isFiltered, parseRunListQuery, serializeRunListQuery, toApiFilters } from "../../apps/web/src/lib/run-filters.js";
+import { parseReceipt } from "../../apps/web/src/lib/reconcile.js";
+import { breakdown, niceMax, savedShare, usageWindow } from "../../apps/web/src/lib/usage.js";
 
 describe("console formatting", () => {
   const now = Date.parse("2026-11-20T12:00:00.000Z");
@@ -90,5 +92,32 @@ describe("runs list filters", () => {
       from: "2026-11-19T12:00:00.000Z",
     });
     expect(toApiFilters({ status: "all", workflow: "", range: "any" }, now)).toEqual({});
+  });
+});
+
+describe("console usage page helpers", () => {
+  const totals = {
+    billedCalls: 4, unreportedCalls: 0, billedInputTokens: 600, billedOutputTokens: 150,
+    billedCachedInputTokens: 0, billedReasoningTokens: 0, replayedCalls: 1, savedByReplayInputTokens: 150,
+    savedByReplayOutputTokens: 50, cacheHitCalls: 1, savedByCacheInputTokens: 40, savedByCacheOutputTokens: 10,
+  };
+
+  it("keeps billed tokens apart from tokens avoided by replay and by cache", () => {
+    expect(breakdown(totals)).toEqual({ billed: 750, savedByReplay: 200, savedByCache: 50 });
+    expect(savedShare(breakdown(totals))).toBeCloseTo(0.25);
+    expect(savedShare({ billed: 0, savedByReplay: 0, savedByCache: 0 })).toBeNull();
+  });
+
+  it("picks round axis maxima and whole UTC-day windows ending tomorrow at midnight", () => {
+    expect([0, 1, 7, 12, 260, 4_100, 50_000].map(niceMax)).toEqual([1, 1, 10, 20, 500, 5_000, 50_000]);
+    const window = usageWindow("7d", Date.parse("2026-11-20T15:30:00.000Z"));
+    expect(window).toEqual({ from: "2026-11-14T00:00:00.000Z", to: "2026-11-21T00:00:00.000Z" });
+  });
+
+  it("accepts only a JSON object as a reconciliation receipt", () => {
+    expect(parseReceipt('{"status":"published"}')).toEqual({ ok: true, value: { status: "published" } });
+    expect(parseReceipt("[1]").ok).toBe(false);
+    expect(parseReceipt("null").ok).toBe(false);
+    expect(parseReceipt("{oops").ok).toBe(false);
   });
 });

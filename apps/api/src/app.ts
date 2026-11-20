@@ -25,6 +25,7 @@ import {
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getOwnerUsageSeries,
   getRunBudget,
   getRunCacheLookups,
   getRunReplays,
@@ -286,7 +287,20 @@ export function createApp(
     response.json({ usage, replays, summary: { ...summarizeRunUsage(usage, replays, cache), budget } });
   });
 
-  app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {
+  // Owner-wide usage by UTC day; reporting only, read from persisted usage_records and replays.
+  app.get("/usage", async (request: express.Request, response: express.Response) => {
+    const day = 86_400_000;
+    const query = z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() }).parse(request.query);
+    const to = query.to ?? new Date();
+    const from = query.from ?? new Date(to.getTime() - 30 * day);
+    if (from >= to || to.getTime() - from.getTime() > 92 * day) {
+      response.status(400).json({ error: "VALIDATION_ERROR", message: "from must precede to by at most 92 days" });
+      return;
+    }
+    response.json(await getOwnerUsageSeries(database, { ownerId: response.locals.principal.id, from, to }));
+  });
+
+  app.get("/runs/:id/sources",async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ sources: await getRunSources(database, runId) });
   });

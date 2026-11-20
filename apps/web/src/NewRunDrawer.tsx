@@ -26,8 +26,11 @@ export function NewRunDrawer({
   onClose,
   onStarted,
   onSessionExpired,
+  initialWorkflowId,
 }: {
   open: boolean;
+  /** Preselects this workflow each time the drawer opens (e.g. from the Workflows page). */
+  initialWorkflowId?: string;
   onClose: () => void;
   onStarted: (runId: string) => void;
   onSessionExpired: () => void;
@@ -79,11 +82,12 @@ export function NewRunDrawer({
     if (!open) return;
     setError(null);
     setSubmitting(false);
+    if (initialWorkflowId) setWorkflowId(initialWorkflowId);
     // Fresh timestamped publication target per opening unless the user edited the input.
     if (!inputDirty) setInputText(template());
     api.listWorkflows().then((body) => setWorkflows(body.workflows)).catch(handleFailure);
     // Intentionally runs only when the drawer opens, not on every input edit.
-  }, [open, handleFailure]);
+  }, [open, handleFailure, initialWorkflowId]);
 
   useEffect(() => {
     if (!open) return;

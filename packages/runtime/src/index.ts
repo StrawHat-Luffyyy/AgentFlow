@@ -685,7 +685,8 @@ export async function getWorkflow(database: Queryable, workflowId: string) {
   const versions = await database.query(
     `SELECT id, version, created_at AS "createdAt",
        jsonb_array_length(definition_json->'steps')::integer AS "stepCount",
-       ${agentProvidersSql("wv")} AS providers
+       ${agentProvidersSql("wv")} AS providers,
+       definition_json->'steps' AS steps
      FROM workflow_versions wv WHERE workflow_id = $1 ORDER BY version`,
     [workflowId],
   );
@@ -4014,6 +4015,81 @@ export function summarizeRunUsage(
         provider,
         model,
         ...totalsOf(usage.filter((r) => modelKey(r) === key), replays.filter((r) => modelKey(r) === key)),
+      };
+    }),
+  };
+}
+
+export interface OwnerUsageSeries {
+  from: string;
+  to: string;
+  /** Totals over the whole window, same shape as a run's usage summary. */
+  totals: UsageTotals;
+  provenance: { reported: number; estimated: number; unknown: number };
+  /** One entry per UTC day in [from, to), including days with no calls. */
+  days: Array<{ day: string } & UsageTotals>;
+  byModel: Array<{ provider: string; model: string } & UsageTotals>;
+}
+
+/**
+ * Billed usage and avoided calls across every run the owner can see, bucketed by UTC day.
+ * Read-only reporting over persisted usage_records and harness_replays; billed and saved
+ * figures stay separate exactly as in summarizeRunUsage.
+ */
+export async function getOwnerUsageSeries(
+  database: Queryable,
+  options: { ownerId: string; from: Date; to: Date },
+): Promise<OwnerUsageSeries> {
+  const scope = `JOIN workflow_runs wr ON wr.id = t.run_id
+     JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     JOIN workflows w ON w.id = wv.workflow_id
+     WHERE w.owner_id = $1 AND t.created_at >= $2 AND t.created_at < $3`;
+  const params = [options.ownerId, options.from.toISOString(), options.to.toISOString()];
+  const day = `to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day`;
+  const [usage, replays] = await Promise.all([
+    database.query<SummarizableUsage & { day: string }>(
+      `SELECT t.step_id AS "stepId", t.provider, t.model, t.provenance,
+         t.input_tokens AS "inputTokens", t.output_tokens AS "outputTokens",
+         t.cached_input_tokens AS "cachedInputTokens", t.reasoning_tokens AS "reasoningTokens", ${day}
+       FROM usage_records t ${scope}`,
+      params,
+    ),
+    database.query<SummarizableReplay & { day: string }>(
+      `SELECT t.step_id AS "stepId", t.provider, t.model, t.source,
+         t.saved_input_tokens AS "savedInputTokens", t.saved_output_tokens AS "savedOutputTokens", ${day}
+       FROM harness_replays t ${scope}`,
+      params,
+    ),
+  ]);
+  const provenance = { reported: 0, estimated: 0, unknown: 0 };
+  for (const record of usage.rows) {
+    if (record.provenance === "reported" || record.provenance === "estimated" || record.provenance === "unknown") {
+      provenance[record.provenance] += 1;
+    }
+  }
+  const days: OwnerUsageSeries["days"] = [];
+  const start = new Date(Date.UTC(options.from.getUTCFullYear(), options.from.getUTCMonth(), options.from.getUTCDate()));
+  for (let cursor = start; cursor < options.to; cursor = new Date(cursor.getTime() + 86_400_000)) {
+    const key = cursor.toISOString().slice(0, 10);
+    days.push({
+      day: key,
+      ...totalsOf(usage.rows.filter((r) => r.day === key), replays.rows.filter((r) => r.day === key)),
+    });
+  }
+  const modelKey = (row: { provider: string; model: string }) => `${row.provider}\u0000${row.model}`;
+  const models = [...new Set([...usage.rows.map(modelKey), ...replays.rows.map(modelKey)])];
+  return {
+    from: options.from.toISOString(),
+    to: options.to.toISOString(),
+    totals: totalsOf(usage.rows, replays.rows),
+    provenance,
+    days,
+    byModel: models.map((key) => {
+      const [provider, model] = key.split("\u0000") as [string, string];
+      return {
+        provider,
+        model,
+        ...totalsOf(usage.rows.filter((r) => modelKey(r) === key), replays.rows.filter((r) => modelKey(r) === key)),
       };
     }),
   };

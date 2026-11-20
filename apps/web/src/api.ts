@@ -218,6 +218,8 @@ export interface WorkflowVersionSummary {
   createdAt: string;
   stepCount: number;
   providers: string[];
+  /** The version's step definitions, as stored (immutable once created). */
+  steps?: Array<{ key: string; kind: string; handler: string; [field: string]: JsonValue }>;
 }
 
 export interface WorkflowDetail extends Omit<WorkflowSummary, "latestVersion" | "versionCount"> {
@@ -248,6 +250,35 @@ export interface CreateRunBody {
   maxTokens?: number;
   maxCostUsd?: number;
 }
+
+/** Totals shared by the owner-wide usage series (same fields as a run's usage summary). */
+export interface UsageTotals {
+  billedCalls: number;
+  unreportedCalls: number;
+  billedInputTokens: number;
+  billedOutputTokens: number;
+  billedCachedInputTokens: number;
+  billedReasoningTokens: number;
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+}
+
+export interface OwnerUsageSeries {
+  from: string;
+  to: string;
+  totals: UsageTotals;
+  provenance: { reported: number; estimated: number; unknown: number };
+  days: Array<{ day: string } & UsageTotals>;
+  byModel: Array<{ provider: string; model: string } & UsageTotals>;
+}
+
+export type ReconcileDecision =
+  | { resolution: "CONFIRM_SUCCEEDED"; receiverId: string; receipt: Record<string, unknown> }
+  | { resolution: "FAIL_FINAL" };
 
 /** HTTP status 0 means the API could not be reached at all. */
 export class ApiError extends Error {
@@ -304,7 +335,11 @@ export const api = {
     return request<{ runs: RunSummary[]; total: number }>(`/runs?${query.toString()}`);
   },
   ready: () => request<Readiness>("/ready"),
-  listApprovals: () => request<{ approvals: Array<Approval & { runId?: string }> }>("/approvals"),
+  listApprovals: () => request<{ approvals: Array<Approval & { runId: string }> }>("/approvals"),
+  getOwnerUsage: (from: string, to: string) =>
+    request<OwnerUsageSeries>(`/usage?${new URLSearchParams({ from, to }).toString()}`),
+  reconcileToolExecution: (id: string, decision: ReconcileDecision) =>
+    request<{ lifecycle: string }>(`/tool-executions/${id}/reconcile`, { method: "POST", body: JSON.stringify(decision) }),
   getToolExecutions: (id: string) => request<{ executions: ToolExecution[] }>(`/runs/${id}/tool-executions`),
   getRun: (id: string) => request<RunDetail>(`/runs/${id}`),
   getAttempts: (id: string) => request<{ attempts: Attempt[] }>(`/runs/${id}/attempts`),
