@@ -230,8 +230,21 @@ export function createApp(
     const query = z.object({
       limit: z.coerce.number().int().min(1).max(100).default(50),
       offset: z.coerce.number().int().min(0).default(0),
+      // Comma-separated public statuses, e.g. status=RUNNING,WAITING_APPROVAL.
+      status: z.string().regex(/^[A-Z_]+(,[A-Z_]+)*$/).optional(),
+      workflowId: z.string().uuid().optional(),
+      from: z.coerce.date().optional(),
+      to: z.coerce.date().optional(),
     }).parse(request.query);
-    response.json(await listRuns(database, { ...query, ownerId: response.locals.principal.id }));
+    response.json(await listRuns(database, {
+      limit: query.limit,
+      offset: query.offset,
+      ownerId: response.locals.principal.id,
+      ...(query.status ? { statuses: query.status.split(",") } : {}),
+      ...(query.workflowId ? { workflowId: query.workflowId } : {}),
+      ...(query.from ? { createdFrom: query.from } : {}),
+      ...(query.to ? { createdTo: query.to } : {}),
+    }));
   });
 
   app.get("/runs/:id", async (request: express.Request, response: express.Response) => {

@@ -23,6 +23,9 @@ export interface RunSummary {
   outputTokens: number;
   /** Distinct LLM providers of the run's AGENT steps. */
   providers?: string[];
+  workflowId?: string;
+  maxTokens?: number | null;
+  maxCostUsd?: number | null;
 }
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -34,11 +37,17 @@ export interface Step {
   kind: string;
   handler: string;
   status: string;
+  effectClass?: string;
   input: JsonValue;
   acceptedOutput: JsonValue | null;
   failure: JsonValue | null;
   attemptCount: number;
   maxAttempts: number;
+  /** Current fencing epoch and lease holder (null when no worker holds the step). */
+  leaseEpoch?: number;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+  dispatchGeneration?: number;
   createdAt: string;
   completedAt: string | null;
   nextAttemptAt: string | null;
@@ -63,6 +72,9 @@ export interface RunDetail {
   /** Run budget (brief 2.5); null or absent when unbudgeted. */
   maxTokens?: number | null;
   maxCostUsd?: number | null;
+  workflowId?: string;
+  workflowName?: string;
+  workflowVersion?: number;
 }
 
 export interface Attempt {
@@ -117,6 +129,64 @@ export interface ServerUsageSummary {
   savedByCacheOutputTokens: number;
   cacheScope: "run" | "version" | "off" | null;
   cacheLookups: { hits: number; misses: number; off: number };
+  billedCalls?: number;
+  unreportedCalls?: number;
+  billedInputTokens?: number;
+  billedOutputTokens?: number;
+  billedCachedInputTokens?: number;
+  billedReasoningTokens?: number;
+  provenance?: Record<string, number>;
+  byStep?: StepUsageSummary[];
+  budget?: { tokensUsed: number; maxTokens: number | null; costUsd: number | null; maxCostUsd: number | null; unreportedCalls: number } | null;
+}
+
+/** Per-step slice of the usage summary (billed, cached, reasoning, journal-replayed and cache-hit tokens). */
+export interface StepUsageSummary {
+  stepId: string;
+  billedCalls: number;
+  unreportedCalls: number;
+  billedInputTokens: number;
+  billedOutputTokens: number;
+  billedCachedInputTokens: number;
+  billedReasoningTokens: number;
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+  cacheLookups?: { hits: number; misses: number; off: number };
+}
+
+export interface ToolExecution {
+  id: string;
+  stepId: string;
+  attemptId: string;
+  toolName: string;
+  toolVersion: string;
+  effectClass: string;
+  requestHash: string;
+  idempotencyKey: string;
+  idempotencyStatus: string;
+  invocationStatus: string;
+  receiverId: string | null;
+  receipt: JsonValue | null;
+  sentAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface RunFilters {
+  status?: string[];
+  workflowId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface Readiness {
+  status: string;
+  database?: string;
+  queue?: string;
 }
 
 export interface UsageRecord {
@@ -225,7 +295,17 @@ export const api = {
     }),
   logout: () => request<{ status: string }>("/auth/logout", { method: "POST" }),
   me: () => request<{ id: string; roles: string[]; username?: string }>("/me"),
-  listRuns: () => request<{ runs: RunSummary[]; total: number }>("/runs?limit=100"),
+  listRuns: (filters: RunFilters = {}) => {
+    const query = new URLSearchParams({ limit: "100" });
+    if (filters.status?.length) query.set("status", filters.status.join(","));
+    if (filters.workflowId) query.set("workflowId", filters.workflowId);
+    if (filters.from) query.set("from", filters.from);
+    if (filters.to) query.set("to", filters.to);
+    return request<{ runs: RunSummary[]; total: number }>(`/runs?${query.toString()}`);
+  },
+  ready: () => request<Readiness>("/ready"),
+  listApprovals: () => request<{ approvals: Array<Approval & { runId?: string }> }>("/approvals"),
+  getToolExecutions: (id: string) => request<{ executions: ToolExecution[] }>(`/runs/${id}/tool-executions`),
   getRun: (id: string) => request<RunDetail>(`/runs/${id}`),
   getAttempts: (id: string) => request<{ attempts: Attempt[] }>(`/runs/${id}/attempts`),
   getApprovals: (id: string) => request<{ approvals: Approval[] }>(`/runs/${id}/approvals`),

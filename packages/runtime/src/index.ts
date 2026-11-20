@@ -365,26 +365,50 @@ export async function createRun(
 
 type Queryable = Pick<Database, "query"> | Pick<Transaction, "query">;
 
-export async function listRuns(
-  database: Queryable,
-  options: { limit?: number; offset?: number; ownerId?: string } = {},
-) {
+export interface ListRunsOptions {
+  limit?: number;
+  offset?: number;
+  ownerId?: string;
+  /** Public statuses to include (as returned in `publicStatus`); empty or absent means all. */
+  statuses?: readonly string[];
+  workflowId?: string;
+  /** Inclusive lower and exclusive upper bound on creation time. */
+  createdFrom?: Date;
+  createdTo?: Date;
+}
+
+/** SQL mirror of derivePublicStatus, so the runs list can be filtered by public status in the database. */
+const publicStatusSql = `CASE
+  WHEN wr.lifecycle <> 'OPEN' THEN wr.lifecycle
+  WHEN wr.control IN ('PAUSED', 'PAUSE_REQUESTED') THEN wr.control
+  WHEN wr.control = 'CANCEL_REQUESTED' THEN 'CANCEL_REQUESTED'
+  WHEN wr.wait_reason = 'RECONCILIATION' THEN 'NEEDS_ATTENTION'
+  WHEN wr.wait_reason = 'APPROVAL' THEN 'WAITING_APPROVAL'
+  WHEN wr.wait_reason = 'RETRY' THEN 'RETRY_WAIT'
+  WHEN COALESCE(step_stats.has_running, false) THEN 'RUNNING'
+  ELSE 'QUEUED' END`;
+
+export async function listRuns(database: Queryable, options: ListRunsOptions = {}) {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
   const offset = Math.max(options.offset ?? 0, 0);
-  const [runs, count] = await Promise.all([
-    database.query(
-      `SELECT wr.id, wr.workflow_version_id AS "workflowVersionId",
-         w.name AS "workflowName", wv.version AS "workflowVersion",
+  const statuses = options.statuses && options.statuses.length > 0 ? [...options.statuses] : null;
+  // One filtered relation feeds both the page and the total, so they always agree.
+  const filtered = `
+    WITH listed AS (
+      SELECT wr.id, wr.workflow_version_id AS "workflowVersionId",
+         w.id AS "workflowId", w.name AS "workflowName", wv.version AS "workflowVersion",
          wr.lifecycle, wr.control, wr.wait_reason AS "waitReason",
          wr.created_at AS "createdAt", wr.finished_at AS "finishedAt",
          wr.deadline_at AS "deadlineAt", wr.failure_json AS failure,
+         wr.max_tokens::float8 AS "maxTokens", wr.max_cost_usd::float8 AS "maxCostUsd",
          COALESCE(step_stats.step_count, 0)::integer AS "stepCount",
          COALESCE(step_stats.completed_step_count, 0)::integer AS "completedStepCount",
          COALESCE(step_stats.attempt_count, 0)::integer AS "attemptCount",
          COALESCE(step_stats.has_running, false) AS "hasRunning",
          COALESCE(usage_stats.input_tokens, 0)::integer AS "inputTokens",
          COALESCE(usage_stats.output_tokens, 0)::integer AS "outputTokens",
-         ${agentProvidersSql("wv")} AS providers
+         ${agentProvidersSql("wv")} AS providers,
+         ${publicStatusSql} AS public_status
        FROM workflow_runs wr
        JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
        JOIN workflows w ON w.id = wv.workflow_id
@@ -400,15 +424,29 @@ export async function listRuns(
            COALESCE(sum(output_tokens), 0) AS output_tokens
          FROM usage_records WHERE run_id = wr.id
        ) usage_stats ON true
-       WHERE ($3::text IS NULL OR w.owner_id = $3)
-       ORDER BY wr.created_at DESC, wr.id DESC LIMIT $1 OFFSET $2`,
-      [limit, offset, options.ownerId ?? null],
+       WHERE ($1::text IS NULL OR w.owner_id = $1)
+         AND ($2::uuid IS NULL OR w.id = $2)
+         AND ($3::timestamptz IS NULL OR wr.created_at >= $3)
+         AND ($4::timestamptz IS NULL OR wr.created_at < $4)
+    )`;
+  const filters = [
+    options.ownerId ?? null,
+    options.workflowId ?? null,
+    options.createdFrom?.toISOString() ?? null,
+    options.createdTo?.toISOString() ?? null,
+    statuses,
+  ];
+  const [runs, count] = await Promise.all([
+    database.query(
+      `${filtered}
+       SELECT * FROM listed WHERE ($5::text[] IS NULL OR public_status = ANY($5))
+       ORDER BY "createdAt" DESC, id DESC LIMIT $6 OFFSET $7`,
+      [...filters, limit, offset],
     ),
     database.query<{ total: number }>(
-      `SELECT count(*)::integer AS total FROM workflow_runs wr
-       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
-       JOIN workflows w ON w.id = wv.workflow_id
-       WHERE ($1::text IS NULL OR w.owner_id = $1)`, [options.ownerId ?? null],
+      `${filtered}
+       SELECT count(*)::integer AS total FROM listed WHERE ($5::text[] IS NULL OR public_status = ANY($5))`,
+      filters,
     ),
   ]);
 
@@ -417,7 +455,8 @@ export async function listRuns(
     control: string;
     waitReason: string;
     hasRunning: boolean;
-  }>).map(({ hasRunning, ...run }) => ({
+    public_status: string;
+  }>).map(({ hasRunning, public_status: _publicStatus, ...run }) => ({
     ...run,
     publicStatus: derivePublicStatus(run, hasRunning ? [{ status: "RUNNING" }] : []),
   }));
@@ -466,7 +505,12 @@ export async function getRun(database: Queryable, runId: string) {
        current_checkpoint_id AS "currentCheckpointId", created_at AS "createdAt",
        finished_at AS "finishedAt", deadline_at AS "deadlineAt", failure_json AS failure,
        max_tokens::float8 AS "maxTokens", max_cost_usd::float8 AS "maxCostUsd",
-       (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers
+       (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers,
+       (SELECT w.id FROM workflow_versions wv JOIN workflows w ON w.id = wv.workflow_id
+        WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowId",
+       (SELECT w.name FROM workflow_versions wv JOIN workflows w ON w.id = wv.workflow_id
+        WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowName",
+       (SELECT wv.version FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowVersion"
      FROM workflow_runs WHERE id = $1`,
     [runId],
   );

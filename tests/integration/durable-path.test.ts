@@ -1395,6 +1395,57 @@ describe("durable API → outbox → BullMQ → worker path", () => {
     }
   }, 30_000);
 
+  it("filters the owner's runs by public status, workflow and creation time", async () => {
+    await worker.pause();
+    try {
+      const makeVersion = async (name: string, authorization = testAuthorization) => {
+        const headers = { authorization };
+        const workflow = await request<{ id: string }>("/workflows", { method: "POST", headers, body: JSON.stringify({ name, description: "Run filters" }) });
+        const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST", headers, body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+        });
+        return { workflowId: workflow.id, versionId: version.id };
+      };
+      const startRun = (versionId: string, authorization = testAuthorization) =>
+        request<{ id: string }>("/runs", { method: "POST", headers: { authorization }, body: JSON.stringify({ workflowVersionId: versionId, input: { topic: "filters" } }) });
+      type RunList = { runs: Array<{ id: string; publicStatus: string; workflowId: string }>; total: number };
+
+      const first = await makeVersion("filters-first");
+      const second = await makeVersion("filters-second");
+      const foreign = await makeVersion("filters-foreign", "Bearer other-test-token");
+      const queued = await startRun(first.versionId);
+      const cancelled = await startRun(first.versionId);
+      const other = await startRun(second.versionId);
+      const foreignRun = await startRun(foreign.versionId, "Bearer other-test-token");
+      await controlRun(database, cancelled.id, "cancel");
+      await repairScheduling(database, 10_000);
+
+      const byWorkflow = await request<RunList>(`/runs?workflowId=${first.workflowId}`);
+      expect(byWorkflow.runs.map((run) => run.id).sort()).toEqual([queued.id, cancelled.id].sort());
+      expect(byWorkflow.total).toBe(2);
+
+      const cancelledOnly = await request<RunList>(`/runs?workflowId=${first.workflowId}&status=CANCELLED`);
+      expect(cancelledOnly).toMatchObject({ total: 1, runs: [{ id: cancelled.id, publicStatus: "CANCELLED" }] });
+      const activeOnly = await request<RunList>(`/runs?workflowId=${first.workflowId}&status=QUEUED,RUNNING`);
+      expect(activeOnly.runs.map((run) => run.id)).toEqual([queued.id]);
+
+      const future = new Date(Date.now() + 60_000).toISOString();
+      expect((await request<RunList>(`/runs?workflowId=${second.workflowId}&from=${future}`)).total).toBe(0);
+      expect((await request<RunList>(`/runs?workflowId=${second.workflowId}&to=${future}`)).runs.map((run) => run.id)).toEqual([other.id]);
+
+      // Another owner's workflow filter returns nothing for this owner, and never leaks its runs.
+      expect((await request<RunList>(`/runs?workflowId=${foreign.workflowId}`)).total).toBe(0);
+      const all = await request<RunList>("/runs?limit=100");
+      expect(all.runs.some((run) => run.id === foreignRun.id)).toBe(false);
+      expect((await rawRequest("/runs?status=lowercase")).status).toBe(400);
+
+      for (const run of [queued, other]) await controlRun(database, run.id, "cancel");
+      await controlRun(database, foreignRun.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
   it("registers a new reference workflow version when its definition changes instead of failing", async () => {
     const owner = "context-version-owner";
     const full = await ensureCloudComparisonWorkflow(database, { context: "full" }, owner);

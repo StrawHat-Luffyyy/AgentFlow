@@ -5,7 +5,7 @@ import {
   budgetFromText, deadlineMsFromMinutes, LIVE_PROVIDERS, liveProviderLabel, parseRunInput, readiness, referenceTemplate,
   SCRIPTED_PROVIDER, selectedVersionFor, type LiveProviderName,
 } from "./new-run.js";
-import { Button, IconButton, InlineAlert } from "./ui.js";
+import { Button, IconButton, InlineAlert } from "./design/index.js";
 
 const REFERENCE = "reference";
 const AVAILABILITY_POLL_MS = 5_000;
@@ -316,7 +316,7 @@ export function NewRunDrawer({
 
         <footer className="drawer-footer">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={submitting} disabled={!canStart} icon={<Play size={14} />}>
+          <Button type="submit" variant="primary" loading={submitting} disabled={!canStart} icon={<Play size={16} />}>
             {liveLabel ? `Start live run · ${liveLabel}` : "Start run"}
           </Button>
         </footer>
