@@ -31,6 +31,8 @@ pnpm exec vitest run tests/unit/harness.test.ts          # single file
 pnpm exec vitest run tests/unit/harness.test.ts -t "provider adapters"   # single test/describe by name
 ```
 
+Console smoke tests: `pnpm test:e2e` (Playwright, uses the installed Google Chrome via `channel: "chrome"`). `tests/e2e/stack.ts` starts its own API (:3100), worker and Vite (:4180) on `agentflow_e2e_test` + Redis DB 1, so it never touches dev data. Spec files are `*.e2e.ts` so Vitest ignores them. `pnpm screenshots` regenerates `docs/screenshots/` (scripted provider, with an injected E2B worker crash).
+
 Integration tests use `TEST_DATABASE_URL` (default `.../agentflow_test`) and **truncate it** — they refuse any database whose name doesn't end in `_test`/`-test`.
 
 Config is read from `process.env` via zod in `packages/config` (no dotenv loading); `.env.example` lists every variable. `LEASE_HEARTBEAT_MS` must be < `OPERATION_LEASE_MS`. `AGENTFLOW_AUTH_CREDENTIALS` is a JSON array of `{id, tokenHash (sha256 hex), roles}` — see README §13 for a generator one-liner.

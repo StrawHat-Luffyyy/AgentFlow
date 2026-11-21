@@ -26,6 +26,9 @@ importers:
       '@google/genai':
         specifier: ^2.27.0
         version: 2.27.0
+      '@playwright/test':
+        specifier: ^1.65.1
+        version: 1.65.1
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.6
@@ -837,6 +840,11 @@ packages:
   '@opentelemetry/semantic-conventions@1.43.0':
     resolution: {integrity: sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg==}
     engines: {node: '>=14'}
+
+  '@playwright/test@1.65.1':
+    resolution: {integrity: sha512-y+NCIRm2LvY4slUVWvGh1nujJ8RF/hEisIsq2mtUPgdQC4L701bq5hZGMhrpeXjACvwvO9tj5dJqhvM6TP9lbw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -1993,6 +2001,16 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
+  playwright-core@1.65.1:
+    resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.65.1:
+    resolution: {integrity: sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
     engines: {node: ^10 || ^12 || >=14}
@@ -2945,6 +2963,10 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.43.0
 
   '@opentelemetry/semantic-conventions@1.43.0': {}
+
+  '@playwright/test@1.65.1':
+    dependencies:
+      playwright: 1.65.1
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -4081,6 +4103,12 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.65.1: {}
+
+  playwright@1.65.1:
+    dependencies:
+      playwright-core: 1.65.1
 
   postcss@8.5.28:
     dependencies:

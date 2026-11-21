@@ -15,6 +15,10 @@ const series = [
   { key: "savedByCache", label: "Avoided · response cache", className: "usage-swatch--cache" },
 ] as const;
 
+function plural(count: number, noun: string): string {
+  return `${formatNumber(count)} ${noun}${count === 1 ? "" : "s"}`;
+}
+
 function formatDay(day: string, withYear = false): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
     month: "short", day: "numeric", timeZone: "UTC", ...(withYear ? { year: "numeric" } : {}),
@@ -100,6 +104,10 @@ export function UsagePage() {
   const share = totals ? savedShare(totals) : null;
   const calls = data ? data.totals.billedCalls + data.totals.replayedCalls + data.totals.cacheHitCalls : 0;
   const provenance = data?.provenance;
+  // Scripted-provider counts are word-count estimates, never billed; say so wherever they appear.
+  const billedLabel = !provenance || provenance.estimated === 0
+    ? "Billed tokens"
+    : provenance.reported > 0 ? "Billed tokens (some estimated)" : "Billed tokens (estimated)";
 
   return (
     <div className="page">
@@ -133,19 +141,19 @@ export function UsagePage() {
         <>
           <div className="token-grid token-grid--quad">
             <div className="metric">
-              <span className="metric-label">Billed tokens</span>
+              <span className="metric-label">{billedLabel}</span>
               <span className="metric-value tabular">{formatNumber(totals.billed)}</span>
-              <span className="metric-detail">{formatNumber(data.totals.billedCalls)} provider calls · {formatNumber(data.totals.billedInputTokens)} in · {formatNumber(data.totals.billedOutputTokens)} out</span>
+              <span className="metric-detail">{plural(data.totals.billedCalls, "provider call")} · {formatNumber(data.totals.billedInputTokens)} in · {formatNumber(data.totals.billedOutputTokens)} out</span>
             </div>
             <div className="metric metric--success">
               <span className="metric-label">Avoided by journal replay</span>
               <span className="metric-value tabular">{formatNumber(totals.savedByReplay)}</span>
-              <span className="metric-detail">{formatNumber(data.totals.replayedCalls)} calls not repeated after a crash or retry</span>
+              <span className="metric-detail">{plural(data.totals.replayedCalls, "call")} not repeated after a crash or retry</span>
             </div>
             <div className="metric metric--success">
               <span className="metric-label">Avoided by response cache</span>
               <span className="metric-value tabular">{formatNumber(totals.savedByCache)}</span>
-              <span className="metric-detail">{formatNumber(data.totals.cacheHitCalls)} identical requests answered from earlier responses</span>
+              <span className="metric-detail">{plural(data.totals.cacheHitCalls, "identical request")} answered from earlier responses</span>
             </div>
             <div className="metric">
               <span className="metric-label">Share avoided</span>
