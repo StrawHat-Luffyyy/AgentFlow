@@ -17,6 +17,8 @@ export function ApprovalCard({ approval, onDecided, title = "Approval required",
     try {
       await api.decideApproval(approval, decision);
       toast.show({ tone: "success", title: decision === "APPROVE" ? "Publication approved" : "Publication rejected" });
+      // The shell's pending-approvals badge listens for this instead of waiting for its next poll.
+      window.dispatchEvent(new Event("agentflow:approvals-changed"));
       onDecided();
     } catch (cause) {
       toast.show({ tone: "danger", title: "Decision failed", description: errorMessage(cause) });

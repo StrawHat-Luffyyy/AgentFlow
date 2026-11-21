@@ -96,6 +96,12 @@ export function AppShell() {
   const location = useLocation();
   const approvals = usePolling(() => api.listApprovals(), [], 5_000);
   const pending = approvals.data?.approvals.length ?? 0;
+  const refreshApprovals = approvals.refresh;
+  useEffect(() => {
+    const onChanged = () => void refreshApprovals();
+    window.addEventListener("agentflow:approvals-changed", onChanged);
+    return () => window.removeEventListener("agentflow:approvals-changed", onChanged);
+  }, [refreshApprovals]);
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((value) => {

@@ -115,7 +115,7 @@
 .page-heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .page-description { color: var(--text-secondary); max-width: 720px; }
 .page-meta { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--text-12); }
-.page-actions { display: flex; align-items: center; gap: var(--space-3); }
+.page-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
 
 .live { display: inline-flex; align-items: center; gap: 6px; min-width: 128px; justify-content: flex-end; color: var(--text-tertiary); font-size: var(--text-12); font-variant-numeric: tabular-nums; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success-solid); }
@@ -302,7 +302,12 @@
 .usage-chart { display: flex; flex-direction: column; gap: var(--space-2); }
 .usage-chart-readout { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); min-height: 22px; font-size: var(--text-12); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .usage-chart-plot { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: 220px; gap: var(--space-2); }
-.usage-chart-axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: var(--text-12); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.usage-chart-axis { position: relative; font-size: var(--text-12); line-height: 1; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.usage-chart-axis span { position: absolute; right: 0; transform: translateY(-50%); }
+.usage-chart-axis span:nth-child(1) { top: 0; }
+.usage-chart-axis span:nth-child(2) { top: 50%; }
+.usage-chart-axis span:nth-child(3) { top: 100%; }
+.usage-chart-svg:focus-visible { outline: 2px solid var(--accent-9); outline-offset: 4px; border-radius: 2px; }
 .usage-chart-svg { width: 100%; height: 220px; display: block; border-bottom: 1px solid var(--border-strong); overflow: visible; }
 .usage-gridline { stroke: var(--border); stroke-dasharray: 3 3; }
 .usage-hit { fill: transparent; }

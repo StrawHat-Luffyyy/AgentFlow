@@ -1,4 +1,4 @@
-import { History as HistoryIcon, Pause, Play, RotateCcw, ShieldCheck, Square } from "lucide-react";
+import { History as HistoryIcon, Pause, Play, RotateCcw, ShieldCheck, Square, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import {
@@ -290,6 +290,7 @@ export function RunDetailPage() {
   }
 
   const pending = data.approvals.filter((approval) => approval.status === "PENDING");
+  const unknownTool = data.tools.find((tool) => tool.invocationStatus === "UNKNOWN");
   const committed = run.steps.filter((step) => step.status === "SUCCEEDED").length;
   const summaryByStep = new Map((data.summary?.byStep ?? []).map((item) => [item.stepId, item]));
 
@@ -330,6 +331,9 @@ export function RunDetailPage() {
         <div className="run-actions">
           <LiveIndicator updatedAt={bundle.updatedAt} refreshing={bundle.refreshing} error={bundle.error} now={now} />
           {pending.length > 0 && <a className="btn btn--primary btn--md" href={`#approval-${pending[0]!.id}`}><ShieldCheck size={16} aria-hidden="true" /><span>Review approval</span></a>}
+          {unknownTool && run.lifecycle === "OPEN" && (
+            <Button variant="primary" icon={<Wrench size={16} />} onClick={() => setUrl({ step: unknownTool.stepId, tab: "tools" })}>Resolve unknown effect</Button>
+          )}
           {run.lifecycle === "OPEN" && run.control === "RUN" && <Button icon={<Pause size={16} />} disabled={mutating} onClick={() => void control("pause")}>Pause</Button>}
           {run.lifecycle === "OPEN" && run.control === "PAUSED" && <Button variant="primary" icon={<Play size={16} />} disabled={mutating} onClick={() => void control("resume")}>Resume</Button>}
           {run.lifecycle === "OPEN" && (

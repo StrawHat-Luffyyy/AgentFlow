@@ -41,7 +41,7 @@ function UsageChart({ data }: { data: OwnerUsageSeries }) {
             ))}
           </>
         ) : (
-          <span className="muted">Hover a day for its figures. Bars are tokens per UTC day.</span>
+          <span className="muted">Hover a day, or focus the chart and use ← →, for its figures. Bars are tokens per UTC day.</span>
         )}
       </div>
       <div className="usage-chart-plot">
@@ -49,8 +49,17 @@ function UsageChart({ data }: { data: OwnerUsageSeries }) {
           <span>{formatTokens(max)}</span><span>{formatTokens(max / 2)}</span><span>0</span>
         </div>
         <svg className="usage-chart-svg" viewBox={`0 0 ${bars.length} ${height}`} preserveAspectRatio="none"
-          role="img" aria-label={`Tokens per day, ${formatDay(bars[0]?.day ?? "")} to ${formatDay(bars.at(-1)?.day ?? "")}`}
-          onMouseLeave={() => setActive(null)}>
+          role="img" tabIndex={0}
+          aria-label={`Tokens per day, ${formatDay(bars[0]?.day ?? "")} to ${formatDay(bars.at(-1)?.day ?? "")}. Use left and right arrows to read each day.`}
+          onMouseLeave={() => setActive(null)}
+          onFocus={() => setActive((current) => current ?? bars.length - 1)}
+          onBlur={() => setActive(null)}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            event.preventDefault();
+            const step = event.key === "ArrowLeft" ? -1 : 1;
+            setActive((current) => Math.min(bars.length - 1, Math.max(0, (current ?? bars.length - 1) + step)));
+          }}>
           <line x1={0} x2={bars.length} y1={height / 2} y2={height / 2} className="usage-gridline" vectorEffect="non-scaling-stroke" />
           {bars.map((bar, index) => {
             let base = height;
@@ -68,7 +77,7 @@ function UsageChart({ data }: { data: OwnerUsageSeries }) {
         </svg>
       </div>
       <div className="usage-chart-x" aria-hidden="true">
-        {bars.map((bar, index) => <span key={bar.day}>{index % labelEvery === 0 ? formatDay(bar.day) : ""}</span>)}
+        {bars.map((bar, index) => <span key={bar.day}>{(bars.length - 1 - index) % labelEvery === 0 ? formatDay(bar.day) : ""}</span>)}
       </div>
       <ul className="usage-legend">
         {series.map((entry) => <li key={entry.key}><span className={`usage-swatch ${entry.className}`} aria-hidden="true" />{entry.label}</li>)}
