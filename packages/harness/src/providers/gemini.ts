@@ -23,10 +23,10 @@ const capabilities: ProviderCapabilities = {
 };
 
 export interface GeminiProviderOptions {
-  apiKey?: string;
-  model?: string;
-  client?: GoogleGenAI;
-  baseUrl?: string;
+  apiKey?: string | undefined;
+  model?: string | undefined;
+  client?: GoogleGenAI | undefined;
+  baseUrl?: string | undefined;
 }
 
 function classifyGeminiError(error: unknown, signal: AbortSignal | undefined): ProviderError {
@@ -119,12 +119,16 @@ function mapMessagesToContents(messages: readonly LLMMessage[]): Content[] {
     }
 
     for (const call of message.toolCalls ?? []) {
-      parts.push({
+      const part: Part = {
         functionCall: {
           name: call.name,
           args: call.arguments,
         },
-      });
+      };
+      if (call.thoughtSignature) {
+        part.thoughtSignature = call.thoughtSignature;
+      }
+      parts.push(part);
     }
 
     const role = message.role === "assistant" ? "model" : "user";
@@ -177,6 +181,10 @@ export class GeminiProvider implements LLMProvider {
       config.temperature = request.temperature;
     }
 
+    if (request.seed !== undefined) {
+      config.seed = request.seed;
+    }
+
     if (context.signal) {
       config.abortSignal = context.signal;
     }
@@ -210,21 +218,55 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const toolCalls: NormalizedToolCall[] = [];
-    const rawFunctionCalls = response.functionCalls ?? [];
-    for (let index = 0; index < rawFunctionCalls.length; index++) {
-      const call = rawFunctionCalls[index];
-      if (!call || typeof call.name !== "string" || !call.name) {
-        throw new ProviderError(
-          "Gemini returned a function call without a valid name",
-          "PERMANENT",
-          "MALFORMED_PROVIDER_RESPONSE",
-        );
+    const candidateParts = response.candidates?.[0]?.content?.parts ?? [];
+    const functionCallParts = candidateParts.filter((p) => p.functionCall != null);
+
+    if (functionCallParts.length > 0) {
+      for (let index = 0; index < functionCallParts.length; index++) {
+        const part = functionCallParts[index]!;
+        const call = part.functionCall!;
+        if (!call || typeof call.name !== "string" || !call.name) {
+          throw new ProviderError(
+            "Gemini returned a function call without a valid name",
+            "PERMANENT",
+            "MALFORMED_PROVIDER_RESPONSE",
+          );
+        }
+        const rawPart = part as Record<string, unknown>;
+        const rawCall = call as Record<string, unknown>;
+        const thoughtSig = part.thoughtSignature
+          ?? rawPart.thought_signature
+          ?? rawCall.thoughtSignature
+          ?? rawCall.thought_signature;
+
+        toolCalls.push({
+          id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
+          name: call.name,
+          arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
+          ...(typeof thoughtSig === "string" && thoughtSig.length > 0 ? { thoughtSignature: thoughtSig } : {}),
+        });
       }
-      toolCalls.push({
-        id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
-        name: call.name,
-        arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
-      });
+    } else {
+      const rawFunctionCalls = response.functionCalls ?? [];
+      for (let index = 0; index < rawFunctionCalls.length; index++) {
+        const call = rawFunctionCalls[index];
+        if (!call || typeof call.name !== "string" || !call.name) {
+          throw new ProviderError(
+            "Gemini returned a function call without a valid name",
+            "PERMANENT",
+            "MALFORMED_PROVIDER_RESPONSE",
+          );
+        }
+        const rawCall = call as Record<string, unknown>;
+        const thoughtSig = rawCall.thoughtSignature ?? rawCall.thought_signature;
+
+        toolCalls.push({
+          id: call.id ?? `gemini-call-${context.logicalOperationId}-${index}`,
+          name: call.name,
+          arguments: asJsonObject(call.args ?? {}, "Gemini function call arguments"),
+          ...(typeof thoughtSig === "string" && thoughtSig.length > 0 ? { thoughtSignature: thoughtSig } : {}),
+        });
+      }
     }
 
     let text = "";
@@ -250,12 +292,25 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const usageMeta = response.usageMetadata;
+    // Gemini UsageMetadata semantics (checked 2026-11-18 against the Gemini API
+    // reference for GenerateContentResponse.UsageMetadata and the thinking guide):
+    // - promptTokenCount includes cached content; cachedContentTokenCount is the
+    //   cached part of the prompt (a subset).
+    // - toolUsePromptTokenCount, thoughtsTokenCount, and candidatesTokenCount are
+    //   reported separately: totalTokenCount = prompt + tool-use prompt + thoughts
+    //   + response candidates.
+    // - Thinking tokens are billed with the response ("output tokens and thinking
+    //   tokens"), so normalized outputTokens = candidates + thoughts.
+    const prompt = nullableCount(usageMeta?.promptTokenCount);
+    const candidates = nullableCount(usageMeta?.candidatesTokenCount);
+    const thoughts = nullableCount(usageMeta?.thoughtsTokenCount);
     const usage = {
       provenance: usageMeta ? ("reported" as const) : ("unknown" as const),
-      inputTokens: nullableCount(usageMeta?.promptTokenCount),
-      outputTokens: nullableCount(usageMeta?.candidatesTokenCount),
+      inputTokens: prompt === null ? null : prompt + (nullableCount(usageMeta?.toolUsePromptTokenCount) ?? 0),
+      outputTokens: candidates === null && thoughts === null ? null : (candidates ?? 0) + (thoughts ?? 0),
       cachedInputTokens: nullableCount(usageMeta?.cachedContentTokenCount),
-      reasoningTokens: null,
+      reasoningTokens: thoughts,
+      totalTokens: nullableCount(usageMeta?.totalTokenCount),
       raw: asJsonObject(usageMeta ?? {}, "Gemini usage metadata"),
     };
 

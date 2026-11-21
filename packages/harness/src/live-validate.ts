@@ -2,6 +2,13 @@ import { GeminiProvider } from "./providers/gemini.js";
 import type { ProviderExecutionContext } from "./types.js";
 
 async function main() {
+  if (!process.env.GEMINI_API_KEY) {
+    try {
+      process.loadEnvFile?.();
+    } catch {
+      // ignore if .env is missing
+    }
+  }
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
 

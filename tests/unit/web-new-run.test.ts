@@ -90,6 +90,12 @@ describe("readiness", () => {
     expect(readiness([], scriptedOnly)).toMatchObject({ state: "ok", blocking: false });
   });
 
+  it("names GROQ_API_KEY when groq is required but not online", () => {
+    const result = readiness(["groq"], withGemini);
+    expect(result.blocking).toBe(true);
+    expect(result.message).toContain("GROQ_API_KEY");
+  });
+
   it("uses generic guidance for non-gemini providers", () => {
     const result = readiness(["openai"], withGemini);
     expect(result.blocking).toBe(true);

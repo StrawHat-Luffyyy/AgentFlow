@@ -33,6 +33,11 @@ export function renderRunDetail(run: RunDetail, opts: RenderOptions): string {
     ["created", time(run.createdAt, opts)],
     run.finishedAt ? ["finished", time(run.finishedAt, opts)] : ["deadline", time(run.deadlineAt, opts)],
   ];
+  const budget = [
+    run.maxTokens ? `${run.maxTokens} tokens` : null,
+    run.maxCostUsd ? `USD ${run.maxCostUsd}` : null,
+  ].filter((part): part is string => part !== null);
+  if (budget.length > 0) fields.push(["budget", budget.join(" / ")]);
   const failure = summarizeFailure(run.failure);
   if (failure) fields.push(["failure", failure]);
   const steps = renderTable([

@@ -10,6 +10,7 @@ import {
   settleOperationFailure,
   settleUnknownToolOutcome,
   UnknownEffectError,
+  BudgetExceededError,
   type ExecutionFaultHooks,
 } from "@agentflow/runtime";
 import {
@@ -23,7 +24,7 @@ import {
   isReferenceDeterministicHandler,
 } from "@agentflow/research";
 import { Worker, type ConnectionOptions, type Job } from "bullmq";
-import { executeBoundedAgentOperation } from "./agent.js";
+import { executeBoundedAgentOperation, type AgentExecutionOptions } from "./agent.js";
 
 export async function processOperationJob(
   database: Database,
@@ -34,6 +35,7 @@ export async function processOperationJob(
   attemptTimeoutMs = 60_000,
   harness?: AgentHarness,
   faultHooks?: ExecutionFaultHooks,
+  agentOptions: AgentExecutionOptions = {},
 ) {
   return tracer.startActiveSpan("agentflow.operation.execute", async (span) => {
     const message = operationJobSchema.parse(job.data);
@@ -92,13 +94,19 @@ export async function processOperationJob(
           output = await executeToolOperation(database, operation, faultHooks);
         } else if (operation.kind === "AGENT") {
           if (!harness) throw new Error("Worker has no agent harness configured");
-          output = await executeBoundedAgentOperation(database, operation, harness, faultHooks);
+          output = await executeBoundedAgentOperation(database, operation, harness, faultHooks, agentOptions);
         } else {
           output = isReferenceDeterministicHandler(operation.handler)
             ? await executeReferenceDeterministicOperation(database, operation)
             : executeDeterministicOperation(operation);
         }
       } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          // enforceRunBudget already moved the run to BUDGET_EXCEEDED under the lease
+          // fence; settling the failure would only be rejected by the terminal run.
+          span.setAttribute("agentflow.failure.class", "BUDGET_EXCEEDED");
+          return { skipped: false, budgetExceeded: true, budget: error.check };
+        }
         if (error instanceof UnknownEffectError) {
           const settlement = await settleUnknownToolOutcome(database, operation, error);
           return { skipped: false, unknown: true, settlement };

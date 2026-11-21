@@ -5,6 +5,7 @@ import {
   createExperimentManifest,
   defaultEvaluationWorkload,
   pairedBootstrapInterval,
+  parseFaultPlan,
   runSeededExperiment,
   runSystemTrial,
   wilsonInterval,
@@ -143,5 +144,39 @@ describe("seeded runner and statistical analysis", () => {
     expect(pairedBootstrapInterval(pairs, 99, 1_000)).toEqual(
       pairedBootstrapInterval(pairs, 99, 1_000),
     );
+  });
+});
+
+describe("LLM journal scenarios (E2 = journal-write window, E2B = after journal commit)", () => {
+  const trial = (system: "B0" | "B1" | "A0" | "A1", scenario: "E2" | "E2B", granularity: 1 | 2 | 4 = 1) => runSystemTrial({
+    seed: 42,
+    trialIndex: 0,
+    system,
+    condition: conditionForScenario(scenario),
+    granularity,
+    workload: defaultEvaluationWorkload,
+  });
+
+  it("accepts the after-llm-journal-commit hook in process fault plans", () => {
+    expect(parseFaultPlan(JSON.stringify(conditionForScenario("E2B").faults))).toEqual([{
+      id: "e2b-journalled-inference",
+      hook: "after-llm-journal-commit",
+      action: "crash",
+      operationId: "analyze-features",
+      occurrence: 1,
+    }]);
+  });
+
+  it("repeats the unjournalled call in E2 even for A1", () => {
+    expect(trial("A1", "E2")).toMatchObject({ outcome: "SUCCEEDED", repeatedLlmCalls: 1 });
+  });
+
+  it("replays the journalled call in E2B for journalled systems only", () => {
+    for (const granularity of [1, 2, 4] as const) {
+      expect(trial("A1", "E2B", granularity)).toMatchObject({ outcome: "SUCCEEDED", repeatedLlmCalls: 0 });
+      expect(trial("A0", "E2B", granularity)).toMatchObject({ outcome: "SUCCEEDED", repeatedLlmCalls: 0 });
+    }
+    expect(trial("B0", "E2B").repeatedLlmCalls).toBeGreaterThan(0);
+    expect(trial("B1", "E2B").repeatedLlmCalls).toBeGreaterThan(0);
   });
 });

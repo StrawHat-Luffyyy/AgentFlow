@@ -3,6 +3,17 @@
 
 export const SCRIPTED_PROVIDER = "scripted-research";
 
+/** Live providers the reference workflow can run against; each worker registers one only when its key is set. */
+export const LIVE_PROVIDERS = [
+  { name: "gemini", label: "Gemini", envVar: "GEMINI_API_KEY", fallbackModel: "gemini-3.5-flash" },
+  { name: "groq", label: "Groq", envVar: "GROQ_API_KEY", fallbackModel: "openai/gpt-oss-120b" },
+] as const;
+export type LiveProviderName = (typeof LIVE_PROVIDERS)[number]["name"];
+
+export function liveProviderLabel(name: string | undefined): string | undefined {
+  return LIVE_PROVIDERS.find((provider) => provider.name === name)?.label ?? name;
+}
+
 export type ParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
 
 function lineColumn(text: string, position: number): { line: number; column: number } {
@@ -68,11 +79,12 @@ export function readiness(required: string[], availability: Availability | null)
   const online = new Set(availability.providers.map((provider) => provider.name));
   const missing = required.find((name) => !online.has(name));
   if (missing) {
+    const known = LIVE_PROVIDERS.find((provider) => provider.name === missing);
     return {
       state: "block-missing-provider",
       blocking: true,
-      message: missing === "gemini"
-        ? "No online worker has gemini configured — set GEMINI_API_KEY on the worker and restart it"
+      message: known
+        ? `No online worker has ${missing} configured — set ${known.envVar} on the worker and restart it`
         : `No online worker has the ${missing} provider registered — configure it on a worker and restart it`,
     };
   }
@@ -110,6 +122,35 @@ export function extractReport(steps: Array<{ acceptedOutput: unknown }>): Report
     };
   }
   return null;
+}
+
+/** Optional positive budget field: empty means no budget. */
+export function budgetFromText(
+  text: string,
+  kind: "tokens" | "usd",
+): { ok: true; value: number | undefined } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (trimmed === "") return { ok: true, value: undefined };
+  const value = Number(trimmed);
+  if (kind === "tokens") {
+    if (!/^\d+$/.test(trimmed) || value < 1 || value > 1_000_000_000) {
+      return { ok: false, error: "Token budget must be a whole number between 1 and 1,000,000,000" };
+    }
+    return { ok: true, value };
+  }
+  if (!Number.isFinite(value) || value <= 0 || value > 1_000_000) {
+    return { ok: false, error: "Cost budget must be a positive amount in USD" };
+  }
+  return { ok: true, value };
+}
+
+/** "N tokens · $X" for runs with a budget, or null. */
+export function budgetLabel(run: { maxTokens?: number | null; maxCostUsd?: number | null }): string | null {
+  const parts = [
+    run.maxTokens ? `${run.maxTokens.toLocaleString()} tokens` : null,
+    run.maxCostUsd ? `$${run.maxCostUsd}` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export function deadlineMsFromMinutes(text: string): { ok: true; value: number } | { ok: false; error: string } {
@@ -176,6 +217,41 @@ export function usageTotal(summary: UsageSummary | null): string {
   if (summary === null || summary.countedRecords === 0) return "—";
   const total = (summary.input + summary.output).toLocaleString();
   return summary.unreportedRecords > 0 ? `${total}+` : total;
+}
+
+export interface ReuseSummaryLike {
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+  cacheScope: string | null;
+  cacheLookups: { hits: number; misses: number; off: number };
+}
+
+/**
+ * Footer lines for provider calls avoided, journal replay and response cache kept apart
+ * (they are different mechanisms). Returns no lines when nothing was looked up or reused.
+ */
+export function reuseDetail(summary: ReuseSummaryLike | null | undefined): string[] {
+  if (!summary) return [];
+  const lines: string[] = [];
+  if (summary.replayedCalls > 0) {
+    lines.push(`Journal replay: ${summary.replayedCalls} call${summary.replayedCalls === 1 ? "" : "s"} avoided · `
+      + `${summary.savedByReplayInputTokens.toLocaleString()} in · ${summary.savedByReplayOutputTokens.toLocaleString()} out saved`);
+  }
+  const { hits, misses, off } = summary.cacheLookups;
+  if (hits + misses + off > 0) {
+    const scope = summary.cacheScope ?? "run";
+    const saved = summary.cacheHitCalls > 0
+      ? ` · ${summary.savedByCacheInputTokens.toLocaleString()} in · ${summary.savedByCacheOutputTokens.toLocaleString()} out saved`
+      : "";
+    lines.push(off > 0 && hits + misses === 0
+      ? "Response cache: off"
+      : `Response cache (${scope}): ${hits} hit${hits === 1 ? "" : "s"} · ${misses} miss${misses === 1 ? "" : "es"}${saved}`);
+  }
+  return lines;
 }
 
 /** Tile/footer text for usage: persisted totals plus provenance exactly as the API returned it. */

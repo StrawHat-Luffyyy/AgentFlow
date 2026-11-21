@@ -9,6 +9,59 @@ const testContext: ProviderExecutionContext = {
   deadlineAt: new Date(Date.now() + 60_000),
 };
 
+const usageOf = async (usageMetadata: Record<string, number> | undefined) => {
+  const mockClient = {
+    models: {
+      generateContent: vi.fn(async () => ({
+        text: "ok",
+        candidates: [{ finishReason: "STOP" }],
+        ...(usageMetadata === undefined ? {} : { usageMetadata }),
+      })),
+    },
+  } as unknown as GoogleGenAI;
+  const provider = new GeminiProvider({ apiKey: "test-fake-key", client: mockClient });
+  const response = await provider.execute(
+    { model: "gemini-3.5-flash", messages: [{ role: "user", content: "hi" }] },
+    testContext,
+  );
+  return response.usage;
+};
+
+describe("GeminiProvider usage normalization", () => {
+  it("bills thinking tokens as output and tool-use prompt tokens as input", async () => {
+    const usage = await usageOf({
+      promptTokenCount: 100,
+      cachedContentTokenCount: 10,
+      toolUsePromptTokenCount: 4,
+      candidatesTokenCount: 20,
+      thoughtsTokenCount: 12,
+      totalTokenCount: 136,
+    });
+    expect(usage).toMatchObject({
+      provenance: "reported",
+      inputTokens: 104,
+      cachedInputTokens: 10,
+      outputTokens: 32,
+      reasoningTokens: 12,
+      totalTokens: 136,
+    });
+    // The provider total is copied verbatim and matches the normalized fields.
+    expect(usage.inputTokens! + usage.outputTokens!).toBe(usage.totalTokens);
+  });
+
+  it("reports unknown usage with null counts when metadata is missing, never estimates", async () => {
+    expect(await usageOf(undefined)).toEqual({
+      provenance: "unknown",
+      inputTokens: null,
+      outputTokens: null,
+      cachedInputTokens: null,
+      reasoningTokens: null,
+      totalTokens: null,
+      raw: {},
+    });
+  });
+});
+
 describe("GeminiProvider adapter unit tests (deterministic / mocked)", () => {
   it("constructs requests with system instructions, messages, and model options", async () => {
     let capturedParams: any = null;
@@ -73,6 +126,7 @@ describe("GeminiProvider adapter unit tests (deterministic / mocked)", () => {
       outputTokens: 8,
       cachedInputTokens: null,
       reasoningTokens: null,
+      totalTokens: 23,
       raw: {
         promptTokenCount: 15,
         candidatesTokenCount: 8,
@@ -348,6 +402,73 @@ describe("GeminiProvider adapter unit tests (deterministic / mocked)", () => {
     ).rejects.toMatchObject({
       errorClass: "PERMANENT",
       code: "MALFORMED_PROVIDER_RESPONSE",
+    });
+  });
+
+  it("extracts thoughtSignature from candidate parts and passes it back in multi-turn tool requests", async () => {
+    let capturedParams: any = null;
+    const mockClient = {
+      models: {
+        generateContent: vi.fn(async (params: any) => {
+          capturedParams = params;
+          return {
+            text: "",
+            candidates: [
+              {
+                finishReason: "STOP",
+                content: {
+                  parts: [
+                    {
+                      functionCall: { name: "calculate", args: { x: 10 }, id: "call-calc-1" },
+                      thoughtSignature: "sig_abc_123_xyz",
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }),
+      },
+    } as unknown as GoogleGenAI;
+
+    const provider = new GeminiProvider({ apiKey: "test-fake-key", client: mockClient });
+    const response = await provider.execute(
+      {
+        model: "gemini-3.5-flash",
+        messages: [{ role: "user", content: "Calculate 10" }],
+      },
+      testContext,
+    );
+
+    expect(response.toolCalls).toHaveLength(1);
+    expect(response.toolCalls[0]).toEqual({
+      id: "call-calc-1",
+      name: "calculate",
+      arguments: { x: 10 },
+      thoughtSignature: "sig_abc_123_xyz",
+    });
+
+    // Now send the toolCall back in turn 2
+    await provider.execute(
+      {
+        model: "gemini-3.5-flash",
+        messages: [
+          { role: "user", content: "Calculate 10" },
+          { role: "assistant", content: "", toolCalls: [response.toolCalls[0]!] },
+          { role: "tool", name: "calculate", content: JSON.stringify({ result: 20 }) },
+        ],
+      },
+      testContext,
+    );
+
+    expect(capturedParams.contents[1]).toEqual({
+      role: "model",
+      parts: [
+        {
+          functionCall: { name: "calculate", args: { x: 10 } },
+          thoughtSignature: "sig_abc_123_xyz",
+        },
+      ],
     });
   });
 });

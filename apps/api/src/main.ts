@@ -2,7 +2,7 @@ import { ensureAdminUser, readCredentials } from "./auth.js";
 import { telemetry } from "./instrumentation.js";
 import { loadConfig } from "@agentflow/config";
 import { createDatabase, migrate } from "@agentflow/db";
-import { queueName } from "@agentflow/shared";
+import { modelPriceTableSchema, queueName } from "@agentflow/shared";
 import { Queue } from "bullmq";
 import { createApp } from "./app.js";
 import { createOutboxDispatcher } from "./outbox.js";
@@ -29,7 +29,8 @@ const scheduler = createRecoveryScheduler(
   config.SCHEDULER_POLL_MS,
   config.DISPATCH_RECOVERY_MS,
 );
-const app = createApp(database, queue, credentials);
+const modelPrices = modelPriceTableSchema.parse(config.AGENTFLOW_MODEL_PRICES ?? {});
+const app = createApp(database, queue, credentials, { modelPrices });
 const server = app.listen(config.API_PORT, () => {
   console.log(`AgentFlow API listening on port ${config.API_PORT}`);
 });

@@ -1,6 +1,7 @@
 import { TurnLimitError, HarnessValidationError } from "./errors.js";
 import { ProviderRegistry, ToolRegistry } from "./registry.js";
 import type {
+  JsonObject,
   LLMRequest,
   LLMResponse,
   NormalizedToolCall,
@@ -23,11 +24,49 @@ export interface ToolOperationInput {
   context: ProviderExecutionContext;
 }
 
+export interface LLMJournalKeyInput {
+  provider: string;
+  request: Omit<LLMRequest, "tools">;
+  allowedTools: readonly string[];
+}
+
+/** Version tag embedded in every journal key; bump when the key's shape changes. */
+export const llmJournalKeyVersion = 2;
+
 export class AgentHarness {
   constructor(
     readonly providers: ProviderRegistry,
     readonly tools: ToolRegistry,
   ) {}
+
+  /**
+   * Everything that determines a provider response, as plain JSON. The runtime
+   * hashes its canonical form to bind a journalled response to its exact request:
+   * a different provider, adapter, model, prompt, tool set (including tool
+   * versions and schemas) or sampling parameter yields a different key.
+   */
+  journalKey(input: LLMJournalKeyInput): JsonObject {
+    const provider = this.providers.get(input.provider);
+    const tools = this.tools.providerTools(input.allowedTools).map((tool) => ({
+      name: tool.name,
+      version: this.tools.get(tool.name).version,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }));
+    const { model, messages, instructions, maxOutputTokens, temperature, seed, opaqueState } = input.request;
+    return JSON.parse(JSON.stringify({
+      hashVersion: llmJournalKeyVersion,
+      provider: provider.name,
+      adapterVersion: provider.adapterVersion,
+      model,
+      instructions: instructions ?? null,
+      messages,
+      tools,
+      // seed is included only when set, so keys (and journal hashes) of unseeded requests are unchanged.
+      params: { maxOutputTokens: maxOutputTokens ?? null, temperature: temperature ?? null, ...(seed === undefined ? {} : { seed }) },
+      opaqueState: opaqueState ?? null,
+    })) as JsonObject;
+  }
 
   async executeModelOperation(input: ModelOperationInput): Promise<LLMResponse> {
     if (!Number.isInteger(input.turn) || input.turn < 1) {

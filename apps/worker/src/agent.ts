@@ -7,14 +7,17 @@ import {
   type LLMResponse,
 } from "@agentflow/harness";
 import type { Database } from "@agentflow/db";
+import { AgentInputProjectionError, projectAgentInput } from "@agentflow/shared";
 import {
   AttemptTimeoutError,
+  BudgetExceededError,
   PermanentOperationError,
   RetryableOperationError,
   beginHarnessLlmOperation,
   beginHarnessToolOperation,
   completeHarnessLlmOperation,
   completeHarnessToolOperation,
+  enforceRunBudget,
   failHarnessLlmOperation,
   recordUnacceptedHarnessLlmResponse,
   type ClaimedOperation,
@@ -55,17 +58,43 @@ function mapHarnessError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+export interface AgentExecutionOptions {
+  /**
+   * Evaluation-only ablation switch (default true). When false, each attempt uses its
+   * own harness ordinals, so a retried attempt never replays an earlier attempt's
+   * journalled responses. Production never sets this.
+   */
+  llmJournalReplay?: boolean;
+}
+
+/** Harness ordinal for an operation: attempt-scoped when journal replay is disabled. */
+export function harnessOrdinal(base: number, attemptNo: number, options: AgentExecutionOptions = {}): number {
+  return options.llmJournalReplay === false ? attemptNo * 1_000 + base : base;
+}
+
 export async function executeBoundedAgentOperation(
   database: Database,
   operation: ClaimedOperation,
   harness: AgentHarness,
   faultHooks?: ExecutionFaultHooks,
+  options: AgentExecutionOptions = {},
 ): Promise<Record<string, unknown>> {
   const config = operation.agentConfig;
   if (operation.kind !== "AGENT" || !config) {
     throw new PermanentOperationError("Operation has no bounded agent configuration", "INVALID_AGENT_OPERATION");
   }
-  const messages: LLMMessage[] = [{ role: "user", content: JSON.stringify(operation.input) }];
+  // Context minimization (brief §2.4): the prompt carries only the declared inputs when
+  // the step declares them; the step output below still carries the full state.
+  let promptInput: Record<string, unknown>;
+  try {
+    promptInput = config.inputs ? projectAgentInput(operation.input, config.inputs) : operation.input;
+  } catch (error) {
+    if (error instanceof AgentInputProjectionError) {
+      throw new PermanentOperationError(error.message, "DECLARED_INPUT_MISSING");
+    }
+    throw error;
+  }
+  const messages: LLMMessage[] = [{ role: "user", content: JSON.stringify(promptInput) }];
   let opaqueState: JsonObject | undefined;
 
   for (let turn = 1; turn <= config.maxTurns; turn += 1) {
@@ -75,23 +104,34 @@ export async function executeBoundedAgentOperation(
       messages,
       instructions: config.instructions,
       ...(config.maxOutputTokens === undefined ? {} : { maxOutputTokens: config.maxOutputTokens }),
+      ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+      ...(config.seed === undefined ? {} : { seed: config.seed }),
       ...(opaqueState === undefined ? {} : { opaqueState }),
     };
     const llm = await beginHarnessLlmOperation(database, operation, {
-      ordinal: (turn - 1) * 2,
+      ordinal: harnessOrdinal((turn - 1) * 2, operation.attemptNo, options),
       turn,
       maxTurns: config.maxTurns,
       provider: provider.name,
       adapterVersion: provider.adapterVersion,
       model: config.model,
       request: jsonRecord(request, "Provider request"),
+      journalKey: harness.journalKey({
+        provider: config.provider,
+        request,
+        allowedTools: config.allowedTools,
+      }),
     });
 
     let response: LLMResponse;
     if (llm.replayed) {
+      // Journal replays and cache hits make no provider call, so they consume no budget.
       response = replayedResponse(llm.output);
       opaqueState = llm.continuationState as JsonObject | null ?? undefined;
     } else {
+      // Run budget (brief §2.5): checked before every real provider call.
+      const beforeCall = await enforceRunBudget(database, operation, "before-call", llm.providerCallId);
+      if (beforeCall?.exceeded) throw new BudgetExceededError(beforeCall);
       const controller = new AbortController();
       const remainingMs = Math.max(0, operation.attemptDeadlineAt.getTime() - Date.now());
       const timer = setTimeout(() => controller.abort(), remainingMs);
@@ -134,7 +174,11 @@ export async function executeBoundedAgentOperation(
       try {
         await completeHarnessLlmOperation(database, operation, llm.providerCallId, completion);
         opaqueState = response.opaqueState ?? undefined;
+        // ...and after every billed response, from the usage record just persisted.
+        const afterResponse = await enforceRunBudget(database, operation, "after-response");
+        if (afterResponse?.exceeded) throw new BudgetExceededError(afterResponse);
       } catch (error) {
+        if (error instanceof BudgetExceededError) throw error;
         await recordUnacceptedHarnessLlmResponse(
           database,
           operation,
@@ -143,6 +187,8 @@ export async function executeBoundedAgentOperation(
         );
         throw mapHarnessError(error);
       }
+      // The response is now journalled: a crash from here on replays it instead of re-calling the provider.
+      await faultHooks?.hit("after-llm-journal-commit", operation);
     }
 
     if (response.toolCalls.length === 0) {
@@ -165,7 +211,7 @@ export async function executeBoundedAgentOperation(
     }
     const call = response.toolCalls[0]!;
     const tool = await beginHarnessToolOperation(database, operation, {
-      ordinal: (turn - 1) * 2 + 1,
+      ordinal: harnessOrdinal((turn - 1) * 2 + 1, operation.attemptNo, options),
       turn,
       maxTurns: config.maxTurns,
       request: jsonRecord(call, "Tool call"),

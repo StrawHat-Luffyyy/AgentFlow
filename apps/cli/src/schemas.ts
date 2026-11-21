@@ -62,6 +62,9 @@ export const runDetailSchema = z.object({
   finishedAt: nullableTimestamp,
   deadlineAt: timestamp,
   failure: z.unknown().optional(),
+  // Run budget (absent from older APIs).
+  maxTokens: z.number().nullable().optional(),
+  maxCostUsd: z.number().nullable().optional(),
   steps: z.array(stepSchema),
 }).passthrough();
 
@@ -132,10 +135,23 @@ export const usageSchema = z.object({
   usage: z.array(z.object({
     provider: z.string(),
     model: z.string(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
+    // null when the provider reported no counts (e.g. a lost or failed call); never estimated.
+    inputTokens: z.number().nullable(),
+    outputTokens: z.number().nullable(),
+    provenance: z.string().optional(),
     createdAt: timestamp,
   }).passthrough()),
+  summary: z.object({
+    savedByReplayInputTokens: z.number(),
+    savedByReplayOutputTokens: z.number(),
+    replayedCalls: z.number(),
+    // Response-cache fields (absent from older APIs).
+    cacheHitCalls: z.number().optional(),
+    savedByCacheInputTokens: z.number().optional(),
+    savedByCacheOutputTokens: z.number().optional(),
+    cacheScope: z.string().nullable().optional(),
+    cacheLookups: z.object({ hits: z.number(), misses: z.number(), off: z.number() }).optional(),
+  }).passthrough().optional(),
 }).passthrough();
 
 export const sourcesSchema = z.object({

@@ -10,6 +10,7 @@ export const ExitCode = {
   RUN_WAITING: 12,
   WATCH_TIMEOUT: 13,
   RUN_TIMED_OUT: 14,
+  RUN_BUDGET_EXCEEDED: 15,
   INTERRUPTED: 130,
 } as const;
 

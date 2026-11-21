@@ -25,6 +25,10 @@ import {
   getRunHarnessOperations,
   getRunSources,
   getRunToolExecutions,
+  getOwnerUsageSeries,
+  getRunBudget,
+  getRunCacheLookups,
+  getRunReplays,
   getRunUsage,
   getWorkflow,
   listAvailableProviders,
@@ -32,6 +36,7 @@ import {
   listRuns,
   listWorkflows,
   reconcileToolExecution,
+  summarizeRunUsage,
 } from "@agentflow/runtime";
 import {
   approvalDecisionSchema,
@@ -39,6 +44,7 @@ import {
   createWorkflowSchema,
   createWorkflowVersionSchema,
   reconciliationDecisionSchema,
+  type ModelPriceTable,
 } from "@agentflow/shared";
 import {
   cloudComparisonCorpusManifest,
@@ -49,7 +55,17 @@ import type { Queue } from "bullmq";
 import express from "express";
 import { z } from "zod";
 
-export function createApp(database: Database, queue: Queue, credentials: readonly Credential[] = readCredentials()): express.Express {
+export interface AppOptions {
+  /** Operator-configured model prices for run cost budgets (AGENTFLOW_MODEL_PRICES). */
+  modelPrices?: ModelPriceTable;
+}
+
+export function createApp(
+  database: Database,
+  queue: Queue,
+  credentials: readonly Credential[] = readCredentials(),
+  options: AppOptions = {},
+): express.Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -207,7 +223,7 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
       ...(body.creationKey === undefined ? {} : {
         creationKey: createHash("sha256").update(JSON.stringify([response.locals.principal.id, body.creationKey])).digest("hex"),
       }),
-    });
+    }, { modelPrices: options.modelPrices ?? {} });
     response.status(201).json(run);
   });
 
@@ -215,8 +231,21 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
     const query = z.object({
       limit: z.coerce.number().int().min(1).max(100).default(50),
       offset: z.coerce.number().int().min(0).default(0),
+      // Comma-separated public statuses, e.g. status=RUNNING,WAITING_APPROVAL.
+      status: z.string().regex(/^[A-Z_]+(,[A-Z_]+)*$/).optional(),
+      workflowId: z.string().uuid().optional(),
+      from: z.coerce.date().optional(),
+      to: z.coerce.date().optional(),
     }).parse(request.query);
-    response.json(await listRuns(database, { ...query, ownerId: response.locals.principal.id }));
+    response.json(await listRuns(database, {
+      limit: query.limit,
+      offset: query.offset,
+      ownerId: response.locals.principal.id,
+      ...(query.status ? { statuses: query.status.split(",") } : {}),
+      ...(query.workflowId ? { workflowId: query.workflowId } : {}),
+      ...(query.from ? { createdFrom: query.from } : {}),
+      ...(query.to ? { createdTo: query.to } : {}),
+    }));
   });
 
   app.get("/runs/:id", async (request: express.Request, response: express.Response) => {
@@ -251,10 +280,27 @@ export function createApp(database: Database, queue: Queue, credentials: readonl
 
   app.get("/runs/:id/usage", async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
-    response.json({ usage: await getRunUsage(database, runId) });
+    const usage = await getRunUsage(database, runId);
+    const replays = await getRunReplays(database, runId);
+    const cache = await getRunCacheLookups(database, runId);
+    const budget = await getRunBudget(database, runId);
+    response.json({ usage, replays, summary: { ...summarizeRunUsage(usage, replays, cache), budget } });
   });
 
-  app.get("/runs/:id/sources", async (request: express.Request, response: express.Response) => {
+  // Owner-wide usage by UTC day; reporting only, read from persisted usage_records and replays.
+  app.get("/usage", async (request: express.Request, response: express.Response) => {
+    const day = 86_400_000;
+    const query = z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() }).parse(request.query);
+    const to = query.to ?? new Date();
+    const from = query.from ?? new Date(to.getTime() - 30 * day);
+    if (from >= to || to.getTime() - from.getTime() > 92 * day) {
+      response.status(400).json({ error: "VALIDATION_ERROR", message: "from must precede to by at most 92 days" });
+      return;
+    }
+    response.json(await getOwnerUsageSeries(database, { ownerId: response.locals.principal.id, from, to }));
+  });
+
+  app.get("/runs/:id/sources",async (request: express.Request, response: express.Response) => {
     const runId = z.string().uuid().parse(request.params.id);
     response.json({ sources: await getRunSources(database, runId) });
   });

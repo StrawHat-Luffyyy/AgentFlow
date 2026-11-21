@@ -15,3 +15,6 @@ evaluation-results/*
 !evaluation-results/granularity-ablation/
 !evaluation-results/*/process.log
 .DS_Store
+# Playwright console tests
+test-results/
+playwright-report/

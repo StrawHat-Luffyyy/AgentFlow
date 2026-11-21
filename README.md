@@ -65,7 +65,25 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
 - **Durable Approvals:** First-class human-in-the-loop gates persist suspended workflow runs in `WAITING` state without consuming worker processes. Pending approvals survive full API and worker restarts and enforce role-gated reviewer permissions (`research-reviewer`).
 - **Idempotent Side Effects:** Dedicated `RECEIVER_IDEMPOTENT_WRITE` contracts derive deterministic idempotency keys from the workflow envelope, enabling cooperating external receivers to deduplicate retried side effects upon crash recovery.
 - **UNKNOWN & Reconciliation:** For unsupported receivers (`UNSAFE_WRITE`), ambiguous post-crash outcomes are safely transitioned to `UNKNOWN` with a `RECONCILIATION` wait reason, preventing dangerous automated duplicate dispatches.
-- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas. AgentFlow standardizes on Google Gemini (`gemini-3.5-flash` via `@google/genai`) as its production LLM provider with tool calling and structured schemas, while preserving a deterministic scripted provider for reproducible benchmark evaluation.
+- **Provider Abstraction:** The harness layer decouples workflow logic from provider-specific wire schemas. AgentFlow ships two production LLM adapters with different wire formats: Google Gemini (`gemini-3.5-flash` via `@google/genai`) and Groq (OpenAI-compatible Chat Completions over plain `fetch`, default `openai/gpt-oss-120b`). Both have tool calling and structured schemas, normalize into the same response and usage shape, and sit behind the same harness-enforced tool allowlist. A deterministic scripted provider is kept for reproducible benchmark evaluation.
+- **LLM Journal & Response Cache:** Every accepted LLM response is committed in its own short fenced transaction (`harness_operations` + `provider_calls`) before the step checkpoint. A crashed or retried attempt replays it with zero provider calls (journal replay). The same table doubles as a content-addressed response cache keyed by the v2 request hash, which covers provider, adapter version, model, prompt, tool names, versions and schemas, and sampling parameters. A workflow version's `cacheScope` controls reuse:
+  - `run` (the default): identical requests within one run.
+  - `version` (opt-in): identical requests across runs of the same immutable version.
+  - `off`: no reuse.
+
+  Cache hits make no provider call and record their saved tokens in `harness_replays` with source `CACHE_RUN`/`CACHE_VERSION`, apart from journal replays (`JOURNAL`) and from billed `usage_records`. `GET /runs/:id/usage` reports both, plus per-operation hit/miss counts.
+- **Per-Step Context Minimization:** An AGENT step may declare `inputs`: dot-paths into the state object flowing between steps (for example `sourceSet` or `request.assumptions`). The prompt then carries only those paths, with their nesting kept. Omitting `inputs` keeps the full accumulated state, the pre-v2 behaviour.
+  - **Definition time:** each path's root is checked against the statically known output keys of upstream handlers. The arbitrary run input can only be checked at runtime.
+  - **Runtime:** a missing root fails the step permanently (`DECLARED_INPUT_MISSING`), and a missing nested field is omitted.
+  - **Outputs:** the step output still carries the full state; only what the model sees is narrowed.
+  - **Reference workflow:** in `minimal` context (now the default for the dashboard's reference workflow), both analysis steps declare `["sourceSet", "request.assumptions"]`. `analyze-features` no longer receives the pricing analysis, and neither prompt carries the per-run `publicationTarget`, so `version`-scoped cache hits become possible across runs.
+  - **Versioning:** changing the reference definition registers a new immutable workflow version instead of failing.
+  - **Evaluation:** `--context full|minimal` on the real runner. The default `full` reproduces the cited campaigns' prompts. `minimal` gives every system (AgentFlow and the baselines) the same projected prompt.
+- **Run Token & Cost Budgets:** `POST /runs` (and `agentflow runs start --max-tokens / --max-cost-usd`, plus the dashboard's New run form) accepts `maxTokens` (billed input + output tokens) and `maxCostUsd`.
+  - **Enforcement:** both are enforced from persisted `usage_records`, under the lease fence, before every real provider call and after every billed response. Journal replays and cache hits make no call, so they consume no budget.
+  - **Breach:** the run moves to the terminal lifecycle `BUDGET_EXCEEDED` with a `RUN_BUDGET_EXCEEDED` history event (phase, tokens/cost used, limits, unreported calls). The current attempt fails `PERMANENT`, and later steps never run. `agentflow runs watch` exits **15**.
+  - **Boundary semantics:** before a call, a run at its limit stops; after a response, only usage *above* the limit stops it.
+  - **Prices:** cost budgets use operator-configured prices (`AGENTFLOW_MODEL_PRICES`, USD per 1M tokens per `provider/model`). The relevant prices are snapshotted on the run at creation. A run whose workflow uses an unpriced model is refused (409). AgentFlow ships no prices.
 - **Observability:** Native OpenTelemetry instrumentation exports standardized spans; execution history logs provide an immutable audit trail (`GET /runs/:id/history`).
 - **Dual Authentication & Ownership:** Session-cookie authentication (`HttpOnly`, `SameSite=Lax`) with `scrypt` password hashing for the operations dashboard; constant-time SHA-256 bearer tokens for CLI, runners, and automated integrations; immutable workflow ownership inherited by runs.
 
@@ -128,7 +146,7 @@ Atomic result + attempt + operation + checkpoint + successor + outbox
   - Session-cookie web auth (`POST /auth/login`, `POST /auth/logout`, `GET /me`, HTTP-only `agentflow_session`, `scrypt` password hashing)
   - Bearer token auth (`Authorization: Bearer <token>`, constant-time SHA-256 verification)
 - **Reference Durable System:** DBOS TypeScript SDK 5.2.11 (`@dbos-inc/dbos-sdk`)
-- **Operations Console:** React 19, Vite 7, Lucide Icons
+- **Operations Console:** React 19, Vite 7, Radix UI primitives, Lucide Icons; Playwright smoke tests
 - **Validation & Schemas:** Zod 3.23
 - **Telemetry:** OpenTelemetry SDK (`@opentelemetry/sdk-node`, `@opentelemetry/api`)
 - **Testing & Verification:** Vitest 3.2, Docker Compose
@@ -143,12 +161,12 @@ AgentFlow/
 │   ├── api/                 # Express 5 control API, dual auth, scheduler, outbox
 │   ├── cli/                 # `agentflow` terminal CLI (thin HTTP client of the API)
 │   ├── worker/              # BullMQ worker process, fenced claim, execution
-│   └── web/                 # React 19 / Vite operations dashboard (session auth)
+│   └── web/                 # React 19 / Vite operations console (session auth)
 ├── packages/
 │   ├── config/              # Environment configuration & validation (native .env loading)
 │   ├── db/                  # PostgreSQL pool, migrations (runs, approvals, sessions, users)
 │   ├── evaluation/          # Real multi-process runner, fault hooks, DBOS runner, seeded simulator
-│   ├── harness/             # LLM provider registry, Google Gemini adapter, tools, live-validate CLI
+│   ├── harness/             # LLM provider registry, Gemini and Groq adapters, tools, live-validate CLIs
 │   ├── research/            # Fixed evaluation corpus, cloud-comparison workflow, scripted provider
 │   ├── runtime/             # Core durable domain transactions, state machine, leases
 │   ├── shared/              # Canonical JSON, queue contracts, shared schemas
@@ -156,7 +174,9 @@ AgentFlow/
 ├── evaluation-results/      # Evaluation evidence (real campaigns and labelled simulator output)
 ├── tests/
 │   ├── unit/                # Unit tests: Gemini adapter (mocked), auth, research, harness, evaluation
-│   └── integration/         # Real PostgreSQL + Redis suite (durable path, session auth, opt-in live Gemini)
+│   ├── integration/         # Real PostgreSQL + Redis suite (durable path, session auth, opt-in live Gemini)
+│   └── e2e/                 # Playwright console smoke tests and README screenshots (isolated stack)
+├── docs/screenshots/        # Console screenshots (scripted provider), regenerated by `pnpm screenshots`
 └── docker-compose.yml       # Local PostgreSQL 17 and Redis 7 services
 ```
 
@@ -220,16 +240,26 @@ The evidence comes from two different kinds of campaign, and they must not be co
 - **A0 (AgentFlow Ablation):** Full AgentFlow checkpoint durability, but with receiver cooperation disabled (`UNSAFE_WRITE`) by an evaluation-only adapter.
 - **A1 (Full AgentFlow):** The production sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
 - **DBOS (Reference):** Matched common subset executed using the DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
+- **C1 (Temporal-style baseline, in-repo):** Every workflow step is an activity whose result is recorded on completion and replayed after a restart. Every LLM call is also its own recorded activity, so a recorded response is never re-requested. Activities retry whole on failure. No Temporal server is used: this is a minimal reimplementation of the semantics.
+- **C2 (LangGraph-style baseline, in-repo):** A full-state checkpoint after each node; a restart resumes from the last checkpoint. The LLM call inside a node is not journaled separately.
+- **A1-nojournal (ablation):** A1 with LLM journal replay disabled through an evaluation-only worker option (each attempt gets fresh harness ordinals), and with the response cache off. It isolates what the journal contributes.
+- **A1-cache (ablation, R1 only):** A1 on a workflow version with `cacheScope: "version"`, so identical requests are answered across runs.
 
-### Injected Fault Scenarios (E0–E7, real runner)
+On this workload every AGENT step makes exactly one LLM call. C1 therefore records responses at the same granularity as AgentFlow's journal and is **expected to tie A1** under crash faults. DBOS and C2 checkpoint per step/node, so they repeat a response that arrived but was not yet checkpointed (E2B). A tool-using workload where one step makes several calls, which would separate per-call journaling from per-node checkpointing *within* a step, is future work.
+
+### Injected Fault Scenarios (E0–E8 + E2B, R1; real runner)
 - **E0:** No fault (baseline overhead, checkpoint latency).
 - **E1:** Crash before executing step 6 (`analyze-features`), after five committed steps.
-- **E2:** Crash after the `analyze-features` provider response, before its local checkpoint commit.
+- **E2 (E2a, journal-write window):** Crash after the `analyze-features` provider response, before its local checkpoint commit. In AgentFlow the crash fires *before* the response reaches the LLM journal (hook `after-provider-response`), so the call is necessarily repeated. This is the unavoidable window between receiving a response and persisting it. The definition is unchanged from earlier campaigns, so their E2 results stay comparable.
+- **E2B (after journal commit):** Crash after the `analyze-features` response has been committed to the LLM journal, but before the step checkpoint (hook `after-llm-journal-commit`). AgentFlow replays the journalled response with zero provider calls. Baselines have no journal, so for them this is the same instant as E2: the response exists only in memory.
 - **E3:** Injected transient provider 503 on `analyze-pricing` (two failures, then success).
 - **E4:** Read timeout (50 ms) on `search-azure`.
 - **E5:** Remote success / local crash (worker killed after receiver commit, before step checkpoint).
 - **E6:** Same crash as E5, but the publication is declared `UNSAFE_WRITE` (no receiver idempotency).
 - **E7:** API and worker processes killed and restarted while an approval is pending.
+- **E8:** Provider HTTP 429 on the first two `analyze-pricing` calls (injected at the provider boundary, so every system sees the same rejections), followed by retries. Rejected calls are counted as calls but not as billed tokens. With a live provider, genuine 429s are counted the same way. Real runner only: the simulator would wrongly bill rejected calls.
+- **R1:** Repeated identical fault-free runs (requires `--context minimal`). It measures the version-scoped response cache (A1-cache vs A1) and is the only scenario where A1-cache is allowed, so cache savings never mix with fault results.
+- **E9 (crash mid-stream) is not implemented:** no provider adapter streams responses.
 
 The simulator uses the same scenario names, but its fault positions are not identical (for example, simulator E1 crashes after the `collect-sources` checkpoint).
 
@@ -289,14 +319,30 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 ## 11. Limitations
 
 - **Python Prototype Unimplemented:** An early conceptual Execute → Remember → Control research prototype was described in design documents, but was **not implemented in code** (zero `.py` files exist). The functional implementation is entirely in TypeScript.
-- **Live Provider End-to-End Campaigns Deferred:** The production Google Gemini provider adapter (`GeminiProvider` using `@google/genai` and `gemini-3.5-flash`) is implemented and validated by unit tests mocking wire protocol, tool execution, and token usage, plus an opt-in live integration test (`pnpm test:gemini-live`) and CLI validator (`pnpm validate:gemini`). However, multi-trial reliability evaluation campaigns were executed using the deterministic `ScriptedResearchProvider` to eliminate non-deterministic external network flakiness, rate limits, and token costs from the benchmark findings.
+- **Live Provider End-to-End Campaigns Deferred:** The production Google Gemini provider adapter (`GeminiProvider` using `@google/genai` and `gemini-3.5-flash`) is implemented and validated by unit tests mocking wire protocol, tool execution, and token usage, plus an opt-in live integration test (`pnpm test:gemini-live`) and CLI validator (`pnpm validate:gemini`). The Groq adapter has the same structure (`pnpm test:groq-live`, `pnpm validate:groq`), but it has not yet been exercised against the live Groq API. However, multi-trial reliability evaluation campaigns were executed using the deterministic `ScriptedResearchProvider` to eliminate non-deterministic external network flakiness, rate limits, and token costs from the benchmark findings.
 - **Primary Matrix Sample Count:** The real process matrix was executed at 5 trials per condition (120 real OS process executions). The invariants held in every observed trial, but five trials cannot bound rare failure rates, and latency percentiles are descriptive.
 - **Large-Sample Results Are Simulated:** The 4,000-trial E5 sweep and the 900-trial granularity study come from the deterministic seeded simulator, not the runtime. No large-sample real campaign was run, and checkpoint grouping is not implemented in the runtime.
 - **DBOS Sample Count:** The DBOS reference system was evaluated over 25 trials on the common subset.
 - **Single-Machine Testbed:** All experiments were conducted on a single host running containerized PostgreSQL and Redis. Distributed cluster partitions and multi-region failovers were outside the MVP scope.
 - **Token Count Estimates:** Token figures from the scripted provider are estimates based on word count, not billed provider tokens.
+- **Usage Normalization:** Every adapter maps provider usage to one convention: `inputTokens` covers all billed input (cached and tool-use prompt tokens included; `cachedInputTokens` is a subset), and `outputTokens` covers all billed output (thinking tokens included; `reasoningTokens` is a subset). `totalTokens` is the provider's own total, copied verbatim. For Gemini that means output = `candidatesTokenCount + thoughtsTokenCount`. In a live `gemini-3.5-flash` check on 2026-11-18, one short reasoning prompt reported 4 candidate tokens and 277 thought tokens. Output is now recorded as 281, and input + output equalled the provider's `totalTokenCount` (317). Usage rows written before this change recorded candidates only, so they under-count output tokens for thinking models. Calls with no reported usage keep `null` counts with provenance `unknown` and are listed as unreported, never estimated.
 - **Report Quality Not Evaluated:** The report-hash and citation checks prove artifact integrity, not semantic report quality.
-- **No Reconciliation UI:** `UNKNOWN` effects are resolved through `POST /tool-executions/:id/reconcile` (operator role); the dashboard shows the state but has no reconcile action.
+- **LLM Journal Window and DBOS Granularity:** AgentFlow journals each LLM response in its own short transaction (`harness_operations` + `provider_calls`), before the step checkpoint. A crash between the provider response and that commit (E2/E2a) still repeats the call and its billed tokens. The DBOS reference wraps each agent step in one DBOS step. A DBOS application that makes every LLM call its own `@step` would also avoid the E2B repeat, so the E2B difference measures *per-call journaling by default*, not a capability DBOS cannot express.
+- **Response Cache Scope and Claims:** In the reference workflow every AGENT step has distinct instructions, so the default `run` scope practically never hits. With `full` context each analysis prompt carries the per-run `publicationTarget`, so `version`-scope hits need byte-identical run input. With `minimal` context (§2.4) the analysis prompts no longer depend on it, so repeated runs over the same corpus and assumptions can hit. A `version`-scoped hit returns a previously generated response for an identical request. That deliberately removes live-provider nondeterminism for repeated runs, which is why it is opt-in. Cache savings come from repeated work, not from fault tolerance. They are reported separately from journal replay and are not part of any fault-scenario comparison against DBOS or the baselines.
+- **Context Minimization Is Not a Fault-Tolerance Result:** Declaring `inputs` is prompt design that any orchestrator's workflow author could do. Its savings are reported as their own ablation, with the same prompts given to every system in a `--context minimal` campaign, and are never credited to AgentFlow's recovery mechanisms. Scripted-provider reductions are word-count estimates of the JSON prompt (`estimated`). Only live provider runs give `reported` billed reductions.
+- **Budgets Are Checked Between Calls:** A budget is evaluated before each provider call and after each response, never mid-call, so one call can overshoot by its own size. Calls whose usage the provider did not report (provenance `unknown`, for example lost responses) cannot be charged; they are reported as `unreportedCalls`. Cost accuracy depends entirely on the configured price table.
+- **Campaign Cost Guard:** Live campaigns require `--max-campaign-tokens`. The runner stops before the next trial once the reported tokens spent reach the ceiling, so the trial in progress can overshoot it. `--dry-run` projections are planning estimates, not usage.
+- **Reconcile UI Not End-to-End Tested:** Operators resolve `UNKNOWN` effects from the run page (or `POST /tool-executions/:id/reconcile`). The API path is covered by the integration suite; the console's Reconcile dialog is not in the Playwright smoke tests, which have no way to produce an `UNKNOWN` effect.
+
+### Threats to Validity
+
+- **Provider determinism:** the scripted provider has zero nondeterminism. Live models do not, even at temperature 0 with a seed, so repeated calls can differ in tokens and text.
+- **Testbed:** a single machine with containerized PostgreSQL and Redis. No network partitions or multi-node scheduling.
+- **Sample size:** campaigns run a small number of trials per condition. Intervals are 95% bootstrap (means) and Wilson (rates), and are descriptive when n is small.
+- **Baseline fidelity:** DBOS uses its real SDK, but on a matched common subset. C1 (Temporal-style) and C2 (LangGraph-style) are in-repo reimplementations of the relevant semantics, not the products, and none were tuned by their maintainers. A DBOS app that wraps each LLM call in its own step would behave like C1.
+- **Workload shape:** with one LLM call per AGENT step, per-call journaling (A1, C1) and per-step checkpointing (DBOS, C2) differ only when the crash lands between response and checkpoint (E2B).
+- **Pricing and caching assumptions:** cost figures depend on the operator-configured price table. Provider-side prompt caching (for example Groq's automatic cache) and its TTL can change billed input between otherwise identical runs.
+- **Tokenizers differ across providers:** token counts are compared between systems within one provider, never across providers.
 
 ---
 
@@ -374,6 +420,32 @@ Verify your Gemini configuration at any time:
 pnpm validate:gemini
 ```
 
+#### D. Optional: Groq Live API
+Groq is a second live provider (OpenAI-compatible Chat Completions). A worker registers it only when the key is set:
+
+```env
+GROQ_API_KEY="your-groq-api-key"
+GROQ_MODEL="openai/gpt-oss-120b"
+```
+
+`openai/gpt-oss-120b` is the default because, per Groq's docs (checked 2026-11-18), it is a production model that supports both tool calling and strict `json_schema` structured outputs. Groq does not allow structured outputs and tool use in the same request, so the adapter rejects that combination as a `PERMANENT` error. Verify with:
+
+```powershell
+pnpm validate:groq
+pnpm test:groq-live
+```
+
+Provider-specific feature support:
+
+| Feature | Gemini | Groq |
+|---|---|---|
+| Tool calling | yes | yes (one call per turn; `parallel_tool_calls: false`) |
+| Structured output | `responseSchema` | strict `json_schema`, not combinable with tools |
+| Cached input tokens reported | `cachedContentTokenCount` | `prompt_tokens_details.cached_tokens` (automatic prompt caching on gpt-oss models) |
+| Reasoning tokens reported | `thoughtsTokenCount`, billed as output | `completion_tokens_details.reasoning_tokens` only when returned; assumed inside `completion_tokens` (Groq docs do not say) |
+| Explicit context caching (brief §2.3) | planned | not applicable |
+| HTTP 429 / 5xx | `TRANSIENT` | `TRANSIENT`, honouring `retry-after`; Groq's 498 (flex capacity) is also `TRANSIENT` |
+
 ### 3. Database Migrations
 ```powershell
 pnpm db:migrate
@@ -398,36 +470,54 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 272 passing (219 unit + 53 integration; 3 live-Gemini skipped if no key)
+# Complete test suite: 294 unit + 61 integration, plus 3 live-Gemini and 3 live-Groq tests that run only when the key is configured
 pnpm test
 
-# Fast in-memory unit tests only (219 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (294 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
-# Real PostgreSQL + Redis integration tests only (53 tests)
+# Real PostgreSQL + Redis integration tests only
 pnpm test:integration
 
-# Live Google Gemini integration test (runs when GEMINI_API_KEY is configured)
+# Console smoke tests (Playwright, installed Google Chrome). Starts its own API, worker and
+# Vite on :3100/:4180 against agentflow_e2e_test and Redis DB 1, so dev data is never touched.
+pnpm test:e2e
+
+# Regenerate docs/screenshots (includes a worker crash at the E2B boundary and its recovery)
+pnpm screenshots
+
+# Live provider integration tests (run when GEMINI_API_KEY / GROQ_API_KEY is configured)
 pnpm test:gemini-live
+pnpm test:groq-live
 
 # Workspace typecheck and build
 pnpm typecheck
 pnpm build
 ```
 
-### 6. Start a Run from the Dashboard
+### 6. Use the Operations Console
 
-Sign in at `http://localhost:4173` and choose **New run** in the Runs rail.
+Sign in at `http://localhost:4173`. Every screenshot below was captured by `pnpm screenshots` with the deterministic **scripted** provider, so all token figures in them are word-count estimates (provenance `estimated`), not billed provider tokens.
 
-- **Cloud comparison (reference)** offers two execution modes. Each creates its own immutable workflow version, so scripted evaluation evidence and live runs never mix:
-  - **Scripted** uses the deterministic `scripted-research` evaluation provider (no API key, no cost).
-  - **Live** calls real Google Gemini (`provider: "gemini"`) with a model advertised by an online worker; it uses tokens on your key.
-- **Your own workflows** run a chosen version; provider and model are fixed by that version's definition and shown read-only.
-- Input is a JSON object (the reference workflow is pre-filled with a valid template). Advanced options set a creation key (idempotent restarts) and a deadline.
+![Run detail after a worker crash: lease expired, then the analyze-features response replayed from the journal](docs/screenshots/run-detail-recovered.png)
 
-The readiness line comes from `GET /runtime/providers`, which aggregates the providers that workers advertised in the last 30 seconds. Live mode is blocked only when workers are online but none has Gemini configured: set `GEMINI_API_KEY` on the **worker** and restart it. With no workers online the run is still accepted and queues until one starts. Readiness is advisory only — it never authorizes or schedules execution.
+- **Runs** lists runs with server-side status, workflow and date filters kept in the URL. **New run** (or `Ctrl/Cmd+K` → *Start a new run*) opens the start form:
+  - **Cloud comparison (reference)** offers two execution modes. Each creates its own immutable workflow version, so scripted evaluation evidence and live runs never mix: **Scripted** uses the `scripted-research` evaluation provider (no API key, no cost); **Live** calls Google Gemini or Groq with a model advertised by an online worker and uses tokens on your key.
+  - **Your own workflows** run a chosen version; provider and model are fixed by that version's definition.
+  - Input is a JSON object (the reference workflow is pre-filled). Advanced options set a creation key (idempotent restarts), a deadline, and token or cost budgets.
+- **Run detail** shows the recovery events strip (lease expiries, re-dispatches, journal replays, cache hits), the step timeline, the token panel and a step inspector (input, output, attempts, usage, tool executions). Pause, resume and cancel are in the header. A pending approval is decided in place. When a side effect's outcome is `UNKNOWN`, **Resolve unknown effect** opens it, and an `operator` can **Reconcile** it: confirm it succeeded (receiver id and receipt) or fail the run for good. Nothing is ever resent.
+- **Approvals** lists pending, unexpired approvals across your runs that one of your roles can decide. Each decision is bound to the persisted payload hash and needs a confirmation.
+- **Usage** charts tokens per UTC day across your runs: billed tokens, and tokens avoided by journal replay and by the response cache, which are never billed and never added to the billed figure. A by-model table and provenance counts (`reported` / `estimated` / `unknown`) sit underneath. The page is served by `GET /usage?from&to` (owner-scoped, at most 92 days).
+- **Workflows** lists your workflows; a workflow's page shows its immutable versions and each version's step definitions, with **Start run** preselecting it.
+- **Settings** holds the theme (system, light or dark, saved in this browser) and your session's roles.
 
-After starting, the run is selected automatically and polled live: runs show a **Scripted** or **Live · gemini** badge, AGENT steps show the model taken from persisted usage records, approvals are decided in place, and a **Result** panel shows the report and final output once the run succeeds. Token counts always come from persisted usage records with their provenance as recorded (`reported`, `estimated`, `unknown`); the dashboard never estimates them. Gemini rate-limit or quota errors (HTTP 429) are classified `TRANSIENT`, retried with backoff, and surface on the step's attempts if retries are exhausted.
+| Usage | Approvals | Workflow |
+| --- | --- | --- |
+| ![Usage page](docs/screenshots/usage.png) | ![Approvals page](docs/screenshots/approvals.png) | ![Workflow detail](docs/screenshots/workflow.png) |
+
+The readiness line comes from `GET /runtime/providers`, which aggregates the providers that workers advertised in the last 30 seconds. Live mode is blocked only when workers are online but none has the selected provider configured: set `GEMINI_API_KEY` or `GROQ_API_KEY` on the **worker** and restart it. With no workers online the run is still accepted and queues until one starts. Readiness is advisory only — it never authorizes or schedules execution.
+
+Token counts always come from persisted usage records with their provenance as recorded; the console never estimates them. Gemini rate-limit or quota errors (HTTP 429) are classified `TRANSIENT`, retried with backoff, and surface on the step's attempts if retries are exhausted.
 
 ### 7. Use the CLI
 
@@ -479,6 +569,7 @@ pnpm --silent agentflow runs list --json | jq -r '.runs[] | select(.publicStatus
 | 4 | Not found (HTTP 404, unknown run-ID prefix) |
 | 5 | Conflict (HTTP 409) |
 | 10 / 11 / 14 | `watch`: run `FAILED` / `CANCELLED` / `TIMED_OUT` |
+| 15 | `watch`: run `BUDGET_EXCEEDED` (token or cost budget breached) |
 | 12 | `watch`: run reached `WAITING_APPROVAL` or `NEEDS_ATTENTION` (pass `--until-terminal` to keep watching) |
 | 13 | `watch`: `--timeout` elapsed |
 | 130 | Interrupted (Ctrl-C); the run itself is unaffected |
@@ -510,7 +601,22 @@ node --import tsx packages/evaluation/src/cli.ts --systems A1 --scenarios E0,E1,
 
 # 7. Live Google Gemini provider validation (requires GEMINI_API_KEY)
 pnpm validate:gemini
+
+# 8. Token-efficiency matrix (scripted, no cost): every system on the token-critical scenarios
+node --import tsx packages/evaluation/src/real-runner.ts --systems B0,B1,A1,A1-nojournal,DBOS,C1,C2 --scenarios E0,E2,E2B,E8 --trials 3 --context minimal --output evaluation-results/scratch-token-matrix
+
+# 9. Repeated-run cache scenario
+node --import tsx packages/evaluation/src/real-runner.ts --systems A1,A1-cache,DBOS --scenarios R1 --trials 3 --context minimal --output evaluation-results/scratch-r1
+
+# 10. Live campaigns: project first, then run under a hard token ceiling
+node --import tsx packages/evaluation/src/real-runner.ts --provider groq --systems A1,DBOS,C1,C2 --scenarios E2,E2B,E8 --trials 30 --context minimal --dry-run
+node --import tsx packages/evaluation/src/real-runner.ts --provider groq --systems A1,DBOS,C1,C2 --scenarios E2,E2B,E8 --trials 30 --context minimal --max-campaign-tokens 400000 --min-trial-interval-ms 2000
+
+# 11. Regenerate token-report.md and summary.json tokenSummary for any campaign directory
+pnpm eval:token-report evaluation-results/scratch-token-matrix
 ```
+
+Every campaign writes `token-report.md`: per system and scenario, it gives billed tokens per successful run, repeated tokens per run (95% bootstrap CI), repeated calls, duplicates, committed re-executions, recovery p50/p95, and journal/cache savings kept separate. It also writes a generated headline sentence per scenario that states ties and losses plainly. Scripted campaigns are labelled as estimated token counts, never as billed usage.
 
 ---
 
@@ -536,7 +642,7 @@ Real campaign directories contain `manifest.json` (source revision, hash of the 
 ## 16. Status
 
 - **TypeScript AgentFlow Runtime:** **IMPLEMENTED & EVALUATED (MVP scope)**  
-  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) provider adapter, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 272 passing unit/integration tests (275 total in registry), a clean typecheck, and a clean build.
+  Durable state machine, outbox dispatch, lease fencing, dual session-cookie and Bearer token auth, role-gated approvals, Google Gemini (`gemini-3.5-flash`) and Groq (`openai/gpt-oss-120b`) provider adapters, receiver contracts, and the `agentflow` terminal CLI are implemented and covered by 304 unit/integration tests (plus 6 opt-in live-provider tests), a clean typecheck, and a clean build.
 - **Evaluation Artifacts:** **REAL SMALL-SAMPLE CAMPAIGNS + LABELLED SIMULATIONS**  
   Real process campaigns (160 trials plus two DEMO runs) and seeded simulator sweeps (4,900 modelled trials), reported separately.
 - **Python Execute → Remember → Control Prototype:** **UNIMPLEMENTED / CONCEPTUAL**  

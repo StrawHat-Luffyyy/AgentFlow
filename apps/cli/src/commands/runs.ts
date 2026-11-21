@@ -51,6 +51,16 @@ export interface StartOptions {
   set: string[];
   creationKey?: string;
   deadline?: string;
+  maxTokens?: string;
+  maxCostUsd?: string;
+}
+
+function positiveNumber(flag: string, raw: string, integer: boolean): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0 || (integer && !Number.isInteger(value))) {
+    throw new UsageError(`${flag} must be a positive ${integer ? "integer" : "number"}`);
+  }
+  return value;
 }
 
 export async function startRun(ctx: CliContext, workflowVersionId: string, opts: StartOptions): Promise<RunDetail> {
@@ -63,6 +73,8 @@ export async function startRun(ctx: CliContext, workflowVersionId: string, opts:
     input: applySets(base as Record<string, unknown>, opts.set),
     ...(opts.creationKey === undefined ? {} : { creationKey: opts.creationKey }),
     ...(opts.deadline === undefined ? {} : { deadlineMs: parseDuration(opts.deadline) }),
+    ...(opts.maxTokens === undefined ? {} : { maxTokens: positiveNumber("--max-tokens", opts.maxTokens, true) }),
+    ...(opts.maxCostUsd === undefined ? {} : { maxCostUsd: positiveNumber("--max-cost-usd", opts.maxCostUsd, false) }),
   });
   return ctx.client.createRun(body);
 }
@@ -107,16 +119,35 @@ function registerSubResources(runs: Command, getContext: ContextFactory): void {
     const now = ctx.io.now();
     ctx.out.data(body, {
       render: () => {
-        const totalIn = body.usage.reduce((sum, u) => sum + u.inputTokens, 0);
-        const totalOut = body.usage.reduce((sum, u) => sum + u.outputTokens, 0);
+        // Null counts mean the provider reported nothing for that call; show a dash, never 0.
+        const count = (value: number | null) => (value === null ? "—" : String(value));
+        const totalIn = body.usage.reduce((sum, u) => sum + (u.inputTokens ?? 0), 0);
+        const totalOut = body.usage.reduce((sum, u) => sum + (u.outputTokens ?? 0), 0);
+        const unreported = body.usage.filter((u) => u.inputTokens === null && u.outputTokens === null).length;
         const table = renderTable([
           { header: "PROVIDER", get: (u) => u.provider },
           { header: "MODEL", get: (u) => u.model },
-          { header: "IN", get: (u) => String(u.inputTokens) },
-          { header: "OUT", get: (u) => String(u.outputTokens) },
+          { header: "IN", get: (u) => count(u.inputTokens) },
+          { header: "OUT", get: (u) => count(u.outputTokens) },
+          { header: "PROVENANCE", get: (u) => u.provenance ?? "—" },
           { header: "WHEN", get: (u) => formatRelative(u.createdAt, now) },
         ], body.usage, ctx.out.width);
-        return `${table}\n\ntotal: ${totalIn} in / ${totalOut} out`;
+        const lines = [`total: ${totalIn} in / ${totalOut} out${unreported > 0 ? ` (${unreported} unreported)` : ""}`];
+        if (body.summary && body.summary.replayedCalls > 0) {
+          lines.push(
+            `saved by replay: ${body.summary.savedByReplayInputTokens} in / ` +
+            `${body.summary.savedByReplayOutputTokens} out (${body.summary.replayedCalls} replayed calls)`,
+          );
+        }
+        const lookups = body.summary?.cacheLookups;
+        if (body.summary && lookups && lookups.hits + lookups.misses + lookups.off > 0) {
+          const scope = body.summary.cacheScope ?? "run";
+          lines.push(lookups.hits + lookups.misses === 0
+            ? "cache: off"
+            : `cache (${scope}): ${lookups.hits} hits / ${lookups.misses} misses` +
+              ` · saved ${body.summary.savedByCacheInputTokens ?? 0} in / ${body.summary.savedByCacheOutputTokens ?? 0} out`);
+        }
+        return `${table}\n\n${lines.join("\n")}`;
       },
     });
   });
@@ -210,6 +241,8 @@ export function registerRunCommands(program: Command, getContext: ContextFactory
     .option("--set <key=value>", "set a top-level input field (repeatable; value parsed as JSON when valid)", collect, [])
     .option("--creation-key <key>", "idempotency key: repeating it returns the same run")
     .option("--deadline <duration>", "run deadline, e.g. 5m (default 5m)")
+    .option("--max-tokens <n>", "run budget on billed LLM tokens; exceeding it ends the run BUDGET_EXCEEDED")
+    .option("--max-cost-usd <usd>", "run budget in USD (needs AGENTFLOW_MODEL_PRICES on the API)")
     .option("--watch", "watch the run after starting it (exit code reflects its outcome)", false);
   addWatchFlags(start).action(async (workflowVersionId: string, opts: StartOptions & WatchFlags & { watch: boolean }) => {
     const ctx = await getContext();

@@ -31,6 +31,8 @@ pnpm exec vitest run tests/unit/harness.test.ts          # single file
 pnpm exec vitest run tests/unit/harness.test.ts -t "provider adapters"   # single test/describe by name
 ```
 
+Console smoke tests: `pnpm test:e2e` (Playwright, uses the installed Google Chrome via `channel: "chrome"`). `tests/e2e/stack.ts` starts its own API (:3100), worker and Vite (:4180) on `agentflow_e2e_test` + Redis DB 1, so it never touches dev data. Spec files are `*.e2e.ts` so Vitest ignores them. `pnpm screenshots` regenerates `docs/screenshots/` (scripted provider, with an injected E2B worker crash).
+
 Integration tests use `TEST_DATABASE_URL` (default `.../agentflow_test`) and **truncate it** — they refuse any database whose name doesn't end in `_test`/`-test`.
 
 Config is read from `process.env` via zod in `packages/config` (no dotenv loading); `.env.example` lists every variable. `LEASE_HEARTBEAT_MS` must be < `OPERATION_LEASE_MS`. `AGENTFLOW_AUTH_CREDENTIALS` is a JSON array of `{id, tokenHash (sha256 hex), roles}` — see README §13 for a generator one-liner.
@@ -60,6 +62,7 @@ Key invariants to preserve when editing:
 - **All state transitions live in `packages/runtime/src/index.ts`** (one large file: run creation, claim, complete, failure settlement, approvals, run control, reconciliation, harness LLM/tool begin/complete). Apps are thin wrappers around these functions; put new domain logic there, not in route handlers.
 - **Error classes** drive retries: `TRANSIENT` (backoff + jitter), `PERMANENT`, `TIMEOUT`, and `UNKNOWN` for ambiguous external writes (`classifyOperationError`).
 - **Side-effect contracts**: `RECEIVER_IDEMPOTENT_WRITE` derives a deterministic idempotency key from the workflow envelope; `UNSAFE_WRITE` outcomes after a crash go to `UNKNOWN` with a `RECONCILIATION` wait reason (resolved via `POST /tool-executions/:id/reconcile`, operator role) — never auto-resend.
+- **Budgets** (`maxTokens` / `maxCostUsd`) are enforced by `enforceRunBudget` under the lease fence from persisted `usage_records` only. A breach terminates the run (`BUDGET_EXCEEDED`, via the shared `terminateRun`) inside that transaction; the worker then returns without `settleOperationFailure` or `completeOperation`.
 - **Approvals** park runs in `WAITING` without holding a worker; role-gated (`research-reviewer`). Several tables (approvals, side effects) are made immutable by DB triggers in migrations 0004/0006.
 - **Worker heartbeats are advisory**: `worker_heartbeats` (written by `apps/worker/src/heartbeat.ts`, read only by `GET /runtime/providers`) feeds dashboard readiness. It must never authorize, reject, claim, schedule, or otherwise alter execution; `tests/integration/runtime-providers.test.ts` enforces this.
 - **Ownership**: workflows have an immutable owner inherited by runs; API endpoints are owner-scoped. Auth is SHA-256 bearer token with constant-time compare (`apps/api/src/auth.ts`).
@@ -70,7 +73,7 @@ Packages:
 - `db` — pg pool + migration runner (tracks applied files in `agentflow_migrations` under an advisory lock; migrations are never edited after being applied — add a new numbered file).
 - `harness` — `AgentHarness`, `ProviderRegistry`/`ToolRegistry`, provider adapters (Google Gemini `gemini-3.5-flash`, `DeterministicFakeProvider`) normalized to a common `LLMResponse`.
 - `research` — the nine-step cloud-comparison reference workflow, fixed corpus, and `ScriptedResearchProvider` used by tests and evaluation.
-- `evaluation` — real runner (`real-runner.ts` spawns separate API/worker/baseline OS processes, injects `SIGKILL` at named `ExecutionFaultBoundary` hooks, records an independent receiver ledger), DBOS reference runner, and the separate seeded simulator (`cli.ts`). Systems: B0/B1 (volatile baselines), A0 (AgentFlow without receiver cooperation), A1 (full), DBOS. Scenarios E0–E7 are defined in README §8.
+- `evaluation` — real runner (`real-runner.ts` spawns separate API/worker/baseline OS processes, injects `SIGKILL` at named `ExecutionFaultBoundary` hooks, records an independent receiver ledger), DBOS reference runner, and the separate seeded simulator (`cli.ts`). Systems: B0/B1 (volatile baselines), A0 (AgentFlow without receiver cooperation), A1 (full), A1-nojournal / A1-cache (evaluation-only ablations), DBOS, C1 (Temporal-style) and C2 (LangGraph-style) in-repo baselines. Scenarios E0–E8, E2B and R1 are defined in README §8. `token-report.ts` (`pnpm eval:token-report <dir>`) writes `token-report.md`. Live campaigns (`--provider gemini|groq`) require `--max-campaign-tokens`; use `--dry-run` first.
 - `telemetry` — OpenTelemetry setup (imported via each app's `instrumentation.ts`).
 
 `apps/cli` is the `agentflow` terminal client: Commander commands over a typed `ApiClient` (the only HTTP code), testable via `run(argv, io)`. It must only import `@agentflow/shared` from the workspace (it is kept bundle-ready) and never touches Postgres. `apps/web` is a React 19 + Vite operations dashboard talking to the API through the `/api` proxy (`src/api.ts`).

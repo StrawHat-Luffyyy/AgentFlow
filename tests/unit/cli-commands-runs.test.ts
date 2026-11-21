@@ -117,6 +117,17 @@ describe("runs start", () => {
     expect(fake.stdout()).toContain(`Started run ${TARGET}`);
   });
 
+  it("sends token and cost budgets and validates them client-side", async () => {
+    await serve(() => ({ status: 201, body: detail(TARGET, "QUEUED") }));
+    const fake = await authedIO(api!.url);
+    expect(await run(["runs", "start", VERSION_ID, "--max-tokens", "5000", "--max-cost-usd", "0.25", "-q"], fake.io)).toBe(0);
+    expect(api!.requests[0]?.body).toMatchObject({ maxTokens: 5000, maxCostUsd: 0.25 });
+    const bad = await authedIO(api!.url);
+    expect(await run(["runs", "start", VERSION_ID, "--max-tokens", "1.5"], bad.io)).toBe(2);
+    expect(await run(["runs", "start", VERSION_ID, "--max-cost-usd", "-1"], bad.io)).toBe(2);
+    expect(api!.requests).toHaveLength(1);
+  });
+
   it("validates the deadline client-side", async () => {
     await serve(() => ({ status: 201, body: detail(TARGET) }));
     const fake = await authedIO(api!.url);
@@ -186,6 +197,32 @@ describe("run sub-resources", () => {
     expect(await run(["runs", "history", TARGET], fake.io)).toBe(0);
     expect(api!.requests[0]?.path).toBe(`/runs/${TARGET}/history`);
     expect(fake.stdout()).toContain("RUN_CREATED");
+  });
+
+  it("renders usage with unreported rows and replay savings", async () => {
+    await serve(() => ({
+      status: 200,
+      body: {
+        usage: [
+          { provider: "gemini", model: "gemini-3.5-flash", inputTokens: 120, outputTokens: 30, provenance: "reported", createdAt: "2026-10-08T11:59:00.000Z" },
+          { provider: "gemini", model: "gemini-3.5-flash", inputTokens: null, outputTokens: null, provenance: "unknown", createdAt: "2026-10-08T11:59:30.000Z" },
+        ],
+        replays: [],
+        summary: {
+          replayedCalls: 1, savedByReplayInputTokens: 120, savedByReplayOutputTokens: 30,
+          cacheHitCalls: 1, savedByCacheInputTokens: 40, savedByCacheOutputTokens: 6,
+          cacheScope: "version", cacheLookups: { hits: 1, misses: 2, off: 0 },
+        },
+      },
+    }));
+    const fake = await authedIO(api!.url);
+    expect(await run(["runs", "usage", TARGET], fake.io)).toBe(0);
+    const out = fake.stdout();
+    expect(out).toContain("unknown");
+    expect(out).toContain("—");
+    expect(out).toContain("total: 120 in / 30 out (1 unreported)");
+    expect(out).toContain("saved by replay: 120 in / 30 out (1 replayed calls)");
+    expect(out).toContain("cache (version): 1 hits / 2 misses · saved 40 in / 6 out");
   });
 
   it.each([

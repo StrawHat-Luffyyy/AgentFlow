@@ -6,10 +6,15 @@ import { join, resolve } from "node:path";
 import { cpus, totalmem } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { migrate } from "@agentflow/db";
-import { cloudComparisonWorkflowDefinition, cloudComparisonCorpusHash } from "@agentflow/research";
+import { cloudComparisonCorpusHash } from "@agentflow/research";
+import { modelPriceTableSchema } from "@agentflow/shared";
 import { SeededRandom } from "./random.js";
 import { quantile, wilsonInterval, pairedBootstrapInterval } from "./statistics.js";
-import { Evidence, evidenceDatabase, installEvidenceSchema, publicationTarget, digest, type RealConfig, type RealScenario, type RealSystem } from "./real-common.js";
+import { Evidence, evidenceDatabase, installEvidenceSchema, isAgentFlowSystem, publicationTarget, digest, realScenarios, realSystems,
+  referenceDefinition, e8RejectedCalls, type RealConfig, type RealProvider, type RealScenario, type RealSystem } from "./real-common.js";
+import { llmEventMetrics } from "./real-metrics.js";
+import { costGuardTripped, projectCampaign, renderProjection } from "./campaign-plan.js";
+import { writeTokenReport } from "./token-report.js";
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(name); return index < 0 ? fallback : process.argv[index + 1]!;
@@ -17,10 +22,53 @@ function argument(name: string, fallback: string): string {
 const seed = Number(argument("--seed", "42"));
 const trials = Number(argument("--trials", "1"));
 const systems = argument("--systems", "B0,B1,A1").split(",") as RealSystem[];
-const scenarios = argument("--scenarios", "E0,E1,E2,E3,E4,E5,E6,E7").split(",") as RealScenario[];
+const scenarios = argument("--scenarios", "E0,E1,E2,E2B,E3,E4,E5,E6,E7").split(",") as RealScenario[];
+// LLM response-cache scope for AgentFlow workflow versions (brief §2.2). Empty keeps the
+// definition unchanged (runtime default "run"), so earlier campaigns stay comparable.
+const cacheScope = argument("--cache-scope", "");
+if (!["", "run", "version", "off"].includes(cacheScope)) throw new Error("--cache-scope must be run, version, or off");
+// Reference workflow context (brief §2.4). Default "full" keeps prompts identical to the
+// cited campaigns; "minimal" gives every system (AgentFlow and baselines) the projected prompts.
+const contextArgument = argument("--context", "full");
+if (contextArgument !== "full" && contextArgument !== "minimal") throw new Error("--context must be full or minimal");
+const context: "full" | "minimal" = contextArgument;
+// LLM provider for every system (brief §3.3 / §9). Token counts are only "reported" for live providers.
+const providerArgument = argument("--provider", "scripted");
+if (!["scripted", "gemini", "groq"].includes(providerArgument)) throw new Error("--provider must be scripted, gemini, or groq");
+const provider = providerArgument as RealProvider;
+// Live keys and models usually live in .env; children inherit this process's env.
+if (provider !== "scripted") {
+  try { process.loadEnvFile?.(); } catch { /* .env is optional */ }
+  const keyName = provider === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY";
+  if (!process.env[keyName] && !process.argv.includes("--dry-run")) throw new Error(`--provider ${provider} needs ${keyName} (env or .env)`);
+}
+const defaultModel = provider === "gemini" ? (process.env.GEMINI_MODEL || "gemini-3.5-flash")
+  : provider === "groq" ? (process.env.GROQ_MODEL || "openai/gpt-oss-120b") : "";
+const model = argument("--model", defaultModel);
+// Cost guard: a hard campaign-wide ceiling on reported tokens, required for live providers.
+const maxCampaignTokensArgument = argument("--max-campaign-tokens", "");
+const maxCampaignTokens = maxCampaignTokensArgument === "" ? null : Number(maxCampaignTokensArgument);
+const minTrialIntervalMs = Number(argument("--min-trial-interval-ms", "0"));
+const dryRun = process.argv.includes("--dry-run");
 if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
-    systems.some((s) => !["B0","B1","A0","A1","DBOS"].includes(s)) ||
-    scenarios.some((s) => !["E0","E1","E2","E3","E4","E5","E6","E7","DEMO"].includes(s))) throw new Error("Invalid experiment configuration");
+    systems.some((s) => !(realSystems as readonly string[]).includes(s)) ||
+    scenarios.some((s) => !(realScenarios as readonly string[]).includes(s))) throw new Error("Invalid experiment configuration");
+if (maxCampaignTokens !== null && (!Number.isInteger(maxCampaignTokens) || maxCampaignTokens < 1)) throw new Error("--max-campaign-tokens must be a positive integer");
+if (provider !== "scripted" && maxCampaignTokens === null && !dryRun) throw new Error("Live campaigns require --max-campaign-tokens (run --dry-run first)");
+// A1-cache measures the version-scoped cache, which only R1 (repeated identical runs) isolates;
+// in fault scenarios it would answer every later trial from cache and hide recovery behaviour.
+if (systems.includes("A1-cache") && scenarios.some((s) => s !== "R1")) throw new Error("A1-cache is only valid in scenario R1");
+if (scenarios.includes("R1") && context !== "minimal") throw new Error("R1 requires --context minimal (full prompts differ per run)");
+if (dryRun) {
+  const prices = modelPriceTableSchema.parse(JSON.parse(process.env.AGENTFLOW_MODEL_PRICES || "{}"));
+  const definitionProvider = provider === "scripted" ? "scripted-research" : provider;
+  const price = prices[`${definitionProvider}/${provider === "scripted" ? "cloud-comparison-scripted-v1" : model}`] ?? null;
+  const tokensPerCall = Number(argument("--tokens-per-call", provider === "scripted" ? "360" : "2000"));
+  const shape = { systems, scenarios, trials, tokensPerCall, e8RejectedCalls };
+  console.log(renderProjection(shape, projectCampaign(shape, price), `${provider}${model ? ` ${model}` : ""}, context ${context}`));
+  if (maxCampaignTokens !== null) console.log(`Cost guard: the campaign stops before the next trial once ${maxCampaignTokens} reported tokens are spent.`);
+  process.exit(0);
+}
 const campaign = `real-${Date.now()}-${randomUUID().slice(0, 8)}`;
 const output = resolve(argument("--output", `evaluation-results/${campaign}`));
 const isDemo = scenarios.includes("DEMO");
@@ -39,7 +87,7 @@ const base: RealConfig = {
   redisUrl: process.env.EVALUATION_REDIS_URL ?? "redis://localhost:6379", queue: `agentflow-${campaign}`,
   leaseMs: Number(argument("--lease-ms", "1000")), retryMs: 20,
   operationDelayMs: Number(argument("--operation-delay-ms", defaultDelayMs)), observationMs: Number(argument("--observation-ms", isDemo ? "600000" : "120000")),
-  apiPort,
+  apiPort, context, provider, ...(model ? { model } : {}),
 };
 if (!new URL(base.dbosUrl).pathname.endsWith("_eval")) throw new Error("DBOS database must end in _eval");
 await mkdir(output, { recursive: true });
@@ -101,10 +149,15 @@ async function request(path: string, body?: unknown): Promise<any> {
 }
 const versions = new Map<string, string>();
 async function versionFor(config: RealConfig): Promise<string> {
-  const key = config.scenario === "E6" && config.system === "A1" ? "unsafe" : "supported";
+  const variant = config.system === "A1-nojournal" ? "nojournal" : config.system === "A1-cache" ? "cache" : "standard";
+  const key = `${config.scenario === "E6" && config.system !== "A0" ? "unsafe" : "supported"}-${variant}`;
   if (versions.has(key)) return versions.get(key)!;
   const workflow = await request("/workflows", { name: `${campaign}-${key}` });
-  const definition = cloudComparisonWorkflowDefinition();
+  const definition = referenceDefinition(config);
+  // Ablations: no-journal also turns the cache off (it could otherwise stand in for the
+  // journal); A1-cache shares responses across runs of this version (R1 only).
+  const scope = variant === "nojournal" ? "off" : variant === "cache" ? "version" : cacheScope;
+  if (scope) Object.assign(definition, { cacheScope: scope });
   if (key === "unsafe") {
     const publication = definition.steps.at(-1)!;
     if (publication.kind === "TOOL") publication.effectClass = "UNSAFE_WRITE";
@@ -117,7 +170,17 @@ interface Event { sequence: string; event: string; operation: string | null; pid
 interface Measurement {
   trialId: string; pair: string; system: RealSystem; scenario: RealScenario; outcome: string;
   elapsedMs: number; restarts: number; repeatedOperations: number; reexecutedCommittedOperations: number;
-  llmCalls: number; repeatedLlmCalls: number; inputTokens: number; outputTokens: number; usageProvenance: string;
+  llmCalls: number; repeatedLlmCalls: number; inputTokens: number; outputTokens: number;
+  /** Provenances actually seen in provider results (e.g. ["reported"] or ["estimated"]). */
+  usageProvenance: string[];
+  provider: RealProvider; resolvedModels: string[];
+  /** Input + output tokens of every provider result in the run, and those beyond the first per operation. */
+  billedTokens: number; repeatedTokens: number;
+  providerErrors: number; rateLimitedCalls: number;
+  /** Provider calls avoided by LLM-journal replay, and the tokens those calls had cost (0 for systems without a journal). */
+  journalReplays: number; tokensSavedByReplay: number;
+  /** Response-cache hits (identical earlier request) and the tokens they avoided; separate from journal replay. */
+  cacheHits: number; tokensSavedByCache: number;
   receiverEffects: number; duplicateEffects: number; missingEffects: number; invalidApprovalExecutions: number;
   checkpointBytes: number | null; checkpointMs: number[]; recoveryMs: number[]; correctReport: boolean;
   faultCount: number; error: string | null;
@@ -127,7 +190,7 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
   const config: RealConfig = { ...base, system, scenario, trialId: `${campaign}-${scenario}-${index}-${system}` };
   const evidence = new Evidence(db, config);
   await db.query("INSERT INTO evaluation_trials(id,system,scenario) VALUES($1,$2,$3)", [config.trialId, system, scenario]);
-  const durable = system === "A1" || system === "A0";
+  const durable = isAgentFlowSystem(system);
   if (durable) {
     const run = await request("/runs", { workflowVersionId: await versionFor(config),
       creationKey: config.trialId, input: { publicationTarget: publicationTarget(config.trialId) },
@@ -243,8 +306,7 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
   const effects = (await db.query("SELECT * FROM controlled_publication_effects WHERE payload_json->'publication'->>'target'=$1 ORDER BY created_at", [publicationTarget(config.trialId)])).rows;
   const state = (await db.query("SELECT approved_hash FROM evaluation_trials WHERE id=$1", [config.trialId])).rows[0];
   const starts = events.filter((e) => e.event === "before-operation");
-  const calls = events.filter((e) => e.event === "provider-start");
-  const usages = events.filter((e) => e.event === "provider-result");
+  const llm = llmEventMetrics(events);
   const committed = new Set<string>(); let reexecuted = 0;
   for (const event of events) {
     if (event.event === "before-operation" && committed.has(event.operation!)) reexecuted++;
@@ -264,13 +326,22 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
       approvals: await request(`/runs/${config.runId}/approvals`), history: await request(`/runs/${config.runId}/history`),
       usage: await request(`/runs/${config.runId}/usage`), toolExecutions: await request(`/runs/${config.runId}/tool-executions`) };
   }
+  const usageSummary = (runtimeEvidence as { usage?: { summary?: {
+    replayedCalls: number; savedByReplayInputTokens: number; savedByReplayOutputTokens: number;
+    cacheHitCalls?: number; savedByCacheInputTokens?: number; savedByCacheOutputTokens?: number;
+  } } } | null)?.usage?.summary;
   const measurement: Measurement = {
     trialId: config.trialId, pair: `${scenario}-${index}`, system, scenario, outcome, elapsedMs, restarts,
     repeatedOperations: starts.length - new Set(starts.map((e) => e.operation)).size,
     reexecutedCommittedOperations: reexecuted,
-    llmCalls: calls.length, repeatedLlmCalls: calls.length - new Set(calls.map((e) => e.operation)).size,
-    inputTokens: usages.reduce((sum,e) => sum + (e.detail.usage?.inputTokens ?? 0),0),
-    outputTokens: usages.reduce((sum,e) => sum + (e.detail.usage?.outputTokens ?? 0),0), usageProvenance: "estimated-scripted-provider",
+    llmCalls: llm.llmCalls, repeatedLlmCalls: llm.repeatedLlmCalls,
+    inputTokens: llm.inputTokens, outputTokens: llm.outputTokens, usageProvenance: llm.usageProvenance,
+    provider, resolvedModels: llm.resolvedModels, billedTokens: llm.billedTokens, repeatedTokens: llm.repeatedTokens,
+    providerErrors: llm.providerErrors, rateLimitedCalls: llm.rateLimitedCalls,
+    journalReplays: usageSummary?.replayedCalls ?? 0,
+    tokensSavedByReplay: (usageSummary?.savedByReplayInputTokens ?? 0) + (usageSummary?.savedByReplayOutputTokens ?? 0),
+    cacheHits: usageSummary?.cacheHitCalls ?? 0,
+    tokensSavedByCache: (usageSummary?.savedByCacheInputTokens ?? 0) + (usageSummary?.savedByCacheOutputTokens ?? 0),
     receiverEffects: effects.length, duplicateEffects: Math.max(0,effects.length-1),
     missingEffects: state.approved_hash && effects.length === 0 ? 1 : 0,
     invalidApprovalExecutions: effects.filter((e) => !state.approved_hash || e.request_hash !== state.approved_hash).length,
@@ -288,19 +359,33 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
 
 let revision = "unknown";
 try { revision = execFileSync("git", ["rev-parse","HEAD"], { encoding: "utf8" }).trim(); } catch {}
-const manifest = { campaign, seed, trials, systems, scenarios, sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
+const sampling = referenceDefinition(base).steps.find((step) => step.kind === "AGENT");
+const manifest = { campaign, seed, trials, systems, scenarios, cacheScope: cacheScope || "default (run)", context,
+  provider, model: model || "cloud-comparison-scripted-v1",
+  sampling: sampling?.kind === "AGENT" ? { temperature: sampling.temperature ?? null, seed: sampling.seed ?? null } : null,
+  costGuard: { maxCampaignTokens, minTrialIntervalMs }, sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
   node: process.version, hardware: { cpu: cpus()[0]?.model, logicalCpus: cpus().length, memoryBytes: totalmem() },
   corpusHash: cloudComparisonCorpusHash, dbosVersion: "5.2.11", policy: { leaseMs: base.leaseMs, schedulerPollMs: 50, outboxPollMs: 20,
     retryInitialMs: base.retryMs, maxAttempts: 3, maxRestarts: 3, observationMs: base.observationMs, workerConcurrency: 1, operationDelayMs: base.operationDelayMs },
-  method: "real processes; PostgreSQL; BullMQ; shared deterministic corpus and scripted provider; independent receiver transaction",
-  limitations: ["Scripted provider token counts are estimates, not billed tokens", "Instrumentation overhead is included", "Serial trials include process startup", "DBOS common subset uses durable steps and an external approval service", "No production checkpoint grouping is changed", "Receiver shares PostgreSQL with the runtime but commits independently"] };
+  method: `real processes; PostgreSQL; BullMQ; shared deterministic corpus; ${provider === "scripted" ? "scripted provider" : `live ${provider} provider`}; independent receiver transaction`,
+  limitations: [provider === "scripted" ? "Scripted provider token counts are estimates, not billed tokens" : "Live provider output is nondeterministic even at temperature 0 with a seed", "Instrumentation overhead is included",
+    "DBOS, C1 (Temporal-style) and C2 (LangGraph-style) are matched reimplementations of a common subset, not tuned by their maintainers", "Serial trials include process startup", "DBOS common subset uses durable steps and an external approval service", "No production checkpoint grouping is changed", "Receiver shares PostgreSQL with the runtime but commits independently"] };
 await writeFile(join(output,"manifest.json"), JSON.stringify({ ...manifest, manifestHash: digest(manifest) },null,2));
+let spentTokens = 0;
+let stoppedByCostGuard = false;
 try {
   const random = new SeededRandom(seed);
-  for (const scenario of scenarios) for (let index=0; index<trials; index++) {
-    for (const system of random.shuffle(systems)) await trial(system,scenario,index);
+  campaignLoop: for (const scenario of scenarios) for (let index=0; index<trials; index++) {
+    for (const system of random.shuffle(systems)) {
+      if (costGuardTripped(spentTokens, maxCampaignTokens)) { stoppedByCostGuard = true; break campaignLoop; }
+      if (results.length > 0 && minTrialIntervalMs > 0) await delay(minTrialIntervalMs);
+      await trial(system,scenario,index);
+      spentTokens += results.at(-1)?.billedTokens ?? 0;
+    }
   }
 } finally {
+  if (stoppedByCostGuard) console.log(`Cost guard: stopped after ${spentTokens} tokens (limit ${maxCampaignTokens}).`);
+  await writeFile(join(output,"manifest.json"), JSON.stringify({ ...manifest, manifestHash: digest(manifest), spentTokens, stoppedByCostGuard },null,2));
   // Write aggregate artifacts before an optional keep-alive wait so DEMO evidence is complete.
   const groups = systems.flatMap((system) => scenarios.map((scenario) => {
     const group = results.filter((r) => r.system===system && r.scenario===scenario);
@@ -308,7 +393,9 @@ try {
       duplicateFree:wilsonInterval(group.filter((r)=>r.duplicateEffects===0).length,group.length),
       medianElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.5),p95ElapsedMs:quantile(group.map((r)=>r.elapsedMs),0.95),
       p95RecoveryMs:quantile(group.flatMap((r)=>r.recoveryMs),0.95),p95CheckpointMs:quantile(group.flatMap((r)=>r.checkpointMs),0.95),
-      repeatedLlmCalls:group.reduce((s,r)=>s+r.repeatedLlmCalls,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
+      repeatedLlmCalls:group.reduce((s,r)=>s+r.repeatedLlmCalls,0),
+      journalReplays:group.reduce((s,r)=>s+r.journalReplays,0),tokensSavedByReplay:group.reduce((s,r)=>s+r.tokensSavedByReplay,0),
+      cacheHits:group.reduce((s,r)=>s+r.cacheHits,0),tokensSavedByCache:group.reduce((s,r)=>s+r.tokensSavedByCache,0),duplicates:group.reduce((s,r)=>s+r.duplicateEffects,0),
       invalidApprovals:group.reduce((s,r)=>s+r.invalidApprovalExecutions,0),committedReexecutions:group.reduce((s,r)=>s+r.reexecutedCommittedOperations,0),
       outcomes:Object.fromEntries([...new Set(group.map((r)=>r.outcome))].map((outcome)=>[outcome,group.filter((r)=>r.outcome===outcome).length])) };
   }));
@@ -320,6 +407,10 @@ try {
       repeatedCallsDifference:pairedBootstrapInterval(pairs.map((r)=>({baseline:r.repeatedLlmCalls,treatment:treatment.get(r.pair)!.repeatedLlmCalls})),seed)};
   }));
   await writeFile(join(output,"summary.json"),JSON.stringify({groups,comparisons},null,2));
+  if (results.length) {
+    await writeFile(join(output,"results.jsonl"), results.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    for (const headline of await writeTokenReport(output)) console.log(headline);
+  }
   if (results.length) {
     const columns=Object.keys(results[0]!) as Array<keyof Measurement>;
     const csv=(value: unknown)=>`"${String(typeof value === "object" ? JSON.stringify(value) : value).replaceAll('"','""')}"`;

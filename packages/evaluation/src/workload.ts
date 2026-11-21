@@ -38,6 +38,12 @@ export function conditionForScenario(scenario: ExperimentScenario): ExperimentCo
       faults: [{ id: "e2-lost-inference", hook: "after-provider-response", action: "crash", operationId: "analyze-features", occurrence: 1 }],
       ...defaultCondition,
     },
+    // E2B: the response is journalled, but the step checkpoint has not committed.
+    E2B: {
+      scenario,
+      faults: [{ id: "e2b-journalled-inference", hook: "after-llm-journal-commit", action: "crash", operationId: "analyze-features", occurrence: 1 }],
+      ...defaultCondition,
+    },
     E3: {
       scenario,
       faults: [{ id: "e3-provider-503", hook: "before-operation", action: "transient-error", operationId: "analyze-pricing", occurrence: 1, repeat: 2 }],

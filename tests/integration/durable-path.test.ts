@@ -18,13 +18,15 @@ import {
   type LLMResponse,
 } from "@agentflow/harness";
 import { defaultWorkflowDefinition } from "@agentflow/shared";
-import { ScriptedResearchProvider, fixedSourceContentHash } from "@agentflow/research";
+import { ScriptedResearchProvider, ensureCloudComparisonWorkflow, fixedSourceContentHash } from "@agentflow/research";
 import {
   beginHarnessLlmOperation,
   claimOperation,
   completeHarnessLlmOperation,
   completeOperation,
   controlRun,
+  createRun,
+  enforceRunBudget,
   executeDeterministicOperation,
   executeToolOperation,
   prepareToolExecution,
@@ -32,6 +34,8 @@ import {
   renewOperationLease,
   repairScheduling,
   settleOperationFailure,
+  RetryableOperationError,
+  type ExecutionFaultHooks,
 } from "../../packages/runtime/src/index.ts";
 import { Queue, QueueEvents, type Job, type Worker } from "bullmq";
 import type { Server } from "node:http";
@@ -791,6 +795,668 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 20_000);
+
+  it("replays journalled LLM responses across attempts and accounts for saved and orphaned calls", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "llm-journal-workflow", description: "LLM journal replay" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "journal-agent",
+              kind: "AGENT",
+              handler: "agent",
+              provider: "fake",
+              model: "fake-model",
+              instructions: "Test the LLM journal.",
+              allowedTools: [],
+              maxTurns: 3,
+            }],
+          },
+        }),
+      });
+      const created = await request<{
+        id: string;
+        steps: Array<{ id: string; dispatchGeneration: number }>;
+      }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          workflowVersionId: version.id,
+          input: { topic: "journal replay" },
+          creationKey: "integration-llm-journal",
+        }),
+      });
+      const step = created.steps[0]!;
+      const job = {
+        runId: created.id,
+        operationId: step.id,
+        workflowVersionId: version.id,
+        dispatchGeneration: step.dispatchGeneration,
+      };
+      // Simulates a worker crash: the lease expires and a new attempt is claimed at a higher epoch.
+      const crashAndReclaim = async (generation: number, workerId: string) => {
+        await database.query(
+          "UPDATE workflow_steps SET lease_expires_at = now() - interval '1 second' WHERE id = $1",
+          [step.id],
+        );
+        await repairScheduling(database, 10_000);
+        await database.query(
+          "UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1",
+          [step.id],
+        );
+        await repairScheduling(database, 10_000);
+        const next = await claimOperation(database, { ...job, dispatchGeneration: generation }, workerId, 15_000);
+        expect(next).not.toBeNull();
+        return next!;
+      };
+      const request0 = { model: "fake-model", messages: [{ role: "user", content: "turn one" }] };
+      const key0 = { hashVersion: 2, provider: "fake", adapterVersion: "1.0.0", ...request0, tools: [], params: {} };
+      const usage = {
+        provenance: "reported" as const,
+        inputTokens: 40,
+        outputTokens: 9,
+        cachedInputTokens: 0,
+        reasoningTokens: null,
+        totalTokens: 49,
+        raw: { input_tokens: 40, output_tokens: 9 },
+      };
+      const turnOne = { ordinal: 0, turn: 1, maxTurns: 3, provider: "fake", adapterVersion: "1.0.0", model: "fake-model" };
+
+      const first = await claimOperation(database, job, "journal-worker-1", 15_000);
+      const begun = await beginHarnessLlmOperation(database, first!, { ...turnOne, request: request0, journalKey: key0 });
+      if (begun.replayed) throw new Error("Expected a new provider call");
+      expect(begun.orphanedCalls).toBe(0);
+      const output = { text: "journalled", toolCalls: [], finishReason: "stop", usage };
+      await completeHarnessLlmOperation(database, first!, begun.providerCallId, {
+        output, continuationState: null, providerRequestId: "journal-1", resolvedModel: "fake-model-v1",
+        finishReason: "stop", usage,
+      });
+      const storedVersion = await database.query<{ request_hash_version: number }>(
+        "SELECT request_hash_version FROM harness_operations WHERE id = $1",
+        [begun.harnessOperationId],
+      );
+      expect(storedVersion.rows[0]?.request_hash_version).toBe(2);
+
+      // Crash after the journal commit, before the step checkpoint (E2B): the next attempt replays.
+      const second = await crashAndReclaim(2, "journal-worker-2");
+      const replay = await beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 });
+      expect(replay).toMatchObject({
+        replayed: true,
+        output,
+        savedUsage: {
+          provenance: "reported", inputTokens: 40, outputTokens: 9, totalTokens: 49,
+          sourceProviderCallId: begun.providerCallId,
+        },
+      });
+      // A second begin in the same attempt is not double-counted.
+      expect(await beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 }))
+        .toMatchObject({ replayed: true });
+      // A changed request (different tool set) never replays the stored response.
+      await expect(beginHarnessLlmOperation(database, second, {
+        ...turnOne, request: request0, journalKey: { ...key0, tools: [{ name: "search", version: "1" }] },
+      })).rejects.toThrow("different request data");
+      // A v2 row cannot be matched by a caller that only supplies the legacy request hash.
+      await expect(beginHarnessLlmOperation(database, second, { ...turnOne, request: request0 }))
+        .rejects.toThrow("different request data");
+
+      // Turn two starts, then the worker crashes before the response is journalled (E2a window).
+      const request2 = { model: "fake-model", messages: [{ role: "user", content: "turn two" }] };
+      const turnTwo = { ...turnOne, ordinal: 2, turn: 2 };
+      const lost = await beginHarnessLlmOperation(database, second, {
+        ...turnTwo, request: request2, journalKey: { ...key0, messages: request2.messages },
+      });
+      if (lost.replayed) throw new Error("Expected a new provider call");
+
+      const third = await crashAndReclaim(3, "journal-worker-3");
+      // The stale attempt can no longer touch the journal.
+      await expect(beginHarnessLlmOperation(database, second, { ...turnOne, request: request0, journalKey: key0 }))
+        .rejects.toThrow("lease fencing");
+      const reissued = await beginHarnessLlmOperation(database, third, {
+        ...turnTwo, request: request2, journalKey: { ...key0, messages: request2.messages },
+      });
+      if (reissued.replayed) throw new Error("A lost response must be re-issued, not replayed");
+      expect(reissued.orphanedCalls).toBe(1);
+
+      // Rows written before migration 0014 (hash v1) still replay after the upgrade.
+      const request4 = { model: "fake-model", messages: [{ role: "user", content: "turn three" }] };
+      const turnThree = { ...turnOne, ordinal: 4, turn: 3 };
+      const legacy = await beginHarnessLlmOperation(database, third, { ...turnThree, request: request4 });
+      if (legacy.replayed) throw new Error("Expected a new provider call");
+      await completeHarnessLlmOperation(database, third, legacy.providerCallId, {
+        output, continuationState: null, providerRequestId: "journal-legacy", resolvedModel: "fake-model-v1",
+        finishReason: "stop", usage,
+      });
+      expect(await beginHarnessLlmOperation(database, third, {
+        ...turnThree, request: request4, journalKey: { ...key0, messages: request4.messages },
+      })).toMatchObject({ replayed: true });
+
+      const replays = await database.query<{ attempt_id: string; saved_input_tokens: number }>(
+        "SELECT attempt_id, saved_input_tokens FROM harness_replays WHERE run_id = $1 ORDER BY created_at",
+        [created.id],
+      );
+      expect(replays.rows).toEqual([
+        { attempt_id: second.attemptId, saved_input_tokens: 40 },
+        { attempt_id: third.attemptId, saved_input_tokens: 40 },
+      ]);
+      await expect(database.query("UPDATE harness_replays SET saved_input_tokens = 0 WHERE run_id = $1", [created.id]))
+        .rejects.toThrow("immutable");
+
+      const history = await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(
+        `/runs/${created.id}/history`,
+      );
+      expect(history.events.filter((event) => event.type === "LLM_JOURNAL_REPLAYED")).toHaveLength(2);
+      expect(history.events.filter((event) => event.type === "LLM_JOURNAL_ORPHANED")).toHaveLength(1);
+
+      const usageResponse = await request<{
+        usage: Array<{ provenance: string; totalTokens: number | null }>;
+        replays: Array<{ savedInputTokens: number; savedOutputTokens: number; savedTotalTokens: number | null }>;
+        summary: Record<string, unknown>;
+      }>(`/runs/${created.id}/usage`);
+      // Billed rows: turn one, the lost turn-two call (unknown), turn three. Replays never add billed rows.
+      expect(usageResponse.usage.map((record) => record.provenance).sort()).toEqual(["reported", "reported", "unknown"]);
+      expect(usageResponse.usage.map((record) => record.totalTokens).sort()).toEqual([49, 49, null]);
+      expect(usageResponse.replays.map((replay) => replay.savedTotalTokens)).toEqual([49, 49]);
+      const totals = {
+        billedCalls: 3,
+        unreportedCalls: 1,
+        billedInputTokens: 80,
+        billedOutputTokens: 18,
+        billedCachedInputTokens: 0,
+        billedReasoningTokens: 0,
+        replayedCalls: 2,
+        savedByReplayInputTokens: 80,
+        savedByReplayOutputTokens: 18,
+        cacheHitCalls: 0,
+        savedByCacheInputTokens: 0,
+        savedByCacheOutputTokens: 0,
+      };
+      // Turns one and two looked up the cache and missed; turn three is a legacy (v1) row.
+      const cacheLookups = { hits: 0, misses: 2, off: 0 };
+      expect(usageResponse.summary).toEqual({
+        ...totals,
+        provenance: { reported: 2, estimated: 0, unknown: 1 },
+        cacheScope: "run",
+        cacheLookups,
+        budget: null,
+        byStep: [{ stepId: step.id, ...totals, cacheLookups }],
+        byModel: [
+          {
+            provider: "fake", model: "fake-model-v1", ...totals,
+            billedCalls: 2, unreportedCalls: 0,
+          },
+          {
+            provider: "fake", model: "fake-model", ...totals,
+            billedCalls: 1, unreportedCalls: 1, billedInputTokens: 0, billedOutputTokens: 0,
+            replayedCalls: 0, savedByReplayInputTokens: 0, savedByReplayOutputTokens: 0,
+          },
+        ],
+      });
+      await controlRun(database, created.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("answers identical LLM requests from the response cache only within its configured scope", async () => {
+    await worker.pause();
+    try {
+      const agentStep = (key: string) => ({
+        key, kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+        instructions: "Cache test.", allowedTools: [], maxTurns: 2,
+      });
+      const createVersion = async (name: string, cacheScope: string | undefined, steps: number) => {
+        const workflow = await request<{ id: string }>("/workflows", {
+          method: "POST",
+          body: JSON.stringify({ name, description: "Response cache" }),
+        });
+        return request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST",
+          body: JSON.stringify({
+            version: 1,
+            definition: {
+              ...(cacheScope === undefined ? {} : { cacheScope }),
+              steps: Array.from({ length: steps }, (_, index) => agentStep(`agent-${index + 1}`)),
+            },
+          }),
+        });
+      };
+      const startRun = async (versionId: string, creationKey: string) => request<{ id: string }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: versionId, input: { topic: "cache" }, creationKey }),
+      });
+      const claimStep = async (runId: string, versionId: string, position: number, workerId: string) => {
+        const step = await database.query<{ id: string; dispatch_generation: number }>(
+          "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = $2",
+          [runId, position],
+        );
+        const claimed = await claimOperation(database, {
+          runId, operationId: step.rows[0]!.id, workflowVersionId: versionId,
+          dispatchGeneration: step.rows[0]!.dispatch_generation,
+        }, workerId, 15_000);
+        expect(claimed).not.toBeNull();
+        return claimed!;
+      };
+      const request0 = { model: "fake-model", messages: [{ role: "user", content: "identical prompt" }] };
+      const key = { hashVersion: 2, provider: "fake", adapterVersion: "1.0.0", ...request0, tools: [], params: { temperature: null } };
+      const turn = { ordinal: 0, turn: 1, maxTurns: 2, provider: "fake", adapterVersion: "1.0.0", model: "fake-model", request: request0 };
+      const usage = {
+        provenance: "reported" as const, inputTokens: 30, outputTokens: 5, cachedInputTokens: 0,
+        reasoningTokens: null, totalTokens: 35, raw: {},
+      };
+      const output = { text: "cached answer", toolCalls: [], finishReason: "stop", usage };
+      const callAndComplete = async (claimed: Awaited<ReturnType<typeof claimStep>>, journalKey = key) => {
+        const begun = await beginHarnessLlmOperation(database, claimed, { ...turn, journalKey });
+        if (begun.replayed) throw new Error("Expected a provider call");
+        await completeHarnessLlmOperation(database, claimed, begun.providerCallId, {
+          output, continuationState: null, providerRequestId: `req-${begun.providerCallId}`,
+          resolvedModel: "fake-model-v1", finishReason: "stop", usage,
+        });
+        return begun;
+      };
+      const providerCallsFor = async (runId: string) => Number((await database.query<{ count: string }>(
+        `SELECT count(*) FROM provider_calls pc JOIN harness_operations ho ON ho.id = pc.harness_operation_id
+         WHERE ho.run_id = $1`, [runId],
+      )).rows[0]!.count);
+
+      // 1. Run scope (the default): a second step with an identical request in the same run hits.
+      const runScoped = await createVersion("cache-run-scope", undefined, 2);
+      const runA = await startRun(runScoped.id, "cache-run-a");
+      const stepOne = await claimStep(runA.id, runScoped.id, 0, "cache-worker");
+      const original = await callAndComplete(stepOne);
+      expect(original.cacheLookup).toBe("MISS");
+      await completeOperation(database, stepOne, { done: true });
+      const stepTwo = await claimStep(runA.id, runScoped.id, 1, "cache-worker");
+      const hit = await beginHarnessLlmOperation(database, stepTwo, { ...turn, journalKey: key });
+      expect(hit).toMatchObject({
+        replayed: true,
+        output,
+        cacheHit: { scope: "run", sourceHarnessOperationId: original.harnessOperationId },
+        savedUsage: { inputTokens: 30, outputTokens: 5, provenance: "reported" },
+      });
+      expect(await providerCallsFor(runA.id)).toBe(1);
+      // A crash after the hit replays it from the journal without counting the saving twice.
+      expect(await beginHarnessLlmOperation(database, stepTwo, { ...turn, journalKey: key }))
+        .toMatchObject({ replayed: true, cacheHit: null, savedUsage: null });
+
+      // 2. The default scope never crosses runs.
+      const runB = await startRun(runScoped.id, "cache-run-b");
+      const crossRun = await callAndComplete(await claimStep(runB.id, runScoped.id, 0, "cache-worker"));
+      expect(crossRun.cacheLookup).toBe("MISS");
+
+      // 3. Version scope: another run of the same version hits; a different version misses.
+      const versionScoped = await createVersion("cache-version-scope", "version", 1);
+      const runC = await startRun(versionScoped.id, "cache-version-c");
+      await callAndComplete(await claimStep(runC.id, versionScoped.id, 0, "cache-worker"));
+      const runD = await startRun(versionScoped.id, "cache-version-d");
+      const claimedD = await claimStep(runD.id, versionScoped.id, 0, "cache-worker");
+      expect(await beginHarnessLlmOperation(database, claimedD, { ...turn, journalKey: key }))
+        .toMatchObject({ replayed: true, cacheHit: { scope: "version" } });
+      expect(await providerCallsFor(runD.id)).toBe(0);
+      const otherVersion = await createVersion("cache-version-other", "version", 1);
+      const runE = await startRun(otherVersion.id, "cache-version-e");
+      expect((await callAndComplete(await claimStep(runE.id, otherVersion.id, 0, "cache-worker"))).cacheLookup).toBe("MISS");
+
+      // 4. A different sampling parameter or tool set is a different request: no hit.
+      const runF = await startRun(versionScoped.id, "cache-version-f");
+      const differentTemperature = await beginHarnessLlmOperation(database, await claimStep(runF.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: { ...key, params: { temperature: 0 } },
+      });
+      expect(differentTemperature).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+      const runG = await startRun(versionScoped.id, "cache-version-g");
+      expect(await beginHarnessLlmOperation(database, await claimStep(runG.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: { ...key, tools: [{ name: "search", version: "1" }] },
+      })).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+
+      // 5. An in-flight (never accepted) response is never served: runF's call has no result.
+      const sameAsF = { ...key, params: { temperature: 0 } };
+      const runH = await startRun(versionScoped.id, "cache-version-h");
+      expect(await beginHarnessLlmOperation(database, await claimStep(runH.id, versionScoped.id, 0, "cache-worker"), {
+        ...turn, journalKey: sameAsF,
+      })).toMatchObject({ replayed: false, cacheLookup: "MISS" });
+
+      // 6. "off" always calls the provider, even for an identical in-run request.
+      const offScoped = await createVersion("cache-off-scope", "off", 2);
+      const runI = await startRun(offScoped.id, "cache-off-i");
+      const offOne = await claimStep(runI.id, offScoped.id, 0, "cache-worker");
+      expect((await callAndComplete(offOne)).cacheLookup).toBe("OFF");
+      await completeOperation(database, offOne, { done: true });
+      expect((await callAndComplete(await claimStep(runI.id, offScoped.id, 1, "cache-worker"))).cacheLookup).toBe("OFF");
+      expect(await providerCallsFor(runI.id)).toBe(2);
+
+      // 7. Audit trail and usage summary keep cache savings apart from journal replay.
+      const history = await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(`/runs/${runA.id}/history`);
+      expect(history.events.filter((event) => event.type === "LLM_CACHE_HIT")).toEqual([
+        expect.objectContaining({ payload: expect.objectContaining({ source: "CACHE_RUN", sourceHarnessOperationId: original.harnessOperationId }) }),
+      ]);
+      const summaryA = (await request<{ summary: Record<string, unknown>; replays: Array<{ source: string }> }>(`/runs/${runA.id}/usage`));
+      expect(summaryA.replays.map((replay) => replay.source)).toEqual(["CACHE_RUN"]);
+      expect(summaryA.summary).toMatchObject({
+        billedCalls: 1,
+        replayedCalls: 0,
+        cacheHitCalls: 1,
+        savedByCacheInputTokens: 30,
+        savedByCacheOutputTokens: 5,
+        cacheScope: "run",
+        cacheLookups: { hits: 1, misses: 1, off: 0 },
+      });
+      const summaryD = (await request<{ summary: Record<string, unknown> }>(`/runs/${runD.id}/usage`)).summary;
+      expect(summaryD).toMatchObject({ billedCalls: 0, cacheHitCalls: 1, cacheScope: "version", cacheLookups: { hits: 1, misses: 0, off: 0 } });
+      const summaryI = (await request<{ summary: Record<string, unknown> }>(`/runs/${runI.id}/usage`)).summary;
+      expect(summaryI).toMatchObject({ billedCalls: 2, cacheHitCalls: 0, cacheScope: "off", cacheLookups: { hits: 0, misses: 0, off: 2 } });
+
+      for (const run of [runA, runB, runC, runD, runE, runF, runG, runH, runI]) {
+        await controlRun(database, run.id, "cancel");
+      }
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("sends only declared agent inputs to the provider while the step output keeps the full state", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "context-minimization-workflow", description: "Declared agent inputs" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          definition: {
+            steps: [{
+              key: "minimal-agent", kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+              instructions: "Use only what you are given.", allowedTools: [], maxTurns: 1,
+              outputKey: "analysis", inputs: ["topic", "nested.keep", "nested.absent"],
+            }],
+          },
+        }),
+      });
+      const runWith = async (input: Record<string, unknown>, creationKey: string) => {
+        const created = await request<{ id: string; steps: Array<{ id: string; dispatchGeneration: number }> }>("/runs", {
+          method: "POST",
+          body: JSON.stringify({ workflowVersionId: version.id, input, creationKey }),
+        });
+        const fake = new DeterministicFakeProvider();
+        const harness = new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry());
+        const step = created.steps[0]!;
+        const result = await processOperationJob(
+          database, "context-worker", 15_000,
+          { data: { runId: created.id, operationId: step.id, workflowVersionId: version.id, dispatchGeneration: step.dispatchGeneration } } as Job,
+          5_000, 60_000, harness,
+        );
+        return { created, fake, result };
+      };
+
+      const full = { topic: "pricing", nested: { keep: "yes", drop: "no" }, publicationTarget: "controlled://publications/x" };
+      const ok = await runWith(full, "context-minimization-ok");
+      expect(ok.result).toMatchObject({ skipped: false, runCompleted: true });
+      expect(ok.fake.calls).toHaveLength(1);
+      // Only the declared paths reach the provider; the absent optional path is omitted.
+      expect(JSON.parse(ok.fake.calls[0]!.request.messages[0]!.content)).toEqual({ topic: "pricing", nested: { keep: "yes" } });
+      const completed = await request<{ steps: Array<{ acceptedOutput: Record<string, unknown> }> }>(`/runs/${ok.created.id}`);
+      expect(completed.steps[0]?.acceptedOutput).toMatchObject({
+        ...full,
+        analysis: expect.objectContaining({ content: "fake-response-1" }),
+      });
+
+      // A declared root missing at runtime is a definition bug: permanent failure, no provider call.
+      const missing = await runWith({ nested: { keep: "yes" } }, "context-minimization-missing");
+      expect(missing.result).toMatchObject({ failed: true, failure: { errorClass: "PERMANENT", code: "DECLARED_INPUT_MISSING" } });
+      expect(missing.fake.calls).toHaveLength(0);
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("enforces run token and cost budgets from persisted usage and ends the run BUDGET_EXCEEDED", async () => {
+    await worker.pause();
+    try {
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST",
+        body: JSON.stringify({ name: "budget-workflow", description: "Run budgets" }),
+      });
+      const agentStep = (key: string, outputKey: string) => ({
+        key, kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+        instructions: `Budget ${key}.`, allowedTools: [], maxTurns: 1, outputKey,
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ version: 1, definition: { steps: [agentStep("first", "one"), agentStep("second", "two")] } }),
+      });
+      // Every fake call reports 40 input + 20 output = 60 billed tokens.
+      const billed: LLMResponse = {
+        text: "ok", toolCalls: [], finishReason: "stop",
+        usage: { provenance: "reported", inputTokens: 40, outputTokens: 20, cachedInputTokens: 0, reasoningTokens: 0, raw: {} },
+        providerRequestId: null, resolvedModel: "fake-model", opaqueState: null,
+      };
+      const processStep = async (runId: string, position: number) => {
+        const step = await database.query<{ id: string; dispatch_generation: number }>(
+          "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = $2",
+          [runId, position],
+        );
+        const fake = new DeterministicFakeProvider([billed]);
+        const harness = new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry());
+        const result = await processOperationJob(
+          database, "budget-worker", 15_000,
+          { data: { runId, operationId: step.rows[0]!.id, workflowVersionId: version.id, dispatchGeneration: step.rows[0]!.dispatch_generation } } as Job,
+          5_000, 60_000, harness,
+        );
+        return { result, fake, stepId: step.rows[0]!.id };
+      };
+      const startRun = (body: Record<string, unknown>) => request<{ id: string; maxTokens: number | null }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, ...body }),
+      });
+      const runState = async (runId: string) => request<{
+        lifecycle: string; publicStatus: string; failure: Record<string, unknown> | null;
+      }>(`/runs/${runId}`);
+      const events = async (runId: string, type: string) =>
+        (await request<{ events: Array<{ type: string; payload: Record<string, unknown> }> }>(`/runs/${runId}/history`))
+          .events.filter((event) => event.type === type);
+
+      // 1. A response that pushes usage past the budget ends the run after that response.
+      const over = await startRun({ maxTokens: 50, creationKey: "budget-over" });
+      expect(over.maxTokens).toBe(50);
+      const first = await processStep(over.id, 0);
+      expect(first.result).toMatchObject({ budgetExceeded: true });
+      expect(first.fake.calls).toHaveLength(1);
+      expect(await runState(over.id)).toMatchObject({ lifecycle: "BUDGET_EXCEEDED", publicStatus: "BUDGET_EXCEEDED" });
+      expect(await events(over.id, "RUN_BUDGET_EXCEEDED")).toEqual([expect.objectContaining({
+        payload: expect.objectContaining({ code: "RUN_BUDGET_EXCEEDED", phase: "after-response", tokensUsed: 60, maxTokens: 50 }),
+      })]);
+      const attempt = await database.query<{ status: string; error_class: string }>(
+        "SELECT status, error_class FROM step_attempts WHERE step_id = $1", [first.stepId],
+      );
+      expect(attempt.rows).toEqual([{ status: "FAILED", error_class: "PERMANENT" }]);
+      const secondStep = await database.query("SELECT 1 FROM workflow_steps WHERE run_id = $1 AND position = 1", [over.id]);
+      expect(secondStep.rowCount).toBe(0);
+
+      // 2. Landing exactly on the budget completes the step; the next call is never sent.
+      const exact = await startRun({ maxTokens: 60 });
+      expect((await processStep(exact.id, 0)).result).toMatchObject({ skipped: false, runCompleted: false });
+      const stopped = await processStep(exact.id, 1);
+      expect(stopped.result).toMatchObject({ budgetExceeded: true, budget: { phase: "before-call", tokensUsed: 60 } });
+      expect(stopped.fake.calls).toHaveLength(0);
+      const unsent = await database.query<{ status: string; error_json: Record<string, unknown> }>(
+        `SELECT pc.status, pc.error_json FROM provider_calls pc WHERE pc.step_id = $1`, [stopped.stepId],
+      );
+      expect(unsent.rows).toEqual([{ status: "FAILED", error_json: { code: "RUN_BUDGET_EXCEEDED", sent: false } }]);
+      const exactUsage = await request<{ usage: unknown[]; summary: { budget: Record<string, unknown> } }>(`/runs/${exact.id}/usage`);
+      expect(exactUsage.usage).toHaveLength(1);
+      expect(exactUsage.summary.budget).toMatchObject({ maxTokens: 60, tokensUsed: 60, maxCostUsd: null, costUsd: null });
+      expect((await runState(exact.id)).publicStatus).toBe("BUDGET_EXCEEDED");
+
+      // 3. Under budget the run succeeds normally.
+      const under = await startRun({ maxTokens: 1_000 });
+      await processStep(under.id, 0);
+      expect((await processStep(under.id, 1)).result).toMatchObject({ runCompleted: true });
+      expect((await runState(under.id)).lifecycle).toBe("SUCCEEDED");
+
+      // 4. Cost budgets need a configured price; this API has none, so creation is refused.
+      const unpriced = await rawRequest("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, maxCostUsd: 1 }),
+      });
+      expect(unpriced.status).toBe(409);
+      expect(await unpriced.text()).toContain("fake/fake-model");
+      // With a price snapshot, $1000 per 1M tokens makes one 60-token call cost $0.06 > $0.05.
+      const priced = await createRun(database, { workflowVersionId: version.id, input: { topic: "budget" }, maxCostUsd: 0.05 },
+        { modelPrices: { "fake/fake-model": { inputPer1M: 1_000, outputPer1M: 1_000 } } });
+      expect((await processStep(priced.id, 0)).result).toMatchObject({ budgetExceeded: true });
+      expect(await events(priced.id, "RUN_BUDGET_EXCEEDED")).toEqual([expect.objectContaining({
+        payload: expect.objectContaining({ maxCostUsd: 0.05, costUsd: expect.closeTo(0.06, 9) }),
+      })]);
+
+      // 5. Replaying a creation key with a different budget is a conflict.
+      const replay = await rawRequest("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "budget" }, maxTokens: 51, creationKey: "budget-over" }),
+      });
+      expect(replay.status).toBe(409);
+
+      // 6. A stale lease cannot enforce (and so cannot terminate) a run.
+      const fenced = await startRun({ maxTokens: 10 });
+      const step = await database.query<{ id: string; dispatch_generation: number }>(
+        "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1 AND position = 0", [fenced.id],
+      );
+      const stale = await claimOperation(database, {
+        runId: fenced.id, operationId: step.rows[0]!.id, workflowVersionId: version.id,
+        dispatchGeneration: step.rows[0]!.dispatch_generation,
+      }, "stale-budget-worker", 15_000);
+      await database.query("UPDATE workflow_steps SET lease_epoch = lease_epoch + 1 WHERE id = $1", [step.rows[0]!.id]);
+      await expect(enforceRunBudget(database, stale!, "before-call")).rejects.toThrow("lease fencing");
+      expect((await runState(fenced.id)).lifecycle).toBe("OPEN");
+      await controlRun(database, fenced.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("replays a journalled response on retry by default and re-calls the provider only in the no-journal ablation", async () => {
+    await worker.pause();
+    try {
+      const retriedCalls = async (name: string, cacheScope: string | undefined, llmJournalReplay: boolean | undefined) => {
+        const workflow = await request<{ id: string }>("/workflows", {
+          method: "POST",
+          body: JSON.stringify({ name, description: "Journal ablation" }),
+        });
+        const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST",
+          body: JSON.stringify({
+            version: 1,
+            definition: {
+              ...(cacheScope ? { cacheScope } : {}),
+              steps: [{ key: "agent", kind: "AGENT", handler: "agent", provider: "fake", model: "fake-model",
+                instructions: "Journal ablation.", allowedTools: [], maxTurns: 1 }],
+            },
+          }),
+        });
+        const created = await request<{ id: string }>("/runs", {
+          method: "POST",
+          body: JSON.stringify({ workflowVersionId: version.id, input: { topic: name },
+            retryPolicy: { maxAttempts: 3, initialBackoffMs: 0, multiplier: 1, maxBackoffMs: 0 } }),
+        });
+        const options = llmJournalReplay === undefined ? {} : { llmJournalReplay };
+        const process = async (faultHooks?: ExecutionFaultHooks) => {
+          const step = await database.query<{ id: string; dispatch_generation: number }>(
+            "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1", [created.id]);
+          const fake = new DeterministicFakeProvider();
+          const result = await processOperationJob(
+            database, "journal-ablation-worker", 15_000,
+            { data: { runId: created.id, operationId: step.rows[0]!.id, workflowVersionId: version.id, dispatchGeneration: step.rows[0]!.dispatch_generation } } as Job,
+            5_000, 60_000, new AgentHarness(new ProviderRegistry().register(fake), new ToolRegistry()), faultHooks, options,
+          );
+          return { result, calls: fake.calls.length, stepId: step.rows[0]!.id };
+        };
+        // Attempt 1 journals the response, then fails transiently before the step commits.
+        const first = await process({
+          hit(boundary) {
+            if (boundary === "after-llm-journal-commit") throw new RetryableOperationError("injected", "INJECTED_TRANSIENT");
+          },
+        });
+        expect(first).toMatchObject({ calls: 1, result: { failed: true } });
+        await database.query("UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1", [first.stepId]);
+        await repairScheduling(database, 10_000);
+        const second = await process();
+        expect(second.result).toMatchObject({ runCompleted: true });
+        return second.calls;
+      };
+      expect(await retriedCalls("journal-ablation-default", undefined, undefined)).toBe(0);
+      expect(await retriedCalls("journal-ablation-off", "off", false)).toBe(1);
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("filters the owner's runs by public status, workflow and creation time", async () => {
+    await worker.pause();
+    try {
+      const makeVersion = async (name: string, authorization = testAuthorization) => {
+        const headers = { authorization };
+        const workflow = await request<{ id: string }>("/workflows", { method: "POST", headers, body: JSON.stringify({ name, description: "Run filters" }) });
+        const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+          method: "POST", headers, body: JSON.stringify({ version: 1, definition: defaultWorkflowDefinition }),
+        });
+        return { workflowId: workflow.id, versionId: version.id };
+      };
+      const startRun = (versionId: string, authorization = testAuthorization) =>
+        request<{ id: string }>("/runs", { method: "POST", headers: { authorization }, body: JSON.stringify({ workflowVersionId: versionId, input: { topic: "filters" } }) });
+      type RunList = { runs: Array<{ id: string; publicStatus: string; workflowId: string }>; total: number };
+
+      const first = await makeVersion("filters-first");
+      const second = await makeVersion("filters-second");
+      const foreign = await makeVersion("filters-foreign", "Bearer other-test-token");
+      const queued = await startRun(first.versionId);
+      const cancelled = await startRun(first.versionId);
+      const other = await startRun(second.versionId);
+      const foreignRun = await startRun(foreign.versionId, "Bearer other-test-token");
+      await controlRun(database, cancelled.id, "cancel");
+      await repairScheduling(database, 10_000);
+
+      const byWorkflow = await request<RunList>(`/runs?workflowId=${first.workflowId}`);
+      expect(byWorkflow.runs.map((run) => run.id).sort()).toEqual([queued.id, cancelled.id].sort());
+      expect(byWorkflow.total).toBe(2);
+
+      const cancelledOnly = await request<RunList>(`/runs?workflowId=${first.workflowId}&status=CANCELLED`);
+      expect(cancelledOnly).toMatchObject({ total: 1, runs: [{ id: cancelled.id, publicStatus: "CANCELLED" }] });
+      const activeOnly = await request<RunList>(`/runs?workflowId=${first.workflowId}&status=QUEUED,RUNNING`);
+      expect(activeOnly.runs.map((run) => run.id)).toEqual([queued.id]);
+
+      const future = new Date(Date.now() + 60_000).toISOString();
+      expect((await request<RunList>(`/runs?workflowId=${second.workflowId}&from=${future}`)).total).toBe(0);
+      expect((await request<RunList>(`/runs?workflowId=${second.workflowId}&to=${future}`)).runs.map((run) => run.id)).toEqual([other.id]);
+
+      // Another owner's workflow filter returns nothing for this owner, and never leaks its runs.
+      expect((await request<RunList>(`/runs?workflowId=${foreign.workflowId}`)).total).toBe(0);
+      const all = await request<RunList>("/runs?limit=100");
+      expect(all.runs.some((run) => run.id === foreignRun.id)).toBe(false);
+      expect((await rawRequest("/runs?status=lowercase")).status).toBe(400);
+
+      for (const run of [queued, other]) await controlRun(database, run.id, "cancel");
+      await controlRun(database, foreignRun.id, "cancel");
+    } finally {
+      await worker.resume();
+    }
+  }, 20_000);
+
+  it("registers a new reference workflow version when its definition changes instead of failing", async () => {
+    const owner = "context-version-owner";
+    const full = await ensureCloudComparisonWorkflow(database, { context: "full" }, owner);
+    const minimal = await ensureCloudComparisonWorkflow(database, { context: "minimal" }, owner);
+    const again = await ensureCloudComparisonWorkflow(database, { context: "minimal" }, owner);
+    const fullAgain = await ensureCloudComparisonWorkflow(database, { context: "full" }, owner);
+    expect(full).toMatchObject({ version: 1, created: true });
+    expect(minimal).toMatchObject({ version: 2, created: true, workflowId: full.workflowId });
+    expect(again).toMatchObject({ version: 2, created: false, workflowVersionId: minimal.workflowVersionId });
+    expect(fullAgain).toMatchObject({ version: 1, created: false, workflowVersionId: full.workflowVersionId });
+  });
 
   it("commits both deterministic operations and ignores duplicate delivery", async () => {
     const workflow = await request<{ id: string }>("/workflows", {
@@ -2099,4 +2765,43 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       await worker.resume();
     }
   }, 20_000);
+
+  it("reports owner-wide usage by day that agrees with per-run summaries and stays owner-scoped", async () => {
+    type Totals = Record<"billedCalls" | "billedInputTokens" | "billedOutputTokens" | "replayedCalls"
+      | "savedByReplayInputTokens" | "savedByReplayOutputTokens" | "cacheHitCalls"
+      | "savedByCacheInputTokens" | "savedByCacheOutputTokens", number>;
+    const fields: Array<keyof Totals> = ["billedCalls", "billedInputTokens", "billedOutputTokens", "replayedCalls",
+      "savedByReplayInputTokens", "savedByReplayOutputTokens", "cacheHitCalls", "savedByCacheInputTokens",
+      "savedByCacheOutputTokens"];
+    const from = new Date(Date.now() - 86_400_000).toISOString();
+    const to = new Date(Date.now() + 60_000).toISOString();
+    for (const authorization of [testAuthorization, "Bearer other-test-token"]) {
+      const headers = { authorization };
+      const expected = Object.fromEntries(fields.map((field) => [field, 0])) as Totals;
+      for (let offset = 0; ; offset += 100) {
+        const page = await request<{ runs: Array<{ id: string }>; total: number }>(
+          `/runs?limit=100&offset=${offset}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers },
+        );
+        for (const run of page.runs) {
+          const { summary } = await request<{ summary: Totals }>(`/runs/${run.id}/usage`, { headers });
+          for (const field of fields) expected[field] += summary[field];
+        }
+        if (offset + 100 >= page.total) break;
+      }
+      const series = await request<{ totals: Totals; days: Array<Totals & { day: string }> }>(
+        `/usage?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers },
+      );
+      expect(series.totals).toMatchObject(expected);
+      for (const field of fields) {
+        expect(series.days.reduce((sum, day) => sum + day[field], 0)).toBe(expected[field]);
+      }
+      if (authorization === testAuthorization) {
+        // Earlier tests in this file billed calls and replayed from both the journal and the cache.
+        expect(expected.billedCalls).toBeGreaterThan(0);
+        expect(expected.replayedCalls).toBeGreaterThan(0);
+        expect(expected.cacheHitCalls).toBeGreaterThan(0);
+      }
+    }
+    expect((await rawRequest("/usage?from=2026-01-01&to=2025-01-01")).status).toBe(400);
+  }, 60_000);
 });

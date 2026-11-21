@@ -14,6 +14,9 @@ import {
   type RetryPolicy,
   type WorkflowDefinition,
   type WorkflowStepDefinition,
+  type ModelPrice,
+  type ModelPriceTable,
+  usageCostUsd,
 } from "@agentflow/shared";
 
 export class NotFoundError extends Error {}
@@ -22,6 +25,7 @@ export class ConflictError extends Error {}
 export type ExecutionFaultBoundary =
   | "before-operation"
   | "after-provider-response"
+  | "after-llm-journal-commit"
   | "after-receiver-commit"
   | "completion-start"
   | "before-checkpoint-commit"
@@ -94,6 +98,11 @@ async function materializeStep(
           ? {} : { maxOutputTokens: input.definition.maxOutputTokens }),
         ...(input.definition.outputKey === undefined
           ? {} : { outputKey: input.definition.outputKey }),
+        ...(input.definition.inputs === undefined
+          ? {} : { inputs: input.definition.inputs }),
+        ...(input.definition.temperature === undefined
+          ? {} : { temperature: input.definition.temperature }),
+        ...(input.definition.seed === undefined ? {} : { seed: input.definition.seed }),
       }) : null,
     ],
   );
@@ -203,7 +212,10 @@ export async function createRun(
     creationKey?: string | undefined;
     deadlineMs?: number | undefined;
     retryPolicy?: RetryPolicy | undefined;
+    maxTokens?: number | undefined;
+    maxCostUsd?: number | undefined;
   },
+  options: { modelPrices?: ModelPriceTable } = {},
 ) {
   return tracer.startActiveSpan("agentflow.run.create", async (span) => {
     try {
@@ -221,10 +233,13 @@ export async function createRun(
             retry_initial_ms: number;
             retry_multiplier: number;
             retry_cap_ms: number;
+            max_tokens: string | null;
+            max_cost_usd: string | null;
           }>(
             `SELECT wr.id, wr.workflow_version_id, wr.input_hash,
                EXTRACT(EPOCH FROM (wr.deadline_at - wr.created_at)) * 1000 AS deadline_ms,
-               ws.max_attempts, ws.retry_initial_ms, ws.retry_multiplier, ws.retry_cap_ms
+               ws.max_attempts, ws.retry_initial_ms, ws.retry_multiplier, ws.retry_cap_ms,
+               wr.max_tokens, wr.max_cost_usd
              FROM workflow_runs wr
              JOIN workflow_steps ws ON ws.run_id = wr.id AND ws.position = 0
              WHERE wr.creation_key = $1`,
@@ -239,7 +254,9 @@ export async function createRun(
               row.max_attempts !== retryPolicy.maxAttempts ||
               row.retry_initial_ms !== retryPolicy.initialBackoffMs ||
               row.retry_multiplier !== retryPolicy.multiplier ||
-              row.retry_cap_ms !== retryPolicy.maxBackoffMs
+              row.retry_cap_ms !== retryPolicy.maxBackoffMs ||
+              (row.max_tokens === null ? undefined : Number(row.max_tokens)) !== input.maxTokens ||
+              (row.max_cost_usd === null ? undefined : Number(row.max_cost_usd)) !== input.maxCostUsd
             ) {
               throw new ConflictError("Creation key is already bound to different input or policy");
             }
@@ -259,6 +276,21 @@ export async function createRun(
         const definition = workflowDefinitionSchema.parse(versionRow.definition_json);
         const firstDefinition = definition.steps[0];
         if (!firstDefinition) throw new ConflictError("Workflow version has no steps");
+        // A cost budget needs a configured price for every model this version can call;
+        // the relevant prices are snapshotted on the run so later edits never change it.
+        let priceSnapshot: ModelPriceTable | null = null;
+        if (input.maxCostUsd !== undefined) {
+          priceSnapshot = {};
+          for (const step of definition.steps) {
+            if (step.kind !== "AGENT") continue;
+            const key = `${step.provider}/${step.model}`;
+            const price = options.modelPrices?.[key];
+            if (!price) {
+              throw new ConflictError(`maxCostUsd requires a configured price for ${key} (AGENTFLOW_MODEL_PRICES)`);
+            }
+            priceSnapshot[key] = price;
+          }
+        }
 
         const runId = randomUUID();
         setExecutionSpanAttributes(span, { runId });
@@ -267,8 +299,10 @@ export async function createRun(
 
         await transaction.query(
           `INSERT INTO workflow_runs
-             (id, workflow_version_id, creation_key, input_json, input_hash, lifecycle, deadline_at)
-           VALUES ($1, $2, $3, $4::jsonb, $5, 'OPEN', now() + ($6 * interval '1 millisecond'))`,
+             (id, workflow_version_id, creation_key, input_json, input_hash, lifecycle, deadline_at,
+              max_tokens, max_cost_usd, price_table_json)
+           VALUES ($1, $2, $3, $4::jsonb, $5, 'OPEN', now() + ($6 * interval '1 millisecond'),
+             $7, $8, $9::jsonb)`,
           [
             runId,
             input.workflowVersionId,
@@ -276,6 +310,9 @@ export async function createRun(
             JSON.stringify(input.input),
             hash(input.input),
             deadlineMs,
+            input.maxTokens ?? null,
+            input.maxCostUsd ?? null,
+            priceSnapshot === null ? null : JSON.stringify(priceSnapshot),
           ],
         );
         const first = await materializeStep(transaction, {
@@ -328,26 +365,50 @@ export async function createRun(
 
 type Queryable = Pick<Database, "query"> | Pick<Transaction, "query">;
 
-export async function listRuns(
-  database: Queryable,
-  options: { limit?: number; offset?: number; ownerId?: string } = {},
-) {
+export interface ListRunsOptions {
+  limit?: number;
+  offset?: number;
+  ownerId?: string;
+  /** Public statuses to include (as returned in `publicStatus`); empty or absent means all. */
+  statuses?: readonly string[];
+  workflowId?: string;
+  /** Inclusive lower and exclusive upper bound on creation time. */
+  createdFrom?: Date;
+  createdTo?: Date;
+}
+
+/** SQL mirror of derivePublicStatus, so the runs list can be filtered by public status in the database. */
+const publicStatusSql = `CASE
+  WHEN wr.lifecycle <> 'OPEN' THEN wr.lifecycle
+  WHEN wr.control IN ('PAUSED', 'PAUSE_REQUESTED') THEN wr.control
+  WHEN wr.control = 'CANCEL_REQUESTED' THEN 'CANCEL_REQUESTED'
+  WHEN wr.wait_reason = 'RECONCILIATION' THEN 'NEEDS_ATTENTION'
+  WHEN wr.wait_reason = 'APPROVAL' THEN 'WAITING_APPROVAL'
+  WHEN wr.wait_reason = 'RETRY' THEN 'RETRY_WAIT'
+  WHEN COALESCE(step_stats.has_running, false) THEN 'RUNNING'
+  ELSE 'QUEUED' END`;
+
+export async function listRuns(database: Queryable, options: ListRunsOptions = {}) {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
   const offset = Math.max(options.offset ?? 0, 0);
-  const [runs, count] = await Promise.all([
-    database.query(
-      `SELECT wr.id, wr.workflow_version_id AS "workflowVersionId",
-         w.name AS "workflowName", wv.version AS "workflowVersion",
+  const statuses = options.statuses && options.statuses.length > 0 ? [...options.statuses] : null;
+  // One filtered relation feeds both the page and the total, so they always agree.
+  const filtered = `
+    WITH listed AS (
+      SELECT wr.id, wr.workflow_version_id AS "workflowVersionId",
+         w.id AS "workflowId", w.name AS "workflowName", wv.version AS "workflowVersion",
          wr.lifecycle, wr.control, wr.wait_reason AS "waitReason",
          wr.created_at AS "createdAt", wr.finished_at AS "finishedAt",
          wr.deadline_at AS "deadlineAt", wr.failure_json AS failure,
+         wr.max_tokens::float8 AS "maxTokens", wr.max_cost_usd::float8 AS "maxCostUsd",
          COALESCE(step_stats.step_count, 0)::integer AS "stepCount",
          COALESCE(step_stats.completed_step_count, 0)::integer AS "completedStepCount",
          COALESCE(step_stats.attempt_count, 0)::integer AS "attemptCount",
          COALESCE(step_stats.has_running, false) AS "hasRunning",
          COALESCE(usage_stats.input_tokens, 0)::integer AS "inputTokens",
          COALESCE(usage_stats.output_tokens, 0)::integer AS "outputTokens",
-         ${agentProvidersSql("wv")} AS providers
+         ${agentProvidersSql("wv")} AS providers,
+         ${publicStatusSql} AS public_status
        FROM workflow_runs wr
        JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
        JOIN workflows w ON w.id = wv.workflow_id
@@ -363,15 +424,29 @@ export async function listRuns(
            COALESCE(sum(output_tokens), 0) AS output_tokens
          FROM usage_records WHERE run_id = wr.id
        ) usage_stats ON true
-       WHERE ($3::text IS NULL OR w.owner_id = $3)
-       ORDER BY wr.created_at DESC, wr.id DESC LIMIT $1 OFFSET $2`,
-      [limit, offset, options.ownerId ?? null],
+       WHERE ($1::text IS NULL OR w.owner_id = $1)
+         AND ($2::uuid IS NULL OR w.id = $2)
+         AND ($3::timestamptz IS NULL OR wr.created_at >= $3)
+         AND ($4::timestamptz IS NULL OR wr.created_at < $4)
+    )`;
+  const filters = [
+    options.ownerId ?? null,
+    options.workflowId ?? null,
+    options.createdFrom?.toISOString() ?? null,
+    options.createdTo?.toISOString() ?? null,
+    statuses,
+  ];
+  const [runs, count] = await Promise.all([
+    database.query(
+      `${filtered}
+       SELECT * FROM listed WHERE ($5::text[] IS NULL OR public_status = ANY($5))
+       ORDER BY "createdAt" DESC, id DESC LIMIT $6 OFFSET $7`,
+      [...filters, limit, offset],
     ),
     database.query<{ total: number }>(
-      `SELECT count(*)::integer AS total FROM workflow_runs wr
-       JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
-       JOIN workflows w ON w.id = wv.workflow_id
-       WHERE ($1::text IS NULL OR w.owner_id = $1)`, [options.ownerId ?? null],
+      `${filtered}
+       SELECT count(*)::integer AS total FROM listed WHERE ($5::text[] IS NULL OR public_status = ANY($5))`,
+      filters,
     ),
   ]);
 
@@ -380,7 +455,8 @@ export async function listRuns(
     control: string;
     waitReason: string;
     hasRunning: boolean;
-  }>).map(({ hasRunning, ...run }) => ({
+    public_status: string;
+  }>).map(({ hasRunning, public_status: _publicStatus, ...run }) => ({
     ...run,
     publicStatus: derivePublicStatus(run, hasRunning ? [{ status: "RUNNING" }] : []),
   }));
@@ -428,7 +504,13 @@ export async function getRun(database: Queryable, runId: string) {
        input_json AS input, state_revision AS "stateRevision",
        current_checkpoint_id AS "currentCheckpointId", created_at AS "createdAt",
        finished_at AS "finishedAt", deadline_at AS "deadlineAt", failure_json AS failure,
-       (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers
+       max_tokens::float8 AS "maxTokens", max_cost_usd::float8 AS "maxCostUsd",
+       (SELECT ${agentProvidersSql("wv")} FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS providers,
+       (SELECT w.id FROM workflow_versions wv JOIN workflows w ON w.id = wv.workflow_id
+        WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowId",
+       (SELECT w.name FROM workflow_versions wv JOIN workflows w ON w.id = wv.workflow_id
+        WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowName",
+       (SELECT wv.version FROM workflow_versions wv WHERE wv.id = workflow_runs.workflow_version_id) AS "workflowVersion"
      FROM workflow_runs WHERE id = $1`,
     [runId],
   );
@@ -603,7 +685,8 @@ export async function getWorkflow(database: Queryable, workflowId: string) {
   const versions = await database.query(
     `SELECT id, version, created_at AS "createdAt",
        jsonb_array_length(definition_json->'steps')::integer AS "stepCount",
-       ${agentProvidersSql("wv")} AS providers
+       ${agentProvidersSql("wv")} AS providers,
+       definition_json->'steps' AS steps
      FROM workflow_versions wv WHERE workflow_id = $1 ORDER BY version`,
     [workflowId],
   );
@@ -1094,7 +1177,13 @@ export interface ClaimedOperation {
     maxTurns: number;
     maxOutputTokens?: number;
     outputKey?: string;
+    /** Declared prompt inputs (brief §2.4); absent means the full step input. */
+    inputs?: string[];
+    temperature?: number;
+    seed?: number;
   } | null;
+  /** Run-level budget (brief §2.5), read at claim time; null or absent means unbudgeted. */
+  budget?: { maxTokens: number | null; maxCostUsd: number | null } | null;
 }
 
 export async function claimOperation(
@@ -1126,13 +1215,15 @@ export async function claimOperation(
       position: number;
       input_json: Record<string, unknown>;
       agent_config_json: ClaimedOperation["agentConfig"];
+      max_tokens: string | null;
+      max_cost_usd: string | null;
     }>(
       `SELECT wr.id AS run_id, ws.id AS operation_id,
          wr.workflow_version_id, wr.lifecycle, wr.control, wr.wait_reason,
          (wr.deadline_at > now()) AS deadline_valid, ws.status,
          ws.dispatch_generation, ws.attempt_count, ws.lease_epoch,
          ws.node_key, ws.kind, ws.handler, ws.effect_class, ws.tool_version,
-         ws.position, ws.input_json, ws.agent_config_json
+         ws.position, ws.input_json, ws.agent_config_json, wr.max_tokens, wr.max_cost_usd
        FROM workflow_runs wr
        JOIN workflow_steps ws ON ws.run_id = wr.id
        WHERE wr.id = $1 AND ws.id = $2
@@ -1187,6 +1278,10 @@ export async function claimOperation(
       input: row.input_json,
       attemptDeadlineAt: new Date(Date.now() + attemptTimeoutMs),
       agentConfig: row.agent_config_json,
+      budget: row.max_tokens === null && row.max_cost_usd === null ? null : {
+        maxTokens: row.max_tokens === null ? null : Number(row.max_tokens),
+        maxCostUsd: row.max_cost_usd === null ? null : Number(row.max_cost_usd),
+      },
     };
   });
 }
@@ -1520,6 +1615,17 @@ export class AttemptTimeoutError extends Error {
 export class UnknownEffectError extends Error {
   constructor(message: string, readonly causeValue?: unknown) {
     super(message);
+  }
+}
+
+/**
+ * Thrown by the worker after enforceRunBudget has already moved the run to
+ * BUDGET_EXCEEDED. The run is terminal, so this must not go through failure settlement.
+ */
+export class BudgetExceededError extends Error {
+  constructor(readonly check: RunBudgetCheck) {
+    super(`Run budget exceeded (${check.phase})`);
+    this.name = "BudgetExceededError";
   }
 }
 
@@ -2050,6 +2156,72 @@ export interface SchedulingRepairResult {
  * Repairs database-authoritative work that can no longer make progress.
  * Every mutation and replacement outbox intent is committed atomically.
  */
+/**
+ * Terminates an OPEN run inside the caller's transaction: fails the running attempt and
+ * every open step, cancels pending approvals, marks in-flight tool executions and
+ * idempotency records UNKNOWN (their outcome is ambiguous), sets the terminal lifecycle,
+ * and appends one audit event. Shared by deadline expiry and budget breaches.
+ */
+async function terminateRun(
+  transaction: Transaction,
+  runId: string,
+  options: {
+    lifecycle: "TIMED_OUT" | "BUDGET_EXCEEDED";
+    attemptErrorClass: "TIMEOUT" | "PERMANENT";
+    stepFailure: Record<string, unknown>;
+    runFailure: Record<string, unknown>;
+    eventType: string;
+    eventPayload: Record<string, unknown>;
+    stepId?: string | null;
+    attemptId?: string | null;
+  },
+): Promise<void> {
+  const stepFailure = JSON.stringify(options.stepFailure);
+  await transaction.query(
+    `UPDATE step_attempts SET status = 'FAILED', finished_at = now(),
+       error_class = $2, retryable = false, error_json = $3::jsonb
+     WHERE status = 'RUNNING' AND step_id IN
+       (SELECT id FROM workflow_steps WHERE run_id = $1)`,
+    [runId, options.attemptErrorClass, stepFailure],
+  );
+  await transaction.query(
+    `UPDATE workflow_steps SET status = 'FAILED', lease_owner = NULL,
+       lease_expires_at = NULL, next_attempt_at = NULL, completed_at = now(),
+       failure_json = $2::jsonb
+     WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
+    [runId, stepFailure],
+  );
+  await transaction.query(
+    `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
+     WHERE run_id = $1 AND status = 'PENDING'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
+     WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
+     WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
+    [runId],
+  );
+  await transaction.query(
+    `UPDATE workflow_runs SET lifecycle = $2, wait_reason = 'NONE',
+       failure_json = $3::jsonb, finished_at = now() WHERE id = $1`,
+    [runId, options.lifecycle, JSON.stringify(options.runFailure)],
+  );
+  const sequence = await nextEventSequence(transaction, runId);
+  await transaction.query(
+    `INSERT INTO audit_events (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+    [
+      randomUUID(), runId, sequence, options.stepId ?? null, options.attemptId ?? null,
+      options.eventType, JSON.stringify(options.eventPayload),
+    ],
+  );
+}
+
 export async function repairScheduling(
   database: Database,
   dispatchRecoveryMs: number,
@@ -2109,48 +2281,15 @@ export async function repairScheduling(
       [batchSize],
     );
     for (const run of timedOut.rows) {
-      await transaction.query(
-        `UPDATE step_attempts SET status = 'FAILED', finished_at = now(),
-           error_class = 'TIMEOUT', retryable = false,
-           error_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED')
-         WHERE status = 'RUNNING' AND step_id IN
-           (SELECT id FROM workflow_steps WHERE run_id = $1)`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE workflow_steps SET status = 'FAILED', lease_owner = NULL,
-           lease_expires_at = NULL, next_attempt_at = NULL, completed_at = now(),
-           failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED')
-         WHERE run_id = $1 AND status IN ('PENDING', 'READY', 'RUNNING', 'RETRY_WAIT', 'WAITING_APPROVAL')`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE approvals SET status = 'CANCELLED', decision_at = now()
-         WHERE run_id = $1 AND status = 'PENDING'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE tool_executions SET invocation_status = 'UNKNOWN', completed_at = now()
-         WHERE run_id = $1 AND invocation_status = 'IN_FLIGHT'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE idempotency_records SET status = 'UNKNOWN', updated_at = now()
-         WHERE run_id = $1 AND status = 'IN_FLIGHT'`,
-        [run.id],
-      );
-      await transaction.query(
-        `UPDATE workflow_runs SET lifecycle = 'TIMED_OUT', wait_reason = 'NONE',
-           failure_json = jsonb_build_object('code', 'RUN_DEADLINE_EXCEEDED'),
-           finished_at = now() WHERE id = $1`,
-        [run.id],
-      );
-      const sequence = await nextEventSequence(transaction, run.id);
-      await transaction.query(
-        `INSERT INTO audit_events (id, run_id, sequence, type, payload_json)
-         VALUES ($1, $2, $3, 'RUN_TIMED_OUT', '{"code":"RUN_DEADLINE_EXCEEDED"}'::jsonb)`,
-        [randomUUID(), run.id, sequence],
-      );
+      const failure = { code: "RUN_DEADLINE_EXCEEDED" };
+      await terminateRun(transaction, run.id, {
+        lifecycle: "TIMED_OUT",
+        attemptErrorClass: "TIMEOUT",
+        stepFailure: failure,
+        runFailure: failure,
+        eventType: "RUN_TIMED_OUT",
+        eventPayload: failure,
+      });
       timedOutRuns += 1;
     }
 
@@ -2721,6 +2860,132 @@ export async function completeOperation(
   });
 }
 
+export interface RunBudgetCheck {
+  phase: "before-call" | "after-response";
+  exceeded: boolean;
+  tokensUsed: number;
+  maxTokens: number | null;
+  costUsd: number | null;
+  maxCostUsd: number | null;
+  /** Billed calls with no reported counts; they cannot be charged against the budget. */
+  unreportedCalls: number;
+}
+
+/**
+ * Totals a run's billed usage (input + output tokens, and cost from the run's price
+ * snapshot) and compares it with the run budget. Pure, so it is unit-testable.
+ * Before a call a run is over budget once usage reaches the limit (another call can only
+ * add tokens); after a response only when usage exceeds it, so a call that lands exactly
+ * on the budget still completes its step.
+ */
+export function evaluateRunBudget(
+  phase: RunBudgetCheck["phase"],
+  budget: { maxTokens: number | null; maxCostUsd: number | null },
+  usage: ReadonlyArray<{ provider: string; model: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null }>,
+  prices: Record<string, ModelPrice> | null,
+): RunBudgetCheck {
+  let tokensUsed = 0;
+  let costUsd = prices ? 0 : null;
+  let unreportedCalls = 0;
+  for (const record of usage) {
+    if (record.inputTokens === null && record.outputTokens === null) {
+      unreportedCalls += 1;
+      continue;
+    }
+    tokensUsed += (record.inputTokens ?? 0) + (record.outputTokens ?? 0);
+    const price = prices?.[`${record.provider}/${record.model}`];
+    if (costUsd !== null && price) costUsd += usageCostUsd(record, price) ?? 0;
+  }
+  const over = (used: number, max: number) => (phase === "before-call" ? used >= max : used > max);
+  const exceeded =
+    (budget.maxTokens !== null && over(tokensUsed, budget.maxTokens)) ||
+    (budget.maxCostUsd !== null && costUsd !== null && over(costUsd, budget.maxCostUsd));
+  return { phase, exceeded, tokensUsed, maxTokens: budget.maxTokens, costUsd, maxCostUsd: budget.maxCostUsd, unreportedCalls };
+}
+
+/**
+ * Enforces the run budget from persisted usage_records (brief §2.5), under the lease
+ * fence, before each LLM call and after each response. On a breach the run is moved to
+ * BUDGET_EXCEEDED in this transaction; the caller then throws BudgetExceededError.
+ * Unbudgeted runs return immediately without touching the database.
+ */
+export async function enforceRunBudget(
+  database: Database,
+  operation: ClaimedOperation,
+  phase: RunBudgetCheck["phase"],
+  /** before-call: the just-begun provider call, closed as never sent on a breach. */
+  unsentProviderCallId?: string,
+): Promise<RunBudgetCheck | null> {
+  const budget = operation.budget;
+  if (!budget || (budget.maxTokens === null && budget.maxCostUsd === null)) return null;
+  return withTransaction(database, async (transaction) => {
+    const fence = await transaction.query<{
+      lifecycle: string;
+      step_status: string;
+      lease_owner: string | null;
+      lease_epoch: number;
+      lease_valid: boolean;
+      attempt_status: string;
+      price_table_json: Record<string, ModelPrice> | null;
+    }>(
+      `SELECT wr.lifecycle, ws.status AS step_status, ws.lease_owner, ws.lease_epoch,
+         (ws.lease_expires_at > now()) AS lease_valid, sa.status AS attempt_status,
+         wr.price_table_json
+       FROM workflow_runs wr
+       JOIN workflow_steps ws ON ws.run_id = wr.id
+       JOIN step_attempts sa ON sa.step_id = ws.id
+       WHERE wr.id = $1 AND ws.id = $2 AND sa.id = $3
+       FOR UPDATE OF wr, ws, sa`,
+      [operation.runId, operation.operationId, operation.attemptId],
+    );
+    const row = fence.rows[0];
+    if (
+      !row || row.lifecycle !== "OPEN" || row.step_status !== "RUNNING" ||
+      row.lease_owner !== operation.workerId || row.lease_epoch !== operation.leaseEpoch ||
+      !row.lease_valid || row.attempt_status !== "RUNNING"
+    ) {
+      throw new ConflictError("Budget enforcement rejected by lease fencing");
+    }
+    const usage = await transaction.query<{
+      provider: string;
+      model: string;
+      inputTokens: number | null;
+      outputTokens: number | null;
+      cachedInputTokens: number | null;
+    }>(
+      `SELECT provider, model, input_tokens AS "inputTokens", output_tokens AS "outputTokens",
+         cached_input_tokens AS "cachedInputTokens"
+       FROM usage_records WHERE run_id = $1`,
+      [operation.runId],
+    );
+    const check = evaluateRunBudget(phase, budget, usage.rows, row.price_table_json);
+    if (check.exceeded && unsentProviderCallId) {
+      // The request was never sent, so nothing was billed: no usage record is written.
+      await transaction.query(
+        `UPDATE provider_calls SET status = 'FAILED', finished_at = now(),
+           error_json = '{"code":"RUN_BUDGET_EXCEEDED","sent":false}'::jsonb
+         WHERE id = $1 AND attempt_id = $2 AND status = 'IN_FLIGHT'`,
+        [unsentProviderCallId, operation.attemptId],
+      );
+    }
+    if (check.exceeded) {
+      const failure = { code: "RUN_BUDGET_EXCEEDED" };
+      const detail = { ...failure, ...check, stepId: operation.operationId, stepKey: operation.nodeKey };
+      await terminateRun(transaction, operation.runId, {
+        lifecycle: "BUDGET_EXCEEDED",
+        attemptErrorClass: "PERMANENT",
+        stepFailure: failure,
+        runFailure: detail,
+        eventType: "RUN_BUDGET_EXCEEDED",
+        eventPayload: detail,
+        stepId: operation.operationId,
+        attemptId: operation.attemptId,
+      });
+    }
+    return check;
+  });
+}
+
 export interface BeginHarnessLlmInput {
   ordinal: number;
   turn: number;
@@ -2728,8 +2993,28 @@ export interface BeginHarnessLlmInput {
   provider: string;
   adapterVersion: string;
   model: string;
+  /** Legacy (v1) hash input: the provider request without tools. */
   request: Record<string, unknown>;
+  /**
+   * v2 hash input: everything that determines the provider response (provider,
+   * adapter version, model, instructions, messages, tool definitions, params,
+   * opaque state). When present, new journal rows are bound to sha256 of its
+   * canonical JSON so a response is never replayed for a different request.
+   */
+  journalKey?: Record<string, unknown>;
 }
+
+export interface HarnessReplaySavedUsage {
+  sourceProviderCallId: string;
+  provenance: "reported" | "estimated" | "unknown";
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  reasoningTokens: number | null;
+  totalTokens: number | null;
+}
+
+export type HarnessCacheLookup = "HIT" | "MISS" | "OFF";
 
 export type BegunHarnessLlmOperation =
   | {
@@ -2737,19 +3022,74 @@ export type BegunHarnessLlmOperation =
       harnessOperationId: string;
       output: Record<string, unknown>;
       continuationState: Record<string, unknown> | null;
+      savedUsage: HarnessReplaySavedUsage | null;
+      /** Set when this request was answered from the response cache rather than the journal. */
+      cacheHit: { scope: "run" | "version"; sourceHarnessOperationId: string } | null;
     }
   | {
       replayed: false;
       harnessOperationId: string;
       providerCallId: string;
       logicalOperationId: string;
+      /** Earlier IN_FLIGHT calls whose outcome was lost (journal_orphaned) and are re-issued now. */
+      orphanedCalls: number;
+      /** Cache decision for this logical operation; null for legacy (v1-hash) operations. */
+      cacheLookup: HarnessCacheLookup | null;
     };
+
+/** Journal hash for an LLM request. v2 covers provider, tools, and params; v1 is the legacy request hash. */
+export function harnessLlmRequestHash(
+  input: Pick<BeginHarnessLlmInput, "request" | "journalKey">,
+  version: 1 | 2,
+): string | null {
+  if (version === 1) return hash(input.request);
+  return input.journalKey === undefined ? null : hash(input.journalKey);
+}
 
 /**
  * Creates one durable LLM logical operation and one physical provider-call record.
- * A completed logical operation is replayed without contacting the provider again.
+ * A completed logical operation is replayed without contacting the provider again;
+ * each replaying attempt is recorded in harness_replays with the tokens it saved.
  */
 export async function beginHarnessLlmOperation(
+  database: Database,
+  operation: ClaimedOperation,
+  input: BeginHarnessLlmInput,
+): Promise<BegunHarnessLlmOperation> {
+  return tracer.startActiveSpan("agentflow.harness.llm.begin", async (span) => {
+    try {
+      setExecutionSpanAttributes(span, {
+        runId: operation.runId,
+        stepId: operation.operationId,
+        stepKey: operation.nodeKey,
+        attemptId: operation.attemptId,
+        leaseEpoch: operation.leaseEpoch,
+      });
+      const begun = await beginHarnessLlmOperationInTransaction(database, operation, input);
+      const savedTokens = begun.replayed
+        ? (begun.savedUsage?.inputTokens ?? 0) + (begun.savedUsage?.outputTokens ?? 0)
+        : 0;
+      if (begun.replayed && begun.cacheHit) {
+        span.setAttribute("agentflow.llm.journal.replayed", false);
+        span.setAttribute("agentflow.llm.cache.result", "hit");
+        span.setAttribute("agentflow.llm.cache.scope", begun.cacheHit.scope);
+        span.setAttribute("agentflow.llm.tokens_saved_by_cache", savedTokens);
+      } else if (begun.replayed) {
+        span.setAttribute("agentflow.llm.journal.replayed", true);
+        span.setAttribute("agentflow.llm.tokens_saved_by_replay", savedTokens);
+      } else {
+        span.setAttribute("agentflow.llm.journal.replayed", false);
+        span.setAttribute("agentflow.llm.journal.orphaned_calls", begun.orphanedCalls);
+        if (begun.cacheLookup) span.setAttribute("agentflow.llm.cache.result", begun.cacheLookup.toLowerCase());
+      }
+      return begun;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+async function beginHarnessLlmOperationInTransaction(
   database: Database,
   operation: ClaimedOperation,
   input: BeginHarnessLlmInput,
@@ -2793,12 +3133,14 @@ export async function beginHarnessLlmOperation(
       throw new ConflictError("Harness operation rejected by lease fencing");
     }
 
-    const requestHash = hash(input.request);
+    const hashVersion: 1 | 2 = input.journalKey === undefined ? 1 : 2;
+    const requestHash = harnessLlmRequestHash(input, hashVersion)!;
     const proposedId = randomUUID();
     await transaction.query(
       `INSERT INTO harness_operations
-         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash)
-       VALUES ($1, $2, $3, $4, 'LLM', $5, $6, 'PENDING', $7)
+         (id, run_id, step_id, ordinal, kind, turn, max_turns, status, request_hash,
+          request_hash_version)
+       VALUES ($1, $2, $3, $4, 'LLM', $5, $6, 'PENDING', $7, $8)
        ON CONFLICT (step_id, ordinal) DO NOTHING`,
       [
         proposedId,
@@ -2808,6 +3150,7 @@ export async function beginHarnessLlmOperation(
         input.turn,
         input.maxTurns,
         requestHash,
+        hashVersion,
       ],
     );
     const existing = await transaction.query<{
@@ -2816,30 +3159,85 @@ export async function beginHarnessLlmOperation(
       turn: number;
       max_turns: number;
       request_hash: string;
+      request_hash_version: number;
       status: string;
       output_json: Record<string, unknown> | null;
       continuation_state_json: Record<string, unknown> | null;
+      cache_lookup: HarnessCacheLookup | null;
     }>(
-      `SELECT id, kind, turn, max_turns, request_hash, status, output_json,
-         continuation_state_json
+      `SELECT id, kind, turn, max_turns, request_hash, request_hash_version, status,
+         output_json, continuation_state_json, cache_lookup
        FROM harness_operations WHERE step_id = $1 AND ordinal = $2 FOR UPDATE`,
       [operation.operationId, input.ordinal],
     );
     const logical = existing.rows[0]!;
+    // Compare against the hash version the row was written with, so rows created
+    // before migration 0014 (v1) still replay; a mismatch never replays.
+    const storedVersion: 1 | 2 = logical.request_hash_version === 2 ? 2 : 1;
     if (
       logical.kind !== "LLM" || logical.turn !== input.turn ||
-      logical.max_turns !== input.maxTurns || logical.request_hash !== requestHash
+      logical.max_turns !== input.maxTurns ||
+      logical.request_hash !== harnessLlmRequestHash(input, storedVersion)
     ) {
       throw new ConflictError("Harness operation identity is bound to different request data");
     }
     if (logical.status === "SUCCEEDED") {
       if (!logical.output_json) throw new ConflictError("Completed harness operation has no output");
+      // A row that was itself answered from the cache has no provider call of its own,
+      // so replaying it records nothing new (its saving was counted at the cache hit).
+      const savedUsage = await recordHarnessReplay(transaction, operation, logical.id, logical.id, "JOURNAL");
       return {
         replayed: true,
         harnessOperationId: logical.id,
         output: logical.output_json,
         continuationState: logical.continuation_state_json,
+        savedUsage,
+        cacheHit: null,
       };
+    }
+
+    // Response cache (brief §2.2): decided once per logical operation, before its first
+    // provider call, inside the same fenced transaction. Only v2 hashes participate,
+    // because only they bind provider, tools, and sampling parameters.
+    let cacheLookup: HarnessCacheLookup | null = logical.cache_lookup;
+    if (cacheLookup === null && storedVersion === 2) {
+      const scope = await workflowCacheScope(transaction, operation.runId);
+      if (scope === "off") {
+        cacheLookup = "OFF";
+      } else {
+        const cached = await findCachedLlmResponse(transaction, {
+          requestHash: logical.request_hash,
+          excludeId: logical.id,
+          runId: operation.runId,
+          scope,
+        });
+        if (cached) {
+          await transaction.query(
+            `UPDATE harness_operations SET status = 'SUCCEEDED', output_json = $1::jsonb,
+               continuation_state_json = $2::jsonb, completed_at = now(), cache_lookup = 'HIT'
+             WHERE id = $3`,
+            [
+              JSON.stringify(cached.output_json),
+              cached.continuation_state_json === null ? null : JSON.stringify(cached.continuation_state_json),
+              logical.id,
+            ],
+          );
+          const hitScope = cached.run_id === operation.runId ? "run" : "version";
+          const savedUsage = await recordHarnessReplay(
+            transaction, operation, logical.id, cached.id, hitScope === "run" ? "CACHE_RUN" : "CACHE_VERSION",
+          );
+          return {
+            replayed: true,
+            harnessOperationId: logical.id,
+            output: cached.output_json,
+            continuationState: cached.continuation_state_json,
+            savedUsage,
+            cacheHit: { scope: hitScope, sourceHarnessOperationId: cached.id },
+          };
+        }
+        cacheLookup = "MISS";
+      }
+      await transaction.query("UPDATE harness_operations SET cache_lookup = $1 WHERE id = $2", [cacheLookup, logical.id]);
     }
 
     const duplicateAttempt = await transaction.query(
@@ -2879,6 +3277,21 @@ export async function beginHarnessLlmOperation(
           unresolved.id, unresolved.provider, unresolved.requested_model,
         ],
       );
+      // journal_orphaned: the response never reached the journal, so the call is re-issued below.
+      const sequence = await nextEventSequence(transaction, operation.runId);
+      await transaction.query(
+        `INSERT INTO audit_events
+           (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+         VALUES ($1, $2, $3, $4, $5, 'LLM_JOURNAL_ORPHANED', $6::jsonb)`,
+        [
+          randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId,
+          JSON.stringify({
+            harnessOperationId: logical.id,
+            orphanedProviderCallId: unresolved.id,
+            orphanedAttemptId: unresolved.attempt_id,
+          }),
+        ],
+      );
     }
     const callCount = await transaction.query<{ next_call: number }>(
       `SELECT COALESCE(MAX(call_no), 0)::integer + 1 AS next_call
@@ -2911,8 +3324,143 @@ export async function beginHarnessLlmOperation(
       harnessOperationId: logical.id,
       providerCallId,
       logicalOperationId: logical.id,
+      orphanedCalls: unresolvedCalls.rows.length,
+      cacheLookup,
     };
   });
+}
+
+/** The run's workflow-version cache scope; absent in the definition means "run". */
+async function workflowCacheScope(transaction: Transaction, runId: string): Promise<"run" | "version" | "off"> {
+  const result = await transaction.query<{ scope: string | null }>(
+    `SELECT wv.definition_json->>'cacheScope' AS scope
+     FROM workflow_runs wr JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     WHERE wr.id = $1`,
+    [runId],
+  );
+  const scope = result.rows[0]?.scope;
+  return scope === "version" || scope === "off" ? scope : "run";
+}
+
+/**
+ * Newest accepted LLM response for an identical v2 request: within the run, or (for
+ * "version") within any run of the same immutable workflow version, preferring the
+ * same run. Only operations whose own provider call was accepted can be a source, so
+ * every cached response traces back to one real, billed provider call.
+ */
+async function findCachedLlmResponse(
+  transaction: Transaction,
+  input: { requestHash: string; excludeId: string; runId: string; scope: "run" | "version" },
+) {
+  const result = await transaction.query<{
+    id: string;
+    run_id: string;
+    output_json: Record<string, unknown>;
+    continuation_state_json: Record<string, unknown> | null;
+  }>(
+    `SELECT ho.id, ho.run_id, ho.output_json, ho.continuation_state_json
+     FROM harness_operations ho
+     JOIN workflow_runs wr ON wr.id = ho.run_id
+     WHERE ho.kind = 'LLM' AND ho.status = 'SUCCEEDED' AND ho.request_hash_version = 2
+       AND ho.request_hash = $1 AND ho.id <> $2 AND ho.output_json IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM provider_calls pc
+         WHERE pc.harness_operation_id = ho.id AND pc.status = 'SUCCEEDED' AND pc.accepted
+       )
+       AND (
+         ho.run_id = $3
+         OR ($4 = 'version' AND wr.workflow_version_id =
+               (SELECT workflow_version_id FROM workflow_runs WHERE id = $3))
+       )
+     ORDER BY (ho.run_id = $3) DESC, ho.completed_at DESC, ho.id
+     LIMIT 1`,
+    [input.requestHash, input.excludeId, input.runId, input.scope],
+  );
+  return result.rows[0] ?? null;
+}
+
+type HarnessReplaySource = "JOURNAL" | "CACHE_RUN" | "CACHE_VERSION";
+
+/**
+ * Records that this attempt reused an accepted response instead of calling the
+ * provider: a journal replay of the same logical operation, or a cache hit on an
+ * identical earlier request (`sourceOperationId`). Saved tokens are copied from the
+ * source call's billed usage record, provenance included; usage_records is never
+ * written for a reuse.
+ */
+async function recordHarnessReplay(
+  transaction: Transaction,
+  operation: ClaimedOperation,
+  harnessOperationId: string,
+  sourceOperationId: string,
+  source: HarnessReplaySource,
+): Promise<HarnessReplaySavedUsage | null> {
+  const sourceCall = await transaction.query<{
+    provider_call_id: string;
+    provider: string;
+    model: string;
+    provenance: "reported" | "estimated" | "unknown" | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    cached_input_tokens: number | null;
+    reasoning_tokens: number | null;
+    total_tokens: number | null;
+  }>(
+    `SELECT pc.id AS provider_call_id, pc.provider,
+       COALESCE(ur.model, pc.resolved_model, pc.requested_model) AS model,
+       ur.provenance, ur.input_tokens, ur.output_tokens, ur.cached_input_tokens,
+       ur.reasoning_tokens, ur.total_tokens
+     FROM provider_calls pc
+     LEFT JOIN usage_records ur ON ur.provider_call_id = pc.id
+     WHERE pc.harness_operation_id = $1 AND pc.status = 'SUCCEEDED' AND pc.accepted
+     ORDER BY pc.call_no DESC LIMIT 1`,
+    [sourceOperationId],
+  );
+  const row = sourceCall.rows[0];
+  if (!row) return null;
+  const savedUsage: HarnessReplaySavedUsage = {
+    sourceProviderCallId: row.provider_call_id,
+    provenance: row.provenance ?? "unknown",
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    cachedInputTokens: row.cached_input_tokens,
+    reasoningTokens: row.reasoning_tokens,
+    totalTokens: row.total_tokens,
+  };
+  const inserted = await transaction.query(
+    `INSERT INTO harness_replays
+       (id, run_id, step_id, attempt_id, harness_operation_id, source_provider_call_id,
+        provider, model, provenance, saved_input_tokens, saved_output_tokens,
+        saved_cached_input_tokens, saved_reasoning_tokens, saved_total_tokens,
+        source, source_harness_operation_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+     ON CONFLICT (harness_operation_id, attempt_id) DO NOTHING`,
+    [
+      randomUUID(), operation.runId, operation.operationId, operation.attemptId,
+      harnessOperationId, row.provider_call_id, row.provider, row.model,
+      savedUsage.provenance, savedUsage.inputTokens, savedUsage.outputTokens,
+      savedUsage.cachedInputTokens, savedUsage.reasoningTokens, savedUsage.totalTokens,
+      source, source === "JOURNAL" ? null : sourceOperationId,
+    ],
+  );
+  if (inserted.rowCount === 1) {
+    const sequence = await nextEventSequence(transaction, operation.runId);
+    await transaction.query(
+      `INSERT INTO audit_events
+         (id, run_id, sequence, step_id, attempt_id, type, payload_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [
+        randomUUID(), operation.runId, sequence, operation.operationId, operation.attemptId,
+        source === "JOURNAL" ? "LLM_JOURNAL_REPLAYED" : "LLM_CACHE_HIT",
+        JSON.stringify({
+          harnessOperationId,
+          ...(source === "JOURNAL" ? {} : { source, sourceHarnessOperationId: sourceOperationId }),
+          ...savedUsage,
+        }),
+      ],
+    );
+  }
+  return savedUsage;
 }
 
 export interface CompleteHarnessLlmInput {
@@ -2927,6 +3475,8 @@ export interface CompleteHarnessLlmInput {
     outputTokens: number | null;
     cachedInputTokens: number | null;
     reasoningTokens: number | null;
+    /** Provider-reported total, verbatim; absent or null when not reported. */
+    totalTokens?: number | null;
     raw: Record<string, unknown>;
   };
 }
@@ -2998,8 +3548,8 @@ export async function completeHarnessLlmOperation(
       `INSERT INTO usage_records
          (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
           provenance, input_tokens, output_tokens, cached_input_tokens,
-          reasoning_tokens, raw_usage_json)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)`,
+          reasoning_tokens, total_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)`,
       [
         randomUUID(),
         operation.runId,
@@ -3013,6 +3563,7 @@ export async function completeHarnessLlmOperation(
         input.usage.outputTokens,
         input.usage.cachedInputTokens,
         input.usage.reasoningTokens,
+        input.usage.totalTokens ?? null,
         JSON.stringify(input.usage.raw),
       ],
     );
@@ -3049,15 +3600,15 @@ export async function recordUnacceptedHarnessLlmResponse(
       `INSERT INTO usage_records
          (id, run_id, step_id, attempt_id, provider_call_id, provider, model,
           provenance, input_tokens, output_tokens, cached_input_tokens,
-          reasoning_tokens, raw_usage_json)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+          reasoning_tokens, total_tokens, raw_usage_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
        ON CONFLICT (provider_call_id) DO NOTHING`,
       [
         randomUUID(), operation.runId, operation.operationId, operation.attemptId,
         providerCallId, row.provider, input.resolvedModel || row.requested_model,
         input.usage.provenance, input.usage.inputTokens, input.usage.outputTokens,
         input.usage.cachedInputTokens, input.usage.reasoningTokens,
-        JSON.stringify(input.usage.raw),
+        input.usage.totalTokens ?? null, JSON.stringify(input.usage.raw),
       ],
     );
     return { recorded: true };
@@ -3272,9 +3823,274 @@ export async function getRunUsage(database: Queryable, runId: string) {
        provider_call_id AS "providerCallId", provider, model, provenance,
        input_tokens AS "inputTokens", output_tokens AS "outputTokens",
        cached_input_tokens AS "cachedInputTokens", reasoning_tokens AS "reasoningTokens",
-       raw_usage_json AS raw, created_at AS "createdAt"
+       total_tokens AS "totalTokens", raw_usage_json AS raw, created_at AS "createdAt"
      FROM usage_records WHERE run_id = $1 ORDER BY created_at, id`,
     [runId],
   );
   return result.rows;
+}
+
+/** Journal replays for a run: provider calls avoided and the billed tokens they would have cost. */
+export async function getRunReplays(database: Queryable, runId: string) {
+  const exists = await database.query("SELECT 1 FROM workflow_runs WHERE id = $1", [runId]);
+  if (exists.rowCount === 0) throw new NotFoundError("Run not found");
+  const result = await database.query(
+    `SELECT id, step_id AS "stepId", attempt_id AS "attemptId",
+       harness_operation_id AS "harnessOperationId",
+       source_provider_call_id AS "sourceProviderCallId", provider, model, provenance,
+       saved_input_tokens AS "savedInputTokens", saved_output_tokens AS "savedOutputTokens",
+       saved_cached_input_tokens AS "savedCachedInputTokens",
+       saved_reasoning_tokens AS "savedReasoningTokens",
+       saved_total_tokens AS "savedTotalTokens", source,
+       source_harness_operation_id AS "sourceHarnessOperationId", created_at AS "createdAt"
+     FROM harness_replays WHERE run_id = $1 ORDER BY created_at, id`,
+    [runId],
+  );
+  return result.rows;
+}
+
+/** The run's budget and how much of it persisted billed usage has consumed (null when unbudgeted). */
+export async function getRunBudget(database: Queryable, runId: string) {
+  const run = await database.query<{
+    max_tokens: string | null;
+    max_cost_usd: string | null;
+    price_table_json: Record<string, ModelPrice> | null;
+  }>("SELECT max_tokens, max_cost_usd, price_table_json FROM workflow_runs WHERE id = $1", [runId]);
+  const row = run.rows[0];
+  if (!row) throw new NotFoundError("Run not found");
+  if (row.max_tokens === null && row.max_cost_usd === null) return null;
+  const usage = await database.query<{
+    provider: string; model: string; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null;
+  }>(
+    `SELECT provider, model, input_tokens AS "inputTokens", output_tokens AS "outputTokens",
+       cached_input_tokens AS "cachedInputTokens" FROM usage_records WHERE run_id = $1`,
+    [runId],
+  );
+  const check = evaluateRunBudget("after-response", {
+    maxTokens: row.max_tokens === null ? null : Number(row.max_tokens),
+    maxCostUsd: row.max_cost_usd === null ? null : Number(row.max_cost_usd),
+  }, usage.rows, row.price_table_json);
+  const { phase: _phase, exceeded: _exceeded, ...budget } = check;
+  return budget;
+}
+
+/** The run's cache scope and each LLM logical operation's cache decision (null for legacy rows). */
+export async function getRunCacheLookups(database: Queryable, runId: string) {
+  const run = await database.query<{ scope: string | null }>(
+    `SELECT wv.definition_json->>'cacheScope' AS scope
+     FROM workflow_runs wr JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     WHERE wr.id = $1`,
+    [runId],
+  );
+  if (run.rowCount === 0) throw new NotFoundError("Run not found");
+  const raw = run.rows[0]!.scope;
+  const scope: "run" | "version" | "off" = raw === "version" || raw === "off" ? raw : "run";
+  const lookups = await database.query<{ stepId: string; cacheLookup: HarnessCacheLookup | null }>(
+    `SELECT step_id AS "stepId", cache_lookup AS "cacheLookup"
+     FROM harness_operations WHERE run_id = $1 AND kind = 'LLM' ORDER BY created_at, id`,
+    [runId],
+  );
+  return { scope, lookups: lookups.rows };
+}
+
+/** Token totals for one slice of a run (whole run, one step, or one provider/model). */
+export interface UsageTotals {
+  billedCalls: number;
+  /** Billed calls whose provider reported no token counts; they are excluded from sums, never estimated. */
+  unreportedCalls: number;
+  billedInputTokens: number;
+  billedOutputTokens: number;
+  billedCachedInputTokens: number;
+  billedReasoningTokens: number;
+  /** Journal replays: the same logical operation re-used after a crash or retry. */
+  replayedCalls: number;
+  savedByReplayInputTokens: number;
+  savedByReplayOutputTokens: number;
+  /** Response-cache hits: an identical earlier request answered this one (brief §2.2). */
+  cacheHitCalls: number;
+  savedByCacheInputTokens: number;
+  savedByCacheOutputTokens: number;
+}
+
+/** Cache decisions per LLM logical operation (HIT / MISS / OFF); legacy operations are not counted. */
+export interface CacheLookupCounts {
+  hits: number;
+  misses: number;
+  off: number;
+}
+
+export interface RunUsageSummary extends UsageTotals {
+  /** Count of usage records per provenance. */
+  provenance: Record<"reported" | "estimated" | "unknown", number>;
+  cacheScope: "run" | "version" | "off" | null;
+  cacheLookups: CacheLookupCounts;
+  byStep: Array<UsageTotals & { stepId: string; cacheLookups: CacheLookupCounts }>;
+  byModel: Array<UsageTotals & { provider: string; model: string }>;
+}
+
+interface SummarizableUsage {
+  stepId: string;
+  provider: string;
+  model: string;
+  provenance: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  reasoningTokens: number | null;
+}
+
+interface SummarizableReplay {
+  stepId: string;
+  provider: string;
+  model: string;
+  savedInputTokens: number | null;
+  savedOutputTokens: number | null;
+  /** JOURNAL (default) or CACHE_RUN / CACHE_VERSION. */
+  source?: string;
+}
+
+interface SummarizableCache {
+  scope: "run" | "version" | "off";
+  lookups: ReadonlyArray<{ stepId: string; cacheLookup: HarnessCacheLookup | null }>;
+}
+
+function countLookups(lookups: SummarizableCache["lookups"]): CacheLookupCounts {
+  return {
+    hits: lookups.filter((l) => l.cacheLookup === "HIT").length,
+    misses: lookups.filter((l) => l.cacheLookup === "MISS").length,
+    off: lookups.filter((l) => l.cacheLookup === "OFF").length,
+  };
+}
+
+function totalsOf(usage: ReadonlyArray<SummarizableUsage>, replays: ReadonlyArray<SummarizableReplay>): UsageTotals {
+  const sum = <T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null) =>
+    rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  const journal = replays.filter((r) => (r.source ?? "JOURNAL") === "JOURNAL");
+  const cached = replays.filter((r) => (r.source ?? "JOURNAL") !== "JOURNAL");
+  return {
+    billedCalls: usage.length,
+    unreportedCalls: usage.filter((r) => r.inputTokens === null && r.outputTokens === null).length,
+    billedInputTokens: sum(usage, (r) => r.inputTokens),
+    billedOutputTokens: sum(usage, (r) => r.outputTokens),
+    billedCachedInputTokens: sum(usage, (r) => r.cachedInputTokens),
+    billedReasoningTokens: sum(usage, (r) => r.reasoningTokens),
+    replayedCalls: journal.length,
+    savedByReplayInputTokens: sum(journal, (r) => r.savedInputTokens),
+    savedByReplayOutputTokens: sum(journal, (r) => r.savedOutputTokens),
+    cacheHitCalls: cached.length,
+    savedByCacheInputTokens: sum(cached, (r) => r.savedInputTokens),
+    savedByCacheOutputTokens: sum(cached, (r) => r.savedOutputTokens),
+  };
+}
+
+export function summarizeRunUsage(
+  usage: ReadonlyArray<SummarizableUsage>,
+  replays: ReadonlyArray<SummarizableReplay>,
+  cache: SummarizableCache | null = null,
+): RunUsageSummary {
+  const lookups = cache?.lookups ?? [];
+  const provenance = { reported: 0, estimated: 0, unknown: 0 };
+  for (const record of usage) {
+    if (record.provenance === "reported" || record.provenance === "estimated" || record.provenance === "unknown") {
+      provenance[record.provenance] += 1;
+    }
+  }
+  const groupKeys = <K extends string>(key: (row: SummarizableUsage | SummarizableReplay) => K) =>
+    [...new Set([...usage.map(key), ...replays.map(key)])];
+  const stepIds = [...new Set([...groupKeys((row) => row.stepId), ...lookups.map((l) => l.stepId)])];
+  const modelKey = (row: SummarizableUsage | SummarizableReplay) => `${row.provider}\u0000${row.model}`;
+  return {
+    ...totalsOf(usage, replays),
+    provenance,
+    cacheScope: cache?.scope ?? null,
+    cacheLookups: countLookups(lookups),
+    byStep: stepIds.map((stepId) => ({
+      stepId,
+      ...totalsOf(usage.filter((r) => r.stepId === stepId), replays.filter((r) => r.stepId === stepId)),
+      cacheLookups: countLookups(lookups.filter((l) => l.stepId === stepId)),
+    })),
+    byModel: groupKeys(modelKey).map((key) => {
+      const [provider, model] = key.split("\u0000") as [string, string];
+      return {
+        provider,
+        model,
+        ...totalsOf(usage.filter((r) => modelKey(r) === key), replays.filter((r) => modelKey(r) === key)),
+      };
+    }),
+  };
+}
+
+export interface OwnerUsageSeries {
+  from: string;
+  to: string;
+  /** Totals over the whole window, same shape as a run's usage summary. */
+  totals: UsageTotals;
+  provenance: { reported: number; estimated: number; unknown: number };
+  /** One entry per UTC day in [from, to), including days with no calls. */
+  days: Array<{ day: string } & UsageTotals>;
+  byModel: Array<{ provider: string; model: string } & UsageTotals>;
+}
+
+/**
+ * Billed usage and avoided calls across every run the owner can see, bucketed by UTC day.
+ * Read-only reporting over persisted usage_records and harness_replays; billed and saved
+ * figures stay separate exactly as in summarizeRunUsage.
+ */
+export async function getOwnerUsageSeries(
+  database: Queryable,
+  options: { ownerId: string; from: Date; to: Date },
+): Promise<OwnerUsageSeries> {
+  const scope = `JOIN workflow_runs wr ON wr.id = t.run_id
+     JOIN workflow_versions wv ON wv.id = wr.workflow_version_id
+     JOIN workflows w ON w.id = wv.workflow_id
+     WHERE w.owner_id = $1 AND t.created_at >= $2 AND t.created_at < $3`;
+  const params = [options.ownerId, options.from.toISOString(), options.to.toISOString()];
+  const day = `to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day`;
+  const [usage, replays] = await Promise.all([
+    database.query<SummarizableUsage & { day: string }>(
+      `SELECT t.step_id AS "stepId", t.provider, t.model, t.provenance,
+         t.input_tokens AS "inputTokens", t.output_tokens AS "outputTokens",
+         t.cached_input_tokens AS "cachedInputTokens", t.reasoning_tokens AS "reasoningTokens", ${day}
+       FROM usage_records t ${scope}`,
+      params,
+    ),
+    database.query<SummarizableReplay & { day: string }>(
+      `SELECT t.step_id AS "stepId", t.provider, t.model, t.source,
+         t.saved_input_tokens AS "savedInputTokens", t.saved_output_tokens AS "savedOutputTokens", ${day}
+       FROM harness_replays t ${scope}`,
+      params,
+    ),
+  ]);
+  const provenance = { reported: 0, estimated: 0, unknown: 0 };
+  for (const record of usage.rows) {
+    if (record.provenance === "reported" || record.provenance === "estimated" || record.provenance === "unknown") {
+      provenance[record.provenance] += 1;
+    }
+  }
+  const days: OwnerUsageSeries["days"] = [];
+  const start = new Date(Date.UTC(options.from.getUTCFullYear(), options.from.getUTCMonth(), options.from.getUTCDate()));
+  for (let cursor = start; cursor < options.to; cursor = new Date(cursor.getTime() + 86_400_000)) {
+    const key = cursor.toISOString().slice(0, 10);
+    days.push({
+      day: key,
+      ...totalsOf(usage.rows.filter((r) => r.day === key), replays.rows.filter((r) => r.day === key)),
+    });
+  }
+  const modelKey = (row: { provider: string; model: string }) => `${row.provider}\u0000${row.model}`;
+  const models = [...new Set([...usage.rows.map(modelKey), ...replays.rows.map(modelKey)])];
+  return {
+    from: options.from.toISOString(),
+    to: options.to.toISOString(),
+    totals: totalsOf(usage.rows, replays.rows),
+    provenance,
+    days,
+    byModel: models.map((key) => {
+      const [provider, model] = key.split("\u0000") as [string, string];
+      return {
+        provider,
+        model,
+        ...totalsOf(usage.rows.filter((r) => modelKey(r) === key), replays.rows.filter((r) => modelKey(r) === key)),
+      };
+    }),
+  };
 }
