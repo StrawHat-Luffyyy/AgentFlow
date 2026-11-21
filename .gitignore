@@ -11,6 +11,7 @@ evaluation-results/*
 !evaluation-results/real-primary-matrix/
 !evaluation-results/real-a0-ablation/
 !evaluation-results/real-dbos-reference/
+!evaluation-results/real-tool-research/
 !evaluation-results/e5-safety-1000/
 !evaluation-results/granularity-ablation/
 !evaluation-results/*/process.log

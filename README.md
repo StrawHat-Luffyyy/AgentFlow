@@ -240,12 +240,16 @@ The evidence comes from two different kinds of campaign, and they must not be co
 - **A0 (AgentFlow Ablation):** Full AgentFlow checkpoint durability, but with receiver cooperation disabled (`UNSAFE_WRITE`) by an evaluation-only adapter.
 - **A1 (Full AgentFlow):** The production sequential durable runtime with PostgreSQL checkpoints and receiver idempotency contracts.
 - **DBOS (Reference):** Matched common subset executed using the DBOS TypeScript SDK v5.2.11 against a dedicated PostgreSQL database (`agentflow_reference_eval`).
-- **C1 (Temporal-style baseline, in-repo):** Every workflow step is an activity whose result is recorded on completion and replayed after a restart. Every LLM call is also its own recorded activity, so a recorded response is never re-requested. Activities retry whole on failure. No Temporal server is used: this is a minimal reimplementation of the semantics.
+- **C1 (Temporal-style baseline, in-repo):** Every workflow step is an activity whose result is recorded on completion and replayed after a restart. Every LLM call (and, in an agent loop, every tool call) is also its own recorded activity, so a recorded response is never re-requested. Activities retry whole on failure. No Temporal server is used: this is a minimal reimplementation of the semantics.
+- **C1-step (Temporal-style variant, in-repo):** C1 with the whole agent loop inside one step activity: only completed steps are recorded, so a crash in the middle of an agent loop re-runs the loop from its first call. It differs from C1 only in journal granularity.
 - **C2 (LangGraph-style baseline, in-repo):** A full-state checkpoint after each node; a restart resumes from the last checkpoint. The LLM call inside a node is not journaled separately.
 - **A1-nojournal (ablation):** A1 with LLM journal replay disabled through an evaluation-only worker option (each attempt gets fresh harness ordinals), and with the response cache off. It isolates what the journal contributes.
 - **A1-cache (ablation, R1 only):** A1 on a workflow version with `cacheScope: "version"`, so identical requests are answered across runs.
 
-On this workload every AGENT step makes exactly one LLM call. C1 therefore records responses at the same granularity as AgentFlow's journal and is **expected to tie A1** under crash faults. DBOS and C2 checkpoint per step/node, so they repeat a response that arrived but was not yet checkpointed (E2B). A tool-using workload where one step makes several calls, which would separate per-call journaling from per-node checkpointing *within* a step, is future work.
+### Workloads
+
+- **cloud-comparison (default):** the nine-step reference workflow above. Every AGENT step makes exactly one LLM call, so C1 records responses at the same granularity as AgentFlow's journal and is **expected to tie A1** under crash faults. DBOS and C2 checkpoint per step/node, so they repeat a response that arrived but was not yet checkpointed (E2B).
+- **tool-research (`--workload tool-research`, scripted only):** four deterministic corpus steps, then one AGENT step, `investigate`, that reads four corpus sources through the PURE `read-source` tool, one per turn, and then answers: **five LLM calls in one step**. The `ScriptedToolResearchProvider` uses the same word-count estimate as the reference provider (provenance `estimated`), and the workflow sets `cacheScope: "off"` so every first-time call reaches the provider. Every system runs the same agent loop and sends identical prompts. Only scenarios E0, E1, E2 and E2B are defined; E2 and E2B crash after call `--crash-turn` (default 3) of the loop. This workload separates per-call journaling (A1, C1) from per-step checkpointing (C1-step, DBOS, C2) *within* a step.
 
 ### Injected Fault Scenarios (E0–E8 + E2B, R1; real runner)
 - **E0:** No fault (baseline overhead, checkpoint latency).
@@ -261,6 +265,8 @@ On this workload every AGENT step makes exactly one LLM call. C1 therefore recor
 - **R1:** Repeated identical fault-free runs (requires `--context minimal`). It measures the version-scoped response cache (A1-cache vs A1) and is the only scenario where A1-cache is allowed, so cache savings never mix with fault results.
 - **E9 (crash mid-stream) is not implemented:** no provider adapter streams responses.
 
+On the tool-research workload, E1 crashes before `investigate` starts, E2 crashes after the provider returns call 3 (before AgentFlow journals it), and E2B crashes after call 3 is journalled. Token metrics count one logical call per step and turn, so the calls of one loop are never counted as repeats of each other.
+
 The simulator uses the same scenario names, but its fault positions are not identical (for example, simulator E1 crashes after the `collect-sources` checkpoint).
 
 ---
@@ -275,6 +281,7 @@ The simulator uses the same scenario names, but its fault positions are not iden
 | **Targeted A0 Ablation** | A0 | E0, E5, E6 | **15** (5/condition) | A0 preserved checkpoints but produced a duplicate effect in **5/5** E5 and **5/5** E6 trials: checkpoint durability alone does not prevent duplicate effects after a remote-success/local-crash. |
 | **DBOS Reference** | DBOS | E0, E1, E2, E5, E7 | **25** (5/condition) | DBOS also showed 0 committed re-executions and 0 duplicates on the common subset; p95 crash-to-resume 2.39–2.47 s (includes process relaunch; not a like-for-like latency comparison). |
 | **Acceptance DEMO** | A1 | DEMO | **1** | See [Demo](#10-demo). |
+| **Multi-call workload** (tool-research, scripted) | A1, A1-nojournal, C1, C1-step, C2, DBOS | E0, E1, E2, E2B | **120** (5/condition) | All 120 trials `SUCCEEDED` with the expected answer and 0 duplicate effects. Crash after call 3 of 5 had been journalled (E2B): A1 and C1 repeated **0** calls; C1-step, C2, DBOS and A1-nojournal repeated **3 calls (947 estimated tokens) per run**. Crash before call 3 was journalled (E2): A1 and C1 repeated the 1 un-journalled call (356 tokens), the others 3 (947). A1 replayed 3 calls per E2B run from its journal (4,735 tokens saved over 5 runs). |
 
 - **Checkpoint commit latency (A1):** p95 per condition **24–32 ms** on local PostgreSQL (A0: 26–34 ms). Instrumentation overhead is included.
 - **Crash recovery (A1, 1,000 ms lease):** p95 crash-to-resumed-operation **1.19–1.23 s**.
@@ -287,6 +294,8 @@ The simulator uses the same scenario names, but its fault positions are not iden
 |---|---|---|---|---|
 | **E5 model sweep** | B0, B1, A0, A1 | E5 | 4,000 (1,000/system) | A1 and B1: 0 duplicates; A0 and B0: duplicates in 1,000/1,000. The model is deterministic for this condition, so the trial count adds no statistical evidence about the real runtime. |
 | **Checkpoint granularity model** | A1 | E0, E1, E5 | 900 (g = 1, 2, 4) | Grouping checkpoints over non-side-effecting operations reduced *modelled* median elapsed time by 7–8% (g=2) and 10–12% (g=4), with 0 modelled duplicates. Production AgentFlow always checkpoints per operation; grouping is not implemented in the runtime. |
+
+**What the multi-call result shows.** The gap between A1 and C2/DBOS grows with the number of LLM calls a step has made before a crash: per-call journaling saves the calls already returned, per-step checkpointing repeats all of them. C1, which also records each call, ties A1, and C1-step, which differs from C1 only in recording the agent loop as one activity, behaves like C2 and DBOS. The difference therefore comes from **journal granularity, not from AgentFlow as a product**: a Temporal or DBOS application that makes every LLM call its own activity or step gets the same saving. All token figures are scripted estimates (n = 5 per condition, zero-variance by construction); no live provider was used.
 
 > [!NOTE]
 > Token counts are labelled estimates from the scripted research provider (`usageProvenance: "estimated-scripted-provider"`, word count × 1.35), not billed provider usage.
@@ -340,7 +349,7 @@ Use `--non-interactive` to skip the dashboard wait and `--no-keep-alive` to exit
 - **Testbed:** a single machine with containerized PostgreSQL and Redis. No network partitions or multi-node scheduling.
 - **Sample size:** campaigns run a small number of trials per condition. Intervals are 95% bootstrap (means) and Wilson (rates), and are descriptive when n is small.
 - **Baseline fidelity:** DBOS uses its real SDK, but on a matched common subset. C1 (Temporal-style) and C2 (LangGraph-style) are in-repo reimplementations of the relevant semantics, not the products, and none were tuned by their maintainers. A DBOS app that wraps each LLM call in its own step would behave like C1.
-- **Workload shape:** with one LLM call per AGENT step, per-call journaling (A1, C1) and per-step checkpointing (DBOS, C2) differ only when the crash lands between response and checkpoint (E2B).
+- **Workload shape:** with one LLM call per AGENT step, per-call journaling (A1, C1) and per-step checkpointing (DBOS, C2) differ only when the crash lands between response and checkpoint (E2B). The tool-research workload (five calls in one step) shows the repeated work growing with the calls already made, but it is one scripted workload with a fixed crash point (call 3), not a distribution of real agent traces.
 - **Pricing and caching assumptions:** cost figures depend on the operator-configured price table. Provider-side prompt caching (for example Groq's automatic cache) and its TTL can change billed input between otherwise identical runs.
 - **Tokenizers differ across providers:** token counts are compared between systems within one provider, never across providers.
 
@@ -470,10 +479,10 @@ The operations dashboard is served at `http://localhost:4173` and proxies `/api`
 PostgreSQL and Redis must be running; the integration suite truncates `agentflow_test` only, so test files run serially (`--no-file-parallelism`).
 
 ```powershell
-# Complete test suite: 294 unit + 61 integration, plus 3 live-Gemini and 3 live-Groq tests that run only when the key is configured
+# Complete test suite: 303 unit + 62 integration, plus 3 live-Gemini and 3 live-Groq tests that run only when the key is configured
 pnpm test
 
-# Fast in-memory unit tests only (294 tests, no Postgres/Redis required)
+# Fast in-memory unit tests only (303 tests, no Postgres/Redis required)
 pnpm exec vitest run tests/unit
 
 # Real PostgreSQL + Redis integration tests only
@@ -630,6 +639,7 @@ Real (measured):
 - **[`real-primary-matrix/`](evaluation-results/real-primary-matrix/):** 120 primary trials.
 - **[`real-a0-ablation/`](evaluation-results/real-a0-ablation/):** 15 A0 ablation trials.
 - **[`real-dbos-reference/`](evaluation-results/real-dbos-reference/):** 25 DBOS reference trials.
+- **[`real-tool-research/`](evaluation-results/real-tool-research/):** 120 multi-call workload trials (scripted; `token-report.md` has the per-system table). Its manifest records revision `f23f20e` plus uncommitted changes (the diff hash covers tracked files only, not the then-new `tool-research.ts`); the code that ran was committed without further edits as `afc1a46`.
 
 Simulated (modelled):
 - **[`e5-safety-1000/`](evaluation-results/e5-safety-1000/):** 4,000-trial E5 model sweep.

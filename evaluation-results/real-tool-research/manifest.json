@@ -1,0 +1,68 @@
+{
+  "campaign": "real-1795251594349-5b5c57cc",
+  "seed": 42,
+  "trials": 5,
+  "systems": [
+    "A1",
+    "A1-nojournal",
+    "C1",
+    "C1-step",
+    "C2",
+    "DBOS"
+  ],
+  "scenarios": [
+    "E0",
+    "E1",
+    "E2",
+    "E2B"
+  ],
+  "workload": "tool-research",
+  "callsPerRun": 5,
+  "crashTurn": 3,
+  "cacheScope": "off (workload definition)",
+  "context": "full",
+  "provider": "scripted",
+  "model": "tool-research-scripted-v1",
+  "sampling": {
+    "temperature": null,
+    "seed": null
+  },
+  "costGuard": {
+    "maxCampaignTokens": null,
+    "minTrialIntervalMs": 0
+  },
+  "sourceRevision": "f23f20e4207eaf65e557f5cf53cbba0457fd2c39",
+  "sourceDiffHash": "457569360be31edbec1e36f972c3ee2ed322353179c8ece59edaa339a883340a",
+  "node": "v24.11.1",
+  "hardware": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "logicalCpus": 12,
+    "memoryBytes": 16870006784
+  },
+  "corpusHash": "79b076dd173ee73b95f0c65627500bcd64042f6488cfeadafa2982cad31f4c9e",
+  "dbosVersion": "5.2.11",
+  "policy": {
+    "leaseMs": 1000,
+    "schedulerPollMs": 50,
+    "outboxPollMs": 20,
+    "retryInitialMs": 20,
+    "maxAttempts": 3,
+    "maxRestarts": 3,
+    "observationMs": 120000,
+    "workerConcurrency": 1,
+    "operationDelayMs": 0
+  },
+  "method": "real processes; PostgreSQL; BullMQ; shared deterministic corpus; scripted provider; independent receiver transaction",
+  "limitations": [
+    "Scripted provider token counts are estimates, not billed tokens",
+    "Instrumentation overhead is included",
+    "DBOS, C1 (Temporal-style) and C2 (LangGraph-style) are matched reimplementations of a common subset, not tuned by their maintainers",
+    "Serial trials include process startup",
+    "DBOS common subset uses durable steps and an external approval service",
+    "No production checkpoint grouping is changed",
+    "Receiver shares PostgreSQL with the runtime but commits independently"
+  ],
+  "manifestHash": "842dd6c5d1883408bae732ce1d31d4b0eb433d6eac71c9dc524d4423268b240f",
+  "spentTokens": 263560,
+  "stoppedByCostGuard": false
+}

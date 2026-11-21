@@ -1,0 +1,1940 @@
+{
+  "groups": [
+    {
+      "system": "A1",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2848,
+      "p95ElapsedMs": 2994.2,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 29.973160000000007,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5325,
+      "p95ElapsedMs": 5447.2,
+      "p95RecoveryMs": 2298.6,
+      "p95CheckpointMs": 28.967479999999973,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5235,
+      "p95ElapsedMs": 5787.400000000001,
+      "p95RecoveryMs": 2553,
+      "p95CheckpointMs": 34.012539999999895,
+      "repeatedLlmCalls": 5,
+      "journalReplays": 10,
+      "tokensSavedByReplay": 2955,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4734,
+      "p95ElapsedMs": 5477.799999999999,
+      "p95RecoveryMs": 2537.8,
+      "p95CheckpointMs": 28.854739999999936,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 15,
+      "tokensSavedByReplay": 4735,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1-nojournal",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 3020,
+      "p95ElapsedMs": 3035.3999999999996,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": 43.28814000000002,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1-nojournal",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5396,
+      "p95ElapsedMs": 5522.8,
+      "p95RecoveryMs": 2520.4,
+      "p95CheckpointMs": 30.909939999999814,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1-nojournal",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5856,
+      "p95ElapsedMs": 7487.599999999999,
+      "p95RecoveryMs": 3099.7999999999997,
+      "p95CheckpointMs": 40.05488000000005,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "A1-nojournal",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5603,
+      "p95ElapsedMs": 6071.8,
+      "p95RecoveryMs": 2917.3999999999996,
+      "p95CheckpointMs": 29.091940000000065,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2398,
+      "p95ElapsedMs": 2502.6,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4352,
+      "p95ElapsedMs": 4925.4,
+      "p95RecoveryMs": 2437,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5163,
+      "p95ElapsedMs": 6831.4,
+      "p95RecoveryMs": 3859.2,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 5,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4231,
+      "p95ElapsedMs": 6021.2,
+      "p95RecoveryMs": 3128.3999999999996,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1-step",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2634,
+      "p95ElapsedMs": 2724.2000000000003,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1-step",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4696,
+      "p95ElapsedMs": 4955.8,
+      "p95RecoveryMs": 2686.3999999999996,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1-step",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5061,
+      "p95ElapsedMs": 7435.4,
+      "p95RecoveryMs": 4517.4,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C1-step",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4461,
+      "p95ElapsedMs": 7741.4,
+      "p95RecoveryMs": 3372.7999999999997,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C2",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2249,
+      "p95ElapsedMs": 2344,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C2",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5120,
+      "p95ElapsedMs": 5603.2,
+      "p95RecoveryMs": 2808.2,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C2",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 4442,
+      "p95ElapsedMs": 5321.4,
+      "p95RecoveryMs": 2683.8,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "C2",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 5234,
+      "p95ElapsedMs": 6805.4,
+      "p95RecoveryMs": 3577.7999999999997,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E0",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 2725,
+      "p95ElapsedMs": 2919,
+      "p95RecoveryMs": null,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E1",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 7275,
+      "p95ElapsedMs": 8220.4,
+      "p95RecoveryMs": 4098,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 0,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E2",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 7478,
+      "p95ElapsedMs": 7774,
+      "p95RecoveryMs": 4109,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    },
+    {
+      "system": "DBOS",
+      "scenario": "E2B",
+      "trials": 5,
+      "completion": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "duplicateFree": {
+        "estimate": 1,
+        "lower": 0.5655175352168251,
+        "upper": 1,
+        "confidence": 0.95
+      },
+      "medianElapsedMs": 7384,
+      "p95ElapsedMs": 9617.2,
+      "p95RecoveryMs": 4308.8,
+      "p95CheckpointMs": null,
+      "repeatedLlmCalls": 15,
+      "journalReplays": 0,
+      "tokensSavedByReplay": 0,
+      "cacheHits": 0,
+      "tokensSavedByCache": 0,
+      "duplicates": 0,
+      "invalidApprovals": 0,
+      "committedReexecutions": 0,
+      "outcomes": {
+        "SUCCEEDED": 5
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "E0",
+      "baseline": "A1-nojournal",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -114.8,
+        "lower": -172.4,
+        "upper": -57.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E0",
+      "baseline": "C1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 407.8,
+        "lower": 213.8,
+        "upper": 601.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E0",
+      "baseline": "C1-step",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 290.8,
+        "lower": -17.6,
+        "upper": 597,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E0",
+      "baseline": "C2",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 616.6,
+        "lower": 503.4,
+        "upper": 723.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E0",
+      "baseline": "DBOS",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 101.8,
+        "lower": -47.6,
+        "upper": 251.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "A1-nojournal",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -5.2,
+        "lower": -203.6,
+        "upper": 194.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "C1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 807.4,
+        "lower": 374.2,
+        "upper": 1200.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "C1-step",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 643.8,
+        "lower": 287.8,
+        "upper": 970,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "C2",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 236,
+        "lower": -91.2,
+        "upper": 563.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E1",
+      "baseline": "DBOS",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -2178.4,
+        "lower": -2666.8,
+        "upper": -1765.4,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "A1-nojournal",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -528.8,
+        "lower": -1614.8,
+        "upper": 446.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "C1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -36.4,
+        "lower": -1082.4,
+        "upper": 868.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "C1-step",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -79,
+        "lower": -1298.4,
+        "upper": 944.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "C2",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 704.2,
+        "lower": 166,
+        "upper": 1142.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2",
+      "baseline": "DBOS",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -2077.2,
+        "lower": -2356.2,
+        "upper": -1783.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -2,
+        "lower": -2,
+        "upper": -2,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2B",
+      "baseline": "A1-nojournal",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -614.8,
+        "lower": -1158,
+        "upper": -126.8,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2B",
+      "baseline": "C1",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": 386.2,
+        "lower": -370.8,
+        "upper": 994.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": 0,
+        "lower": 0,
+        "upper": 0,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2B",
+      "baseline": "C1-step",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -323,
+        "lower": -1653.8000000000002,
+        "upper": 761.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2B",
+      "baseline": "C2",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -375.8,
+        "lower": -1527.4,
+        "upper": 541.2,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      }
+    },
+    {
+      "scenario": "E2B",
+      "baseline": "DBOS",
+      "pairs": 5,
+      "elapsedDifference": {
+        "estimate": -2778.2,
+        "lower": -4245.6,
+        "upper": -1621.6,
+        "confidence": 0.95
+      },
+      "repeatedCallsDifference": {
+        "estimate": -3,
+        "lower": -3,
+        "upper": -3,
+        "confidence": 0.95
+      }
+    }
+  ],
+  "tokenSummary": {
+    "rows": [
+      {
+        "system": "A1",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1-nojournal",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1-step",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C2",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "DBOS",
+        "scenario": "E0",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": null,
+        "p95RecoveryMs": null,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2217,
+        "p95RecoveryMs": 2298.6,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1-nojournal",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2290,
+        "p95RecoveryMs": 2520.4,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2111,
+        "p95RecoveryMs": 2437,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1-step",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2250,
+        "p95RecoveryMs": 2686.3999999999996,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C2",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2393,
+        "p95RecoveryMs": 2808.2,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "DBOS",
+        "scenario": "E1",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 3608,
+        "p95RecoveryMs": 4098,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2207,
+          "lower": 2207,
+          "upper": 2207,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 356,
+          "lower": 356,
+          "upper": 356,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 5,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2253,
+        "p95RecoveryMs": 2553,
+        "journalReplays": 10,
+        "tokensSavedByReplay": 2955,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1-nojournal",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2460,
+        "p95RecoveryMs": 3099.7999999999997,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2207,
+          "lower": 2207,
+          "upper": 2207,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 356,
+          "lower": 356,
+          "upper": 356,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 5,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2468,
+        "p95RecoveryMs": 3859.2,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1-step",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2140,
+        "p95RecoveryMs": 4517.4,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C2",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2209,
+        "p95RecoveryMs": 2683.8,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "DBOS",
+        "scenario": "E2",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 3851,
+        "p95RecoveryMs": 4109,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2133,
+        "p95RecoveryMs": 2537.8,
+        "journalReplays": 15,
+        "tokensSavedByReplay": 4735,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "A1-nojournal",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2137,
+        "p95RecoveryMs": 2917.3999999999996,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 1851,
+          "lower": 1851,
+          "upper": 1851,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 0,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 1958,
+        "p95RecoveryMs": 3128.3999999999996,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C1-step",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2260,
+        "p95RecoveryMs": 3372.7999999999997,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "C2",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 2751,
+        "p95RecoveryMs": 3577.7999999999997,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      },
+      {
+        "system": "DBOS",
+        "scenario": "E2B",
+        "trials": 5,
+        "succeeded": 5,
+        "failureRate": {
+          "estimate": 0,
+          "lower": 0,
+          "upper": 0.43448246478317476,
+          "confidence": 0.95
+        },
+        "billedPerSuccessfulRun": {
+          "estimate": 2798,
+          "lower": 2798,
+          "upper": 2798,
+          "confidence": 0.95
+        },
+        "repeatedTokensPerRun": {
+          "estimate": 947,
+          "lower": 947,
+          "upper": 947,
+          "confidence": 0.95
+        },
+        "repeatedLlmCalls": 15,
+        "duplicateEffects": 0,
+        "committedReexecutions": 0,
+        "p50RecoveryMs": 3729,
+        "p95RecoveryMs": 4308.8,
+        "journalReplays": 0,
+        "tokensSavedByReplay": 0,
+        "cacheHits": 0,
+        "tokensSavedByCache": 0,
+        "rateLimitedCalls": 0
+      }
+    ],
+    "headlines": [
+      "Under E0, AgentFlow A1 repeated 0 (95% CI 0–0) estimated tokens per run versus 0 (95% CI 0–0) for A1 without journal replay (tied with it), 0 (95% CI 0–0) for C1 (Temporal-style) (tied with it), 0 (95% CI 0–0) for C1-step (Temporal-style, agent loop as one activity) (tied with it), 0 (95% CI 0–0) for C2 (LangGraph-style) (tied with it), 0 (95% CI 0–0) for DBOS (tied with it) (n=5 per system; scripted provider; estimated token counts from the scripted provider, not billed usage).",
+      "Under E1, AgentFlow A1 repeated 0 (95% CI 0–0) estimated tokens per run versus 0 (95% CI 0–0) for A1 without journal replay (tied with it), 0 (95% CI 0–0) for C1 (Temporal-style) (tied with it), 0 (95% CI 0–0) for C1-step (Temporal-style, agent loop as one activity) (tied with it), 0 (95% CI 0–0) for C2 (LangGraph-style) (tied with it), 0 (95% CI 0–0) for DBOS (tied with it) (n=5 per system; scripted provider; estimated token counts from the scripted provider, not billed usage).",
+      "Under E2, AgentFlow A1 repeated 356 (95% CI 356–356) estimated tokens per run versus 947 (95% CI 947–947) for A1 without journal replay (fewer than it), 356 (95% CI 356–356) for C1 (Temporal-style) (tied with it), 947 (95% CI 947–947) for C1-step (Temporal-style, agent loop as one activity) (fewer than it), 947 (95% CI 947–947) for C2 (LangGraph-style) (fewer than it), 947 (95% CI 947–947) for DBOS (fewer than it) (n=5 per system; scripted provider; estimated token counts from the scripted provider, not billed usage).",
+      "Under E2B, AgentFlow A1 repeated 0 (95% CI 0–0) estimated tokens per run versus 947 (95% CI 947–947) for A1 without journal replay (fewer than it), 0 (95% CI 0–0) for C1 (Temporal-style) (tied with it), 947 (95% CI 947–947) for C1-step (Temporal-style, agent loop as one activity) (fewer than it), 947 (95% CI 947–947) for C2 (LangGraph-style) (fewer than it), 947 (95% CI 947–947) for DBOS (fewer than it) (n=5 per system; scripted provider; estimated token counts from the scripted provider, not billed usage)."
+    ]
+  }
+}

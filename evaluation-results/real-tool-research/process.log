@@ -1,0 +1,4575 @@
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E0-0-DBOS baseline (node:1980) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E0-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E0-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E0-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E0-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E0-1-DBOS baseline (node:23396) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E0-1-DBOS baseline Initializing DBOS (v5.2.11)
+System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E0-1-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E0-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline (node:4860) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E0-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E0-3-DBOS baseline (node:23264) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E0-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E0-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E0-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E0-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E0-4-DBOS baseline (node:17028) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E0-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E0-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E0-4-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E0-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline (node:8296) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline (node:20740) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-0-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E1-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline (node:17772) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline (node:8964) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-1-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E1-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline (node:2368) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline (node:3512) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-2-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E1-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline (node:8572) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline (node:2796) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Initializing DBOS (v5.2.11)
+System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-3-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E1-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline (node:15520) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline (node:23168) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E1-4-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E1-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline (node:3496) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline (node:15092) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-0-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline (node:11936) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline (node:21904) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-1-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline (node:10248) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline (node:22224) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-2-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline (node:17124) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline (node:17748) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-3-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline (node:6768) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline (node:20788) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2-4-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline (node:22860) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline (node:8648) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-0-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2B-0-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline (node:2624) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline (node:21640) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-1-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2B-1-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline (node:5456) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline No workflows to recover from application version acceptance-v1
+DBOS launched!
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline (node:14192) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-2-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2B-2-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline (node:16132) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline (node:13924) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-3-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2B-3-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 1,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 0,
+  dueRetries: 1,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc api Scheduling repair completed {
+  expiredApprovals: 0,
+  expiredLeases: 0,
+  unknownEffects: 0,
+  recoveredDispatches: 1,
+  dueRetries: 0,
+  timedOutRuns: 0,
+  settledCancellations: 0,
+  failedOperations: 0,
+  timedOutAttempts: 0
+}
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline (node:23432) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+Executor ID: local
+Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline No workflows to recover from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline (node:23500) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Initializing DBOS (v5.2.11)
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline System Database URL: postgresql://agentflow:***@localhost:5432/agentflow_reference_eval
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Executor ID: local
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Application version: acceptance-v1
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Recovering 1 workflows from application version acceptance-v1
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline DBOS launched!
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Listening to 0 queues:
+real-1795251594349-5b5c57cc-E2B-4-DBOS baseline Workflow (real-1795251594349-5b5c57cc-E2B-4-DBOS) already exists in queue: _dbos_internal_queue, but the provided queue name is: undefined. The queue is not updated. Error
+    at SystemDatabase.#initWorkflowStatusInternal (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1426:180)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SystemDatabase.initWorkflowStatusStandalone (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1332:22)
+    at async SystemDatabase.descriptor.value (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:928:18)
+    at async SystemDatabase.initWorkflowStatus (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\system_database.ts:1315:12)
+    at async DBOSExecutor.internalWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos-executor.ts:676:18)
+    at async DBOS.#invokeWorkflow (D:\Projects\AgentFlow\node_modules\.pnpm\@dbos-inc+dbos-sdk@5.2.11\node_modules\@dbos-inc\dbos-sdk\src\dbos.ts:1887:14)
+    at async <anonymous> (D:\Projects\AgentFlow\packages\evaluation\src\real-child.ts:183:22)
