@@ -32,7 +32,8 @@ export type ExecutionFaultBoundary =
   | "after-checkpoint-commit";
 
 export interface ExecutionFaultHooks {
-  hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation): void | Promise<void>;
+  /** `detail.turn` is set at the per-LLM-call boundaries of an agent loop (1-based). */
+  hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation, detail?: { turn?: number }): void | Promise<void>;
 }
 
 function hash(value: unknown): string {

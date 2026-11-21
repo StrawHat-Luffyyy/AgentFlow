@@ -53,10 +53,13 @@ export function createProcessFaultHooks(
     throw new Error("SIGKILL did not terminate the worker");
   });
   return {
-    hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation): void {
+    hit(boundary: ExecutionFaultBoundary, operation: ClaimedOperation, detail?: { turn?: number }): void {
       if (boundary === "completion-start") return;
       try {
-        controller.hit(boundary, operation.nodeKey, (options.now ?? Date.now)() - startedAt);
+        const elapsedMs = (options.now ?? Date.now)() - startedAt;
+        // "investigate#3" targets the third LLM call of an agent loop; a bare step key matches any call.
+        if (detail?.turn !== undefined) controller.hit(boundary, `${operation.nodeKey}#${detail.turn}`, elapsedMs);
+        controller.hit(boundary, operation.nodeKey, elapsedMs);
       } catch (error) {
         if (!(error instanceof InjectedFault)) throw error;
         if (error.action === "crash") terminate();

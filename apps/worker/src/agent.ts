@@ -151,7 +151,7 @@ export async function executeBoundedAgentOperation(
             signal: controller.signal,
           },
         });
-        await faultHooks?.hit("after-provider-response", operation);
+        await faultHooks?.hit("after-provider-response", operation, { turn });
       } catch (error) {
         const providerError = error instanceof ProviderError ? error : null;
         await failHarnessLlmOperation(database, operation, llm.providerCallId, {
@@ -188,7 +188,7 @@ export async function executeBoundedAgentOperation(
         throw mapHarnessError(error);
       }
       // The response is now journalled: a crash from here on replays it instead of re-calling the provider.
-      await faultHooks?.hit("after-llm-journal-commit", operation);
+      await faultHooks?.hit("after-llm-journal-commit", operation, { turn });
     }
 
     if (response.toolCalls.length === 0) {

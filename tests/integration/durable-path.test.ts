@@ -18,7 +18,10 @@ import {
   type LLMResponse,
 } from "@agentflow/harness";
 import { defaultWorkflowDefinition } from "@agentflow/shared";
-import { ScriptedResearchProvider, ensureCloudComparisonWorkflow, fixedSourceContentHash } from "@agentflow/research";
+import {
+  ScriptedResearchProvider, ScriptedToolResearchProvider, ensureCloudComparisonWorkflow, fixedSourceContentHash, readSourceTool,
+  toolResearchAnswer, toolResearchWorkflowDefinition,
+} from "@agentflow/research";
 import {
   beginHarnessLlmOperation,
   claimOperation,
@@ -1390,6 +1393,67 @@ describe("durable API → outbox → BullMQ → worker path", () => {
       };
       expect(await retriedCalls("journal-ablation-default", undefined, undefined)).toBe(0);
       expect(await retriedCalls("journal-ablation-off", "off", false)).toBe(1);
+    } finally {
+      await worker.resume();
+    }
+  }, 30_000);
+
+  it("replays the journalled calls of a multi-call agent loop after a crash at call 3 and calls the provider only for calls 4-5", async () => {
+    await worker.pause();
+    try {
+      const investigate = toolResearchWorkflowDefinition().steps.find((step) => step.kind === "AGENT")!;
+      // Same agent step as the tool-research workload, without the upstream corpus steps.
+      const { inputs: _inputs, ...step } = investigate as typeof investigate & { inputs?: string[] };
+      const workflow = await request<{ id: string }>("/workflows", {
+        method: "POST", body: JSON.stringify({ name: "multi-call-journal", description: "Multi-call replay" }),
+      });
+      const version = await request<{ id: string }>(`/workflows/${workflow.id}/versions`, {
+        method: "POST", body: JSON.stringify({ version: 1, definition: { cacheScope: "off", steps: [step] } }),
+      });
+      const created = await request<{ id: string }>("/runs", {
+        method: "POST",
+        body: JSON.stringify({ workflowVersionId: version.id, input: { topic: "multi-call" },
+          retryPolicy: { maxAttempts: 3, initialBackoffMs: 0, multiplier: 1, maxBackoffMs: 0 } }),
+      });
+      const attempt = async (faultHooks?: ExecutionFaultHooks) => {
+        const row = await database.query<{ id: string; dispatch_generation: number }>(
+          "SELECT id, dispatch_generation FROM workflow_steps WHERE run_id = $1", [created.id]);
+        const scripted = new ScriptedToolResearchProvider();
+        const turns: number[] = [];
+        const counting = Object.assign(Object.create(scripted) as ScriptedToolResearchProvider, {
+          execute: (request: Parameters<ScriptedToolResearchProvider["execute"]>[0], context: Parameters<ScriptedToolResearchProvider["execute"]>[1]) => {
+            turns.push(request.messages.filter((message) => message.role === "assistant").length + 1);
+            return scripted.execute(request, context);
+          },
+        });
+        const result = await processOperationJob(
+          database, "multi-call-worker", 15_000,
+          { data: { runId: created.id, operationId: row.rows[0]!.id, workflowVersionId: version.id, dispatchGeneration: row.rows[0]!.dispatch_generation } } as Job,
+          5_000, 60_000, new AgentHarness(new ProviderRegistry().register(counting), new ToolRegistry().register(readSourceTool)), faultHooks,
+        );
+        return { result, turns, stepId: row.rows[0]!.id };
+      };
+      // Attempt 1 journals calls 1-3 and their tool results, then fails right after call 3 commits.
+      const first = await attempt({
+        hit(boundary, _operation, detail) {
+          if (boundary === "after-llm-journal-commit" && detail?.turn === 3) throw new RetryableOperationError("injected", "INJECTED_TRANSIENT");
+        },
+      });
+      expect(first).toMatchObject({ turns: [1, 2, 3], result: { failed: true } });
+      await database.query("UPDATE workflow_steps SET next_attempt_at = now() - interval '1 second' WHERE id = $1", [first.stepId]);
+      await repairScheduling(database, 10_000);
+      const second = await attempt();
+      expect(second.result).toMatchObject({ runCompleted: true });
+      expect(second.turns).toEqual([4, 5]);
+      const operations = await database.query<{ ordinal: number; kind: string; status: string }>(
+        "SELECT ordinal, kind, status FROM harness_operations WHERE step_id = $1 ORDER BY ordinal", [first.stepId]);
+      expect(operations.rows.map((operation) => `${operation.ordinal}:${operation.kind}`)).toEqual(
+        ["0:LLM", "1:TOOL", "2:LLM", "3:TOOL", "4:LLM", "5:TOOL", "6:LLM", "7:TOOL", "8:LLM"]);
+      expect(operations.rows.every((operation) => operation.status === "SUCCEEDED")).toBe(true);
+      const usage = await request<{ summary: { billedCalls: number; replayedCalls: number } }>(`/runs/${created.id}/usage`);
+      expect(usage.summary).toMatchObject({ billedCalls: 5, replayedCalls: 3 });
+      const run = await request<{ steps: Array<{ acceptedOutput: { investigation: { content: string; turns: number } } }> }>(`/runs/${created.id}`);
+      expect(run.steps[0]!.acceptedOutput.investigation).toMatchObject({ content: toolResearchAnswer, turns: 5 });
     } finally {
       await worker.resume();
     }

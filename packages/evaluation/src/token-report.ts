@@ -39,6 +39,9 @@ export interface TokenManifest {
   model?: string;
   context?: string;
   cacheScope?: string;
+  workload?: string;
+  callsPerRun?: number;
+  crashTurn?: number;
 }
 
 export interface TokenRow {
@@ -105,6 +108,7 @@ export function provenanceLabel(trials: readonly TokenTrial[], manifest: TokenMa
 const systemNames: Record<string, string> = {
   DBOS: "DBOS",
   C1: "C1 (Temporal-style)",
+  "C1-step": "C1-step (Temporal-style, agent loop as one activity)",
   C2: "C2 (LangGraph-style)",
   B0: "B0 (volatile)",
   B1: "B1 (volatile, idempotent receiver)",
@@ -165,6 +169,7 @@ export function renderTokenReport(trials: readonly TokenTrial[], manifest: Token
     "",
     `- Provider: ${manifest.provider ?? "scripted"}${manifest.model ? ` (${manifest.model})` : ""}${models.length ? `; resolved models: ${models.join(", ")}` : ""}`,
     `- Token provenance: ${label}`,
+    `- Workload: ${manifest.workload ?? "cloud-comparison"}${manifest.callsPerRun ? ` (${manifest.callsPerRun} LLM calls in one agent step${manifest.crashTurn ? `; E2/E2B crash after call ${manifest.crashTurn}` : ""})` : " (one LLM call per agent step)"}`,
     `- Context: ${manifest.context ?? "full"}; cache scope: ${manifest.cacheScope ?? "default (run)"}`,
     "- Token counts are compared within this provider only; tokenizers differ across providers.",
     "",
@@ -176,7 +181,7 @@ export function renderTokenReport(trials: readonly TokenTrial[], manifest: Token
     "",
     ...table,
     "",
-    "Repeated tokens are the tokens of LLM results beyond the first per operation in a run, i.e. work paid for again. Journal and cache savings are reported separately and are never subtracted from these figures.",
+    "Repeated tokens are the tokens of LLM results beyond the first per LLM call (a step and its turn) in a run, i.e. work paid for again. Journal and cache savings are reported separately and are never subtracted from these figures.",
     "",
   ].join("\n");
   return { markdown, rows, headlines };

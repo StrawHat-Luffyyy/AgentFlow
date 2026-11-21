@@ -55,11 +55,18 @@ const activityHistory = {
   },
 };
 
-async function runTemporalStyle(): Promise<void> {
-  const llmRecorder: LlmRecorder = {
+/**
+ * Temporal-style workflow. C1 records every LLM call and agent tool call as its own activity;
+ * C1-step (perCallActivities false) records only whole steps, so an agent loop that crashes
+ * mid-way re-runs from its first call.
+ */
+async function runTemporalStyle(perCallActivities: boolean): Promise<void> {
+  const llmRecorder: LlmRecorder | undefined = perCallActivities ? {
     lookup: (key) => activityHistory.get<LLMResponse>(`llm:${key}`),
     store: (key, response) => activityHistory.put(`llm:${key}`, response),
-  };
+    lookupTool: (key) => activityHistory.get<Record<string, unknown>>(`tool:${key}`),
+    storeTool: (key, output) => activityHistory.put(`tool:${key}`, output),
+  } : undefined;
   let state: Record<string, unknown> = initialInput;
   for (const step of definition.steps) {
     const key = `step:${step.key}`;
@@ -69,7 +76,7 @@ async function runTemporalStyle(): Promise<void> {
       await evidence.event("activity-replayed", step.key, { activityKey: key });
       continue;
     }
-    state = await boundedOperation(step, state, { llmRecorder });
+    state = await boundedOperation(step, state, llmRecorder ? { llmRecorder } : {});
     await activityHistory.put(key, state);
     await evidence.event("reference-checkpoint", step.key);
   }
@@ -125,11 +132,11 @@ if (role === "api") {
 } else if (role === "worker") {
   const starts = new Map<string, number>();
   const hooks: ExecutionFaultHooks = {
-    async hit(boundary, operation) {
+    async hit(boundary, operation, call) {
       if (boundary === "completion-start") { starts.set(operation.operationId, performance.now()); return; }
       const detail = boundary === "after-checkpoint-commit"
         ? { checkpointMs: performance.now() - starts.get(operation.operationId)!, operationId: operation.operationId }
-        : { operationId: operation.operationId, attempt: operation.attemptNo };
+        : { operationId: operation.operationId, attempt: operation.attemptNo, ...(call?.turn === undefined ? {} : { turn: call.turn }) };
       if (boundary === "before-checkpoint-commit") return;
       await evidence.boundary(boundary, operation.nodeKey, detail);
     },
@@ -177,8 +184,8 @@ if (role === "api") {
       await handle.getResult();
       await evidence.event("reference-steps", null, await DBOS.listWorkflowSteps(handle.workflowID));
       await DBOS.shutdown();
-    } else if (config.system === "C1") {
-      await runTemporalStyle();
+    } else if (config.system === "C1" || config.system === "C1-step") {
+      await runTemporalStyle(config.system === "C1");
     } else if (config.system === "C2") {
       await runCheckpointerStyle();
     } else {

@@ -6,12 +6,13 @@ import { join, resolve } from "node:path";
 import { cpus, totalmem } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { migrate } from "@agentflow/db";
-import { cloudComparisonCorpusHash } from "@agentflow/research";
+import { TOOL_RESEARCH_STEP, cloudComparisonCorpusHash, toolResearchAnswer, toolResearchCallsPerRun } from "@agentflow/research";
 import { modelPriceTableSchema } from "@agentflow/shared";
 import { SeededRandom } from "./random.js";
 import { quantile, wilsonInterval, pairedBootstrapInterval } from "./statistics.js";
 import { Evidence, evidenceDatabase, installEvidenceSchema, isAgentFlowSystem, publicationTarget, digest, realScenarios, realSystems,
-  referenceDefinition, e8RejectedCalls, type RealConfig, type RealProvider, type RealScenario, type RealSystem } from "./real-common.js";
+  referenceDefinition, e8RejectedCalls, realWorkloads, toolResearchScenarios,
+  type RealConfig, type RealProvider, type RealScenario, type RealSystem, type RealWorkload } from "./real-common.js";
 import { llmEventMetrics } from "./real-metrics.js";
 import { costGuardTripped, projectCampaign, renderProjection } from "./campaign-plan.js";
 import { writeTokenReport } from "./token-report.js";
@@ -49,6 +50,19 @@ const model = argument("--model", defaultModel);
 const maxCampaignTokensArgument = argument("--max-campaign-tokens", "");
 const maxCampaignTokens = maxCampaignTokensArgument === "" ? null : Number(maxCampaignTokensArgument);
 const minTrialIntervalMs = Number(argument("--min-trial-interval-ms", "0"));
+// Workload (see realWorkloads). tool-research: one agent step, five LLM calls; scripted only.
+const workloadArgument = argument("--workload", "cloud-comparison");
+if (!(realWorkloads as readonly string[]).includes(workloadArgument)) throw new Error(`--workload must be ${realWorkloads.join(" or ")}`);
+const workload = workloadArgument as RealWorkload;
+const crashTurn = Number(argument("--crash-turn", "3"));
+if (workload === "tool-research") {
+  if (provider !== "scripted") throw new Error("--workload tool-research runs on the scripted provider only");
+  if (!Number.isInteger(crashTurn) || crashTurn < 1 || crashTurn > toolResearchCallsPerRun) {
+    throw new Error(`--crash-turn must be 1..${toolResearchCallsPerRun}`);
+  }
+  const unsupported = scenarios.filter((s) => !toolResearchScenarios.includes(s));
+  if (unsupported.length) throw new Error(`--workload tool-research supports ${toolResearchScenarios.join(", ")} (not ${unsupported.join(", ")})`);
+}
 const dryRun = process.argv.includes("--dry-run");
 if (!Number.isInteger(trials) || trials < 1 || !Number.isInteger(seed) ||
     systems.some((s) => !(realSystems as readonly string[]).includes(s)) ||
@@ -64,7 +78,8 @@ if (dryRun) {
   const definitionProvider = provider === "scripted" ? "scripted-research" : provider;
   const price = prices[`${definitionProvider}/${provider === "scripted" ? "cloud-comparison-scripted-v1" : model}`] ?? null;
   const tokensPerCall = Number(argument("--tokens-per-call", provider === "scripted" ? "360" : "2000"));
-  const shape = { systems, scenarios, trials, tokensPerCall, e8RejectedCalls };
+  const shape = { systems, scenarios, trials, tokensPerCall, e8RejectedCalls,
+    ...(workload === "tool-research" ? { callsPerRun: toolResearchCallsPerRun } : {}) };
   console.log(renderProjection(shape, projectCampaign(shape, price), `${provider}${model ? ` ${model}` : ""}, context ${context}`));
   if (maxCampaignTokens !== null) console.log(`Cost guard: the campaign stops before the next trial once ${maxCampaignTokens} reported tokens are spent.`);
   process.exit(0);
@@ -88,6 +103,7 @@ const base: RealConfig = {
   leaseMs: Number(argument("--lease-ms", "1000")), retryMs: 20,
   operationDelayMs: Number(argument("--operation-delay-ms", defaultDelayMs)), observationMs: Number(argument("--observation-ms", isDemo ? "600000" : "120000")),
   apiPort, context, provider, ...(model ? { model } : {}),
+  ...(workload === "tool-research" ? { workload, crashTurn } : {}),
 };
 if (!new URL(base.dbosUrl).pathname.endsWith("_eval")) throw new Error("DBOS database must end in _eval");
 await mkdir(output, { recursive: true });
@@ -346,8 +362,12 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
     missingEffects: state.approved_hash && effects.length === 0 ? 1 : 0,
     invalidApprovalExecutions: effects.filter((e) => !state.approved_hash || e.request_hash !== state.approved_hash).length,
     checkpointBytes, checkpointMs: events.filter((e) => e.event === "after-checkpoint-commit").map((e) => e.detail.checkpointMs as number),
-    recoveryMs, correctReport: effects.some((e) => e.payload_json.report?.citations?.length === 6 &&
-      createHash("sha256").update(e.payload_json.report.content).digest("hex") === e.payload_json.report.sha256),
+    recoveryMs, correctReport: workload === "tool-research"
+      // No report is published: the run is correct when it succeeded and its final call returned the scripted answer.
+      ? outcome === "SUCCEEDED" && events.some((e) => e.event === "provider-result" && e.operation === TOOL_RESEARCH_STEP &&
+        e.detail.turn === toolResearchCallsPerRun && e.detail.outputHash === digest(toolResearchAnswer))
+      : effects.some((e) => e.payload_json.report?.citations?.length === 6 &&
+        createHash("sha256").update(e.payload_json.report.content).digest("hex") === e.payload_json.report.sha256),
     faultCount: events.filter((e) => e.event === "fault").length, error,
   };
   results.push(measurement);
@@ -360,8 +380,10 @@ async function trial(system: RealSystem, scenario: RealScenario, index: number):
 let revision = "unknown";
 try { revision = execFileSync("git", ["rev-parse","HEAD"], { encoding: "utf8" }).trim(); } catch {}
 const sampling = referenceDefinition(base).steps.find((step) => step.kind === "AGENT");
-const manifest = { campaign, seed, trials, systems, scenarios, cacheScope: cacheScope || "default (run)", context,
-  provider, model: model || "cloud-comparison-scripted-v1",
+const manifest = { campaign, seed, trials, systems, scenarios, workload,
+  ...(workload === "tool-research" ? { callsPerRun: toolResearchCallsPerRun, crashTurn } : {}),
+  cacheScope: workload === "tool-research" ? "off (workload definition)" : cacheScope || "default (run)", context,
+  provider, model: model || (workload === "tool-research" ? "tool-research-scripted-v1" : "cloud-comparison-scripted-v1"),
   sampling: sampling?.kind === "AGENT" ? { temperature: sampling.temperature ?? null, seed: sampling.seed ?? null } : null,
   costGuard: { maxCampaignTokens, minTrialIntervalMs }, sourceRevision: revision, sourceDiffHash: digest(execFileSync("git",["diff"],{encoding:"utf8"})),
   node: process.version, hardware: { cpu: cpus()[0]?.model, logicalCpus: cpus().length, memoryBytes: totalmem() },

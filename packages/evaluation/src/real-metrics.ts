@@ -13,7 +13,7 @@ export interface LlmEventMetrics {
   outputTokens: number;
   /** Input + output of every provider result, i.e. what the provider billed (or estimated). */
   billedTokens: number;
-  /** Tokens of results beyond the first per operation: work paid for twice. */
+  /** Tokens of results beyond the first per LLM call (step + turn): work paid for twice. */
   repeatedTokens: number;
   /** Provider calls that returned no result (errors), and how many of those were HTTP 429. */
   providerErrors: number;
@@ -29,10 +29,13 @@ export function llmEventMetrics(events: readonly EvaluationEventLike[]): LlmEven
   const errors = events.filter((e) => e.event === "provider-error");
   const tokensOf = (e: EvaluationEventLike) =>
     (e.detail.usage?.inputTokens ?? 0) + (e.detail.usage?.outputTokens ?? 0);
+  // One logical LLM call = a step plus its 1-based turn in the agent loop. Events recorded
+  // before turns were tracked have no turn: they were all single-call steps, so turn 1.
+  const callKey = (e: EvaluationEventLike) => `${e.operation ?? ""}#${Number(e.detail.turn ?? 1)}`;
   const seen = new Set<string>();
   let repeatedTokens = 0;
   for (const result of results) {
-    const key = result.operation ?? "";
+    const key = callKey(result);
     if (seen.has(key)) repeatedTokens += tokensOf(result);
     seen.add(key);
   }
@@ -40,7 +43,7 @@ export function llmEventMetrics(events: readonly EvaluationEventLike[]): LlmEven
   const outputTokens = results.reduce((sum, e) => sum + (e.detail.usage?.outputTokens ?? 0), 0);
   return {
     llmCalls: starts.length,
-    repeatedLlmCalls: starts.length - new Set(starts.map((e) => e.operation)).size,
+    repeatedLlmCalls: starts.length - new Set(starts.map(callKey)).size,
     inputTokens,
     outputTokens,
     billedTokens: inputTokens + outputTokens,

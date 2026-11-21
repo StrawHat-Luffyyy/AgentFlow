@@ -9,7 +9,7 @@ import {
   ProviderRegistry,
   ToolRegistry,
 } from "@agentflow/harness";
-import { ScriptedResearchProvider } from "@agentflow/research";
+import { readSourceTool, ScriptedResearchProvider, ScriptedToolResearchProvider } from "@agentflow/research";
 import { recordWorkerHeartbeat } from "@agentflow/runtime";
 import type { ConnectionOptions } from "bullmq";
 import { advertisedProviders, startHeartbeat } from "./heartbeat.js";
@@ -30,7 +30,8 @@ const database = createDatabase(config.DATABASE_URL);
 await migrate(database);
 
 const providers = new ProviderRegistry()
-  .register(new ScriptedResearchProvider());
+  .register(new ScriptedResearchProvider())
+  .register(new ScriptedToolResearchProvider());
 if (config.GEMINI_API_KEY) {
   providers.register(new GeminiProvider({
     apiKey: config.GEMINI_API_KEY,
@@ -43,7 +44,8 @@ if (config.GROQ_API_KEY) {
     model: config.GROQ_MODEL,
   }));
 }
-const harness = new AgentHarness(providers, new ToolRegistry());
+// read-source is a PURE fixed-corpus lookup used by the tool-research evaluation workload.
+const harness = new AgentHarness(providers, new ToolRegistry().register(readSourceTool));
 const faultPlan = process.env.AGENTFLOW_FAULT_PLAN;
 const faultHooks = faultPlan ? createProcessFaultHooks(parseFaultPlan(faultPlan)) : undefined;
 
@@ -77,6 +79,7 @@ const heartbeat = startHeartbeat({
     gemini: [config.GEMINI_MODEL],
     groq: [config.GROQ_MODEL],
     "scripted-research": ["cloud-comparison-scripted-v1"],
+    "scripted-tool-research": ["tool-research-scripted-v1"],
   }),
   write: (advertised) => recordWorkerHeartbeat(database, { workerId: config.WORKER_ID, providers: advertised }),
 });
